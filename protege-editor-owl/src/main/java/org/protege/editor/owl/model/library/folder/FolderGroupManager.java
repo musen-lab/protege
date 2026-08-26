@@ -69,7 +69,7 @@ public class FolderGroupManager extends CatalogEntryManager {
 
     public FolderGroupManager() {
         algorithms = new HashSet<>();
-        algorithms.add(new XmlBaseAlgorithm());
+        algorithms.add(new OntologyIriExtractionAlgorithm());
     }
 
     public static GroupEntry createGroupEntry(URI folder,
