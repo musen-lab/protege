@@ -7,6 +7,7 @@ import org.protege.editor.core.ui.preferences.PreferencesLayoutPanel;
 import org.protege.editor.core.ui.view.View;
 import org.protege.editor.owl.model.axiom.FreshAxiomLocation;
 import org.protege.editor.owl.model.axiom.FreshAxiomLocationPreferences;
+import org.protege.editor.owl.model.declaration.DeclarationSynthesisPreferences;
 import org.protege.editor.owl.model.search.SearchManagePluginListCellRenderer;
 import org.protege.editor.owl.model.search.SearchManagerPlugin;
 import org.protege.editor.owl.model.search.SearchManagerSelector;
@@ -35,6 +36,22 @@ public class GeneralPreferencesPanel extends OWLPreferencesPanel {
 
     private static final String SECOND_TOOL_TIP = "1000 = 1 second";
 
+    private static final String KEEP_DECLARATIONS_LABEL =
+            "Keep entity declarations in the ontology that defines the entity";
+
+    private static final String KEEP_DECLARATIONS_TOOL_TIP =
+            "<html>For modular ontologies, where a term should be declared by the module that owns "
+                    + "it.<br><br>"
+                    + "When this is ticked, saving to RDF/XML or Turtle writes a declaration only for "
+                    + "an entity this ontology declares itself.  An entity it merely refers to is left "
+                    + "to the ontology that owns it, instead of being claimed here.<br>"
+                    + "A declaration the ontology states explicitly is always written, even when an "
+                    + "import carries it too.<br><br>"
+                    + "This matters most when editing a module whose imports are not loaded, where "
+                    + "every borrowed term otherwise looks undeclared.<br><br>"
+                    + "The OWL API also adds a comment to files saved this way, noting that type "
+                    + "declarations were not added automatically.</html>";
+
     private JCheckBox alwaysCentreDialogsCheckbox;
 
     private JCheckBox detachedWindowsFloat;
@@ -42,6 +59,8 @@ public class GeneralPreferencesPanel extends OWLPreferencesPanel {
     private JRadioButton addFreshAxiomsToActiveOntologyRadioButton;
 
     private JRadioButton addFreshAxiomsToSubjectDefiningOntology;
+
+    private JCheckBox keepDeclarationsInDefiningOntologyCheckBox;
 
 
     private JCheckBox autoExpandEnabledCheckBox;
@@ -72,6 +91,9 @@ public class GeneralPreferencesPanel extends OWLPreferencesPanel {
         else if (addFreshAxiomsToSubjectDefiningOntology.isSelected()) {
             axiomPrefs.setFreshAxiomLocation(FreshAxiomLocation.SUBJECT_DEFINING_ONTOLOGY);
         }
+
+        DeclarationSynthesisPreferences.getPreferences().setKeepDeclarationsInDefiningOntology(
+                keepDeclarationsInDefiningOntologyCheckBox.isSelected());
 
         OWLTreePreferences prefs = OWLTreePreferences.getInstance();
         prefs.setAutoExpansionEnabled(autoExpandEnabledCheckBox.isSelected());
@@ -120,6 +142,16 @@ public class GeneralPreferencesPanel extends OWLPreferencesPanel {
         panel.addGroup("Axioms");
         panel.addGroupComponent(addFreshAxiomsToActiveOntologyRadioButton);
         panel.addGroupComponent(addFreshAxiomsToSubjectDefiningOntology);
+
+        // Declarations
+
+        keepDeclarationsInDefiningOntologyCheckBox = new JCheckBox(KEEP_DECLARATIONS_LABEL,
+                DeclarationSynthesisPreferences.getPreferences().isKeepDeclarationsInDefiningOntology());
+        keepDeclarationsInDefiningOntologyCheckBox.setToolTipText(KEEP_DECLARATIONS_TOOL_TIP);
+
+        panel.addSeparator();
+        panel.addGroup("Declarations");
+        panel.addGroupComponent(keepDeclarationsInDefiningOntologyCheckBox);
 
 
         // Tree preferences
