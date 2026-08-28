@@ -1,0 +1,33 @@
+@prefix : <http://example.invalid/declarations/module#> .
+@prefix base: <http://example.invalid/declarations/base#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@base <http://example.invalid/declarations/module> .
+
+<http://example.invalid/declarations/module> rdf:type owl:Ontology ;
+    owl:imports <http://example.invalid/declarations/base> .
+
+#################################################################
+#    One entity per row of the acceptance table
+#################################################################
+
+###  Declared here and nowhere else.  Must always be written.
+:LocalTerm rdf:type owl:Class ;
+    rdfs:subClassOf base:Borrowed ,
+                    base:BaseOnly .
+
+###  Declared here, and the import declares it too.  Must still be written:
+###  Protege does not judge whether a declaration belongs where it sits.
+base:SharedTerm rdf:type owl:Class .
+
+###  Declared here although the import owns the namespace.  Must still be written.
+base:MisplacedTerm rdf:type owl:Class .
+
+###  base:Borrowed is referenced by :LocalTerm above and declared nowhere.
+###  This is the only declaration Protege invents, and the only one the
+###  setting suppresses.
+
+###  base:BaseOnly is referenced above and declared in the import, so the OWL API
+###  never invents a declaration for it either way.

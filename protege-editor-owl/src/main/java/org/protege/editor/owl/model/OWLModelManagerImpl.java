@@ -9,6 +9,8 @@ import org.protege.editor.owl.model.cache.OWLEntityRenderingCache;
 import org.protege.editor.owl.model.cache.OWLEntityRenderingCacheImpl;
 import org.protege.editor.owl.model.cache.OWLObjectRenderingCache;
 import org.protege.editor.owl.model.classexpression.anonymouscls.AnonymousDefinedClassManager;
+import org.protege.editor.owl.model.declaration.DeclarationSynthesisFormatMapper;
+import org.protege.editor.owl.model.declaration.DeclarationSynthesisPreferences;
 import org.protege.editor.owl.model.entity.CustomOWLEntityFactory;
 import org.protege.editor.owl.model.entity.OWLEntityFactory;
 import org.protege.editor.owl.model.event.EventType;
@@ -104,6 +106,14 @@ public class OWLModelManagerImpl extends AbstractModelManager implements OWLMode
     private final DeprecationCache deprecationCache;
 
     private final UserResolvedIRIMapper userResolvedIRIMapper = new UserResolvedIRIMapper(new MissingImportHandlerImpl());
+
+    /**
+     * Decides the document format each save is written with, honouring the user's choice about where
+     * entity declarations belong.  Reads the setting on every save, so a change needs no restart.
+     */
+    private final DeclarationSynthesisFormatMapper declarationSynthesisFormatMapper =
+            new DeclarationSynthesisFormatMapper(() -> DeclarationSynthesisPreferences.getPreferences()
+                    .isKeepDeclarationsInDefiningOntology());
 
     private final List<OWLModelManagerListener> modelManagerChangeListeners = new ArrayList<>();
 
@@ -592,13 +602,19 @@ public class OWLModelManagerImpl extends AbstractModelManager implements OWLMode
          * and can also result in data corruption.
          *
          * See http://protegewiki.stanford.edu/wiki/OWL2RDFParserDeclarationRequirement
+         *
+         * A user who wants to avoid that can now ask, in Preferences > General, for declarations to
+         * stay with the ontology that defines the entity.  The mapper returns a copy of the format
+         * with the flag cleared and leaves the retained instance alone, so nothing that reads the
+         * format afterwards is misled.
          */
+        final OWLDocumentFormat saveFormat = declarationSynthesisFormatMapper.mapFormat(format);
         IRI documentIRI = IRI.create(documentURI);
-        OntologySaver saver = OntologySaver.builder().addOntology(ont, format, documentIRI).build();
+        OntologySaver saver = OntologySaver.builder().addOntology(ont, saveFormat, documentIRI).build();
         saver.saveOntologies();
 
         manager.setOntologyDocumentIRI(ont, documentIRI);
-        logger.info("Saved ontology {} to {} in {} format", ont.getOntologyID(), documentIRI, format);
+        logger.info("Saved ontology {} to {} in {} format", ont.getOntologyID(), documentIRI, saveFormat);
 
         dirtyOntologies.remove(ont.getOntologyID());
 
