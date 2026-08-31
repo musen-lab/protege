@@ -70,6 +70,19 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
             "^\\s*<([^>]*)>\\s+(?:a|rdf:type|<http://www\\.w3\\.org/1999/02/22-rdf-syntax-ns#type>)\\s+"
                     + "(?:owl:Ontology|<http://www\\.w3\\.org/2002/07/owl#Ontology>)\\s*[.;]");
 
+    /*
+     * Functional syntax: 'Ontology(<iri>' opens the ontology frame; Manchester
+     * syntax: 'Ontology: <iri>'. Same shapes the OWL API's AutoIRIMapper has
+     * matched for years (its 'pattern' and 'manPattern'), except anchored with
+     * find() rather than Matcher.matches(), so trailing content on the line
+     * (a version IRI, an annotation) does not defeat the match.
+     */
+    private static final Pattern FUNCTIONAL_ONTOLOGY = Pattern.compile(
+            "^\\s*Ontology\\s*\\(\\s*<([^>]*)>");
+
+    private static final Pattern MANCHESTER_ONTOLOGY = Pattern.compile(
+            "^\\s*Ontology:\\s*<([^>]*)>");
+
     @Override
     public Set<URI> getSuggestions(File f) {
         Set<URI> suggestions = extractFromXml(f);
@@ -91,10 +104,12 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
                     base = parseUri(baseMatcher.group(1));
                     continue;
                 }
-                Matcher ontologyMatcher = TURTLE_ONTOLOGY.matcher(line);
-                if (ontologyMatcher.find()) {
-                    URI iri = resolveOntologyIri(ontologyMatcher.group(1), base);
-                    return iri != null ? Collections.singleton(iri) : Collections.emptySet();
+                for (Pattern declaration : new Pattern[]{TURTLE_ONTOLOGY, FUNCTIONAL_ONTOLOGY, MANCHESTER_ONTOLOGY}) {
+                    Matcher ontologyMatcher = declaration.matcher(line);
+                    if (ontologyMatcher.find()) {
+                        URI iri = resolveOntologyIri(ontologyMatcher.group(1), base);
+                        return iri != null ? Collections.singleton(iri) : Collections.emptySet();
+                    }
                 }
             }
         }
