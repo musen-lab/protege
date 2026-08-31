@@ -83,6 +83,18 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
     private static final Pattern MANCHESTER_ONTOLOGY = Pattern.compile(
             "^\\s*Ontology:\\s*<([^>]*)>");
 
+    /*
+     * OBO: the header's 'ontology: <id>' tag carries no IRI; the OWL API derives
+     * one by the OBO Foundry convention (purl prefix + id + ".owl", slashed
+     * subset ids included), so the catalog must list the same IRI the loader
+     * will assign. The .obo document URL is listed too, because OBO import
+     * lines conventionally reference the document rather than the derived IRI.
+     * Lowercase 'ontology:' cannot collide with Manchester's 'Ontology:'.
+     */
+    private static final Pattern OBO_ONTOLOGY = Pattern.compile("^ontology:\\s*(\\S+)\\s*$");
+
+    private static final String OBO_PURL_PREFIX = "http://purl.obolibrary.org/obo/";
+
     @Override
     public Set<URI> getSuggestions(File f) {
         Set<URI> suggestions = extractFromXml(f);
@@ -110,6 +122,10 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
                         URI iri = resolveOntologyIri(ontologyMatcher.group(1), base);
                         return iri != null ? Collections.singleton(iri) : Collections.emptySet();
                     }
+                }
+                Matcher oboMatcher = OBO_ONTOLOGY.matcher(line);
+                if (oboMatcher.find()) {
+                    return oboSuggestions(oboMatcher.group(1));
                 }
             }
         }
@@ -176,6 +192,19 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
             logger.debug("Could not examine {} as XML: {}", f, t.toString());
         }
         return handler.collectedSuggestions();
+    }
+
+    private static Set<URI> oboSuggestions(String oboId) {
+        Set<URI> suggestions = new TreeSet<>();
+        URI ontologyIri = parseUri(OBO_PURL_PREFIX + oboId + ".owl");
+        if (ontologyIri != null && ontologyIri.isAbsolute()) {
+            suggestions.add(ontologyIri);
+        }
+        URI documentUrl = parseUri(OBO_PURL_PREFIX + oboId + ".obo");
+        if (documentUrl != null && documentUrl.isAbsolute()) {
+            suggestions.add(documentUrl);
+        }
+        return suggestions.isEmpty() ? Collections.emptySet() : suggestions;
     }
 
     private static void trySetFeature(SAXParserFactory factory, String feature) {

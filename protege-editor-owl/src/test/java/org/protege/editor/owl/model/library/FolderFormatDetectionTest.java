@@ -5,6 +5,7 @@ import org.junit.Test;
 import org.protege.editor.owl.model.library.folder.FolderGroupManager;
 import org.protege.xmlcatalog.CatalogUtilities;
 import org.protege.xmlcatalog.XMLCatalog;
+import org.protege.xmlcatalog.entry.GroupEntry;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,6 +16,7 @@ import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * T1 (Import Management): a local copy of an imported ontology must be auto-detected
@@ -72,10 +74,37 @@ public class FolderFormatDetectionTest {
 
     @Test
     public void detectsOboFormat() throws IOException {
-        // The OBO parser derives the ontology IRI from the "ontology:" tag
-        // using the OBO Foundry convention.
+        // The OBO parser derives the ontology IRI from the "ontology:" tag using
+        // the OBO Foundry convention. The .obo document URL is also expected,
+        // because OBO import lines conventionally reference the document.
         assertLocalCopyDetected("toppings.obo",
-                                "http://purl.obolibrary.org/obo/t1toppings.owl");
+                                "http://purl.obolibrary.org/obo/t1toppings.owl",
+                                "http://purl.obolibrary.org/obo/t1toppings.obo");
+    }
+
+    @Test
+    public void detectsOboFormatWithSlashedId() throws IOException {
+        // OBO Foundry subset ontologies use slashed ids (e.g. go/subsets/goslim_generic).
+        assertLocalCopyDetected("toppings-subset.obo",
+                                "http://purl.obolibrary.org/obo/t1toppings/subsets/basic.owl",
+                                "http://purl.obolibrary.org/obo/t1toppings/subsets/basic.obo");
+    }
+
+    @Test
+    public void oboFileWithoutOntologyTagYieldsNoEntry() throws IOException {
+        // No "ontology:" tag means no IRI can be derived: the file must be
+        // skipped silently (the anonymous-ontology rule).
+        File folder = new File(TEST_ROOT, "toppings-notag-obo");
+        folder.mkdirs();
+        Files.copy(new File(SOURCE_DIR, "toppings-notag.obo").toPath(),
+                   new File(folder, "toppings-notag.obo").toPath(),
+                   StandardCopyOption.REPLACE_EXISTING);
+        OntologyCatalogManager catalogManager
+                = new OntologyCatalogManager(Collections.singletonList(new FolderGroupManager()));
+        XMLCatalog catalog = catalogManager.ensureCatalogExists(folder);
+        GroupEntry group = (GroupEntry) catalog.getEntries().get(0);
+        assertTrue("Expected no catalog entries for an OBO file without an ontology tag",
+                   group.getEntries().isEmpty());
     }
 
     @Test
@@ -84,7 +113,7 @@ public class FolderFormatDetectionTest {
                                 "http://import-test.invalid/formats/toppings-owx");
     }
 
-    private void assertLocalCopyDetected(String fixtureName, String ontologyIri) throws IOException {
+    private void assertLocalCopyDetected(String fixtureName, String... ontologyIris) throws IOException {
         File folder = new File(TEST_ROOT, fixtureName.replace('.', '-'));
         folder.mkdirs();
         File localCopy = new File(folder, fixtureName);
@@ -95,9 +124,11 @@ public class FolderFormatDetectionTest {
                 = new OntologyCatalogManager(Collections.singletonList(new FolderGroupManager()));
         XMLCatalog catalog = catalogManager.ensureCatalogExists(folder);
 
-        URI redirect = CatalogUtilities.getRedirect(URI.create(ontologyIri), catalog);
-        assertNotNull("Local copy " + fixtureName + " was not auto-detected as " + ontologyIri, redirect);
-        assertEquals(localCopy.toURI(), redirect);
+        for (String ontologyIri : ontologyIris) {
+            URI redirect = CatalogUtilities.getRedirect(URI.create(ontologyIri), catalog);
+            assertNotNull("Local copy " + fixtureName + " was not auto-detected as " + ontologyIri, redirect);
+            assertEquals(localCopy.toURI(), redirect);
+        }
     }
 
     private static void removeDirectory(File dir) {
