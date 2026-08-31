@@ -17,7 +17,9 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -75,13 +77,29 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
      * syntax: 'Ontology: <iri>'. Same shapes the OWL API's AutoIRIMapper has
      * matched for years (its 'pattern' and 'manPattern'), except anchored with
      * find() rather than Matcher.matches(), so trailing content on the line
-     * (a version IRI, an annotation) does not defeat the match.
+     * (a version IRI, an annotation) does not defeat the match. In both formats
+     * an optional version IRI follows the ontology IRI, either on the same line
+     * (second group) or alone on the following line (the OWL API writers'
+     * layout, matched by BARE_IRI_LINE).
      */
     private static final Pattern FUNCTIONAL_ONTOLOGY = Pattern.compile(
-            "^\\s*Ontology\\s*\\(\\s*<([^>]*)>");
+            "^\\s*Ontology\\s*\\(\\s*<([^>]*)>(?:\\s+<([^>]*)>)?");
 
     private static final Pattern MANCHESTER_ONTOLOGY = Pattern.compile(
-            "^\\s*Ontology:\\s*<([^>]*)>");
+            "^\\s*Ontology:\\s*<([^>]*)>(?:\\s+<([^>]*)>)?");
+
+    private static final Pattern BARE_IRI_LINE = Pattern.compile("^\\s*<([^>]*)>\\s*$");
+
+    private static final Pattern[] FRAME_DECLARATIONS = {FUNCTIONAL_ONTOLOGY, MANCHESTER_ONTOLOGY};
+
+    /*
+     * Turtle: the OWL API's writer continues the ontology statement onto the
+     * next line for the version ('<iri> rdf:type owl:Ontology ;' then
+     * 'owl:versionIRI <viri> .'), so this is matched anywhere in a line while
+     * the ontology statement is still open, not just at line start.
+     */
+    private static final Pattern TURTLE_VERSION = Pattern.compile(
+            "(?:^|\\s)owl:versionIRI\\s+<([^>]*)>");
 
     /*
      * OBO: the header's 'ontology: <id>' tag carries no IRI; the OWL API derives
@@ -93,6 +111,13 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
      */
     private static final Pattern OBO_ONTOLOGY = Pattern.compile("^ontology:\\s*(\\S+)\\s*$");
 
+    /*
+     * OBO: 'data-version: <v>' derives the version IRI by the same Foundry
+     * convention, with the full id repeated: obo/<id>/<v>/<id>.owl (verified
+     * against OWL API 4.5.29, slashed ids included).
+     */
+    private static final Pattern OBO_DATA_VERSION = Pattern.compile("^data-version:\\s*(\\S+)\\s*$");
+
     private static final String OBO_PURL_PREFIX = "http://purl.obolibrary.org/obo/";
 
     @Override
@@ -101,38 +126,136 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
         if (suggestions.isEmpty()) {
             suggestions = extractFromTextHead(f);
         }
+        if (suggestions.isEmpty()) {
+            logger.debug("No ontology IRI could be extracted from {}", f);
+        }
         return suggestions;
     }
 
+    /*
+     * Text-based formats (Turtle, functional syntax, Manchester syntax, OBO).
+     * The head of the file is read once into memory; each format then examines
+     * it with its own small method. First format to find a declaration wins.
+     */
     private Set<URI> extractFromTextHead(File f) {
+        List<String> head = readHead(f);
+        Set<URI> suggestions = extractFromTurtle(head);
+        if (suggestions.isEmpty()) {
+            suggestions = extractFromFrameSyntax(head);
+        }
+        if (suggestions.isEmpty()) {
+            suggestions = extractFromObo(head);
+        }
+        return suggestions;
+    }
+
+    private static List<String> readHead(File f) {
+        List<String> head = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8))) {
-            URI base = null;
             String line;
-            int linesExamined = 0;
-            while ((line = reader.readLine()) != null && linesExamined++ < MAX_LINES_TO_EXAMINE) {
-                Matcher baseMatcher = TURTLE_BASE.matcher(line);
-                if (baseMatcher.find()) {
-                    base = parseUri(baseMatcher.group(1));
-                    continue;
-                }
-                for (Pattern declaration : new Pattern[]{TURTLE_ONTOLOGY, FUNCTIONAL_ONTOLOGY, MANCHESTER_ONTOLOGY}) {
-                    Matcher ontologyMatcher = declaration.matcher(line);
-                    if (ontologyMatcher.find()) {
-                        URI iri = resolveOntologyIri(ontologyMatcher.group(1), base);
-                        return iri != null ? Collections.singleton(iri) : Collections.emptySet();
-                    }
-                }
-                Matcher oboMatcher = OBO_ONTOLOGY.matcher(line);
-                if (oboMatcher.find()) {
-                    return oboSuggestions(oboMatcher.group(1));
-                }
+            while ((line = reader.readLine()) != null && head.size() < MAX_LINES_TO_EXAMINE) {
+                head.add(line);
             }
         }
         catch (Throwable t) {
-            logger.debug("Could not examine {} as a text-based ontology format: {}", f, t.toString());
+            logger.debug("Could not read {} as text: {}", f, t.toString());
+        }
+        return head;
+    }
+
+    private static Set<URI> extractFromTurtle(List<String> head) {
+        URI base = null;
+        for (int i = 0; i < head.size(); i++) {
+            String line = head.get(i);
+            Matcher baseMatcher = TURTLE_BASE.matcher(line);
+            if (baseMatcher.find()) {
+                base = parseUri(baseMatcher.group(1));
+                continue;
+            }
+            Matcher declaration = TURTLE_ONTOLOGY.matcher(line);
+            if (declaration.find()) {
+                URI ontologyIri = resolveOntologyIri(declaration.group(1), base);
+                // A line ending in ';' continues the statement: the version, if
+                // any, is on one of the following lines.
+                URI versionIri = line.trim().endsWith(";")
+                        ? turtleVersionInStatement(head, i + 1, base) : null;
+                return collectSuggestions(ontologyIri, versionIri);
+            }
         }
         return Collections.emptySet();
+    }
+
+    private static URI turtleVersionInStatement(List<String> head, int firstLine, URI base) {
+        for (int i = firstLine; i < head.size(); i++) {
+            String line = head.get(i);
+            Matcher version = TURTLE_VERSION.matcher(line);
+            if (version.find()) {
+                return resolveOntologyIri(version.group(1), base);
+            }
+            if (line.trim().endsWith(".")) {
+                return null; // statement closed without a version
+            }
+        }
+        return null;
+    }
+
+    private static Set<URI> extractFromFrameSyntax(List<String> head) {
+        for (int i = 0; i < head.size(); i++) {
+            for (Pattern format : FRAME_DECLARATIONS) {
+                Matcher declaration = format.matcher(head.get(i));
+                if (declaration.find()) {
+                    URI ontologyIri = resolveOntologyIri(declaration.group(1), null);
+                    // The version is either the second IRI on the same line, or
+                    // alone on the immediately following line (the OWL API
+                    // writers' layout).
+                    URI versionIri = declaration.group(2) != null
+                            ? resolveOntologyIri(declaration.group(2), null)
+                            : bareIriOnLine(head, i + 1);
+                    return collectSuggestions(ontologyIri, versionIri);
+                }
+            }
+        }
+        return Collections.emptySet();
+    }
+
+    private static URI bareIriOnLine(List<String> head, int index) {
+        if (index >= head.size()) {
+            return null;
+        }
+        Matcher version = BARE_IRI_LINE.matcher(head.get(index));
+        return version.find() ? resolveOntologyIri(version.group(1), null) : null;
+    }
+
+    private static Set<URI> extractFromObo(List<String> head) {
+        String id = null;
+        String dataVersion = null;
+        for (String line : head) {
+            if (line.startsWith("[")) {
+                break; // first stanza ends the header
+            }
+            Matcher ontologyTag = OBO_ONTOLOGY.matcher(line);
+            if (id == null && ontologyTag.find()) {
+                id = ontologyTag.group(1);
+                continue;
+            }
+            Matcher dataVersionTag = OBO_DATA_VERSION.matcher(line);
+            if (dataVersion == null && dataVersionTag.find()) {
+                dataVersion = dataVersionTag.group(1);
+            }
+        }
+        return id != null ? oboSuggestions(id, dataVersion) : Collections.emptySet();
+    }
+
+    private static Set<URI> collectSuggestions(URI ontologyIri, URI versionIri) {
+        Set<URI> suggestions = new TreeSet<>();
+        if (ontologyIri != null) {
+            suggestions.add(ontologyIri);
+        }
+        if (versionIri != null && versionIri.isAbsolute()) {
+            suggestions.add(versionIri);
+        }
+        return suggestions.isEmpty() ? Collections.emptySet() : suggestions;
     }
 
     /**
@@ -194,7 +317,7 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
         return handler.collectedSuggestions();
     }
 
-    private static Set<URI> oboSuggestions(String oboId) {
+    private static Set<URI> oboSuggestions(String oboId, String dataVersion) {
         Set<URI> suggestions = new TreeSet<>();
         URI ontologyIri = parseUri(OBO_PURL_PREFIX + oboId + ".owl");
         if (ontologyIri != null && ontologyIri.isAbsolute()) {
@@ -203,6 +326,12 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
         URI documentUrl = parseUri(OBO_PURL_PREFIX + oboId + ".obo");
         if (documentUrl != null && documentUrl.isAbsolute()) {
             suggestions.add(documentUrl);
+        }
+        if (dataVersion != null) {
+            URI versionIri = parseUri(OBO_PURL_PREFIX + oboId + "/" + dataVersion + "/" + oboId + ".owl");
+            if (versionIri != null && versionIri.isAbsolute()) {
+                suggestions.add(versionIri);
+            }
         }
         return suggestions.isEmpty() ? Collections.emptySet() : suggestions;
     }
@@ -231,6 +360,10 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
 
         private String declaredOntologyIri;
 
+        private String declaredVersionIri;
+
+        private boolean inOntologyElement = false;
+
         private int elementsExamined = 0;
 
         @Override
@@ -251,12 +384,27 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
             if (OWL_NS.equals(uri) && "Ontology".equals(localName)) {
                 declaredOntologyIri = atts.getValue(RDF_NS, "about");
                 if (declaredOntologyIri == null) {
-                    // OWL/XML declares the IRI as an unqualified attribute
+                    // OWL/XML declares both IRIs as unqualified attributes on this element
                     declaredOntologyIri = atts.getValue("ontologyIRI");
+                    declaredVersionIri = atts.getValue("versionIRI");
+                    throw new ScanCompleteException();
                 }
+                // RDF/XML: owl:versionIRI, if any, is a child element of this one.
+                inOntologyElement = true;
+            }
+            else if (inOntologyElement && OWL_NS.equals(uri) && "versionIRI".equals(localName)) {
+                declaredVersionIri = atts.getValue(RDF_NS, "resource");
                 throw new ScanCompleteException();
             }
             if (elementsExamined >= MAX_ELEMENTS_TO_EXAMINE) {
+                throw new ScanCompleteException();
+            }
+        }
+
+        @Override
+        public void endElement(String uri, String localName, String qName) throws SAXException {
+            if (inOntologyElement && OWL_NS.equals(uri) && "Ontology".equals(localName)) {
+                // Ontology element closed without a version IRI: nothing more to find.
                 throw new ScanCompleteException();
             }
         }
@@ -269,6 +417,10 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
             }
             if (xmlBase != null && xmlBase.isAbsolute() && !xmlBase.equals(declared)) {
                 suggestions.add(xmlBase);
+            }
+            URI version = resolveOntologyIri(declaredVersionIri, xmlBase);
+            if (version != null && !version.equals(declared)) {
+                suggestions.add(version);
             }
             return suggestions.isEmpty() ? Collections.emptySet() : suggestions;
         }

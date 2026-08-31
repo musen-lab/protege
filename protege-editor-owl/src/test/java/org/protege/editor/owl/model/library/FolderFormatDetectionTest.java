@@ -90,6 +90,60 @@ public class FolderFormatDetectionTest {
                                 "http://purl.obolibrary.org/obo/t1toppings/subsets/basic.obo");
     }
 
+    /*
+     * Version IRIs (decided 2026-08-31, #11): a versioned local copy must also be
+     * importable by its owl:versionIRI, in every supported serialization. The
+     * fixtures mirror the OWL API's own serializer output line-for-line, which is
+     * the population these files overwhelmingly come from.
+     */
+
+    @Test
+    public void detectsVersionIriInRdfXml() throws IOException {
+        assertLocalCopyDetected("versioned-rdfxml.owl",
+                                "http://import-test.invalid/versioned/rdfxml",
+                                "http://import-test.invalid/versioned/rdfxml/1.0");
+    }
+
+    @Test
+    public void detectsVersionIriInOwlXml() throws IOException {
+        assertLocalCopyDetected("versioned.owx",
+                                "http://import-test.invalid/versioned/owx",
+                                "http://import-test.invalid/versioned/owx/1.0");
+    }
+
+    @Test
+    public void detectsVersionIriInTurtle() throws IOException {
+        // The OWL API's Turtle writer puts owl:versionIRI on a continuation line.
+        assertLocalCopyDetected("versioned.ttl",
+                                "http://import-test.invalid/versioned/ttl",
+                                "http://import-test.invalid/versioned/ttl/1.0");
+    }
+
+    @Test
+    public void detectsVersionIriInFunctionalSyntax() throws IOException {
+        // The OWL API's functional writer puts the version IRI alone on the next line.
+        assertLocalCopyDetected("versioned.ofn",
+                                "http://import-test.invalid/versioned/ofn",
+                                "http://import-test.invalid/versioned/ofn/1.0");
+    }
+
+    @Test
+    public void detectsVersionIriInManchesterSyntax() throws IOException {
+        assertLocalCopyDetected("versioned.omn",
+                                "http://import-test.invalid/versioned/omn",
+                                "http://import-test.invalid/versioned/omn/1.0");
+    }
+
+    @Test
+    public void detectsVersionIriInObo() throws IOException {
+        // data-version derives the version purl: obo/<id>/<data-version>/<id>.owl
+        // (verified against OWL API 4.5.29, full id repeated even when slashed).
+        assertLocalCopyDetected("versioned.obo",
+                                "http://purl.obolibrary.org/obo/t1vtoppings.owl",
+                                "http://purl.obolibrary.org/obo/t1vtoppings.obo",
+                                "http://purl.obolibrary.org/obo/t1vtoppings/2026-08-01/t1vtoppings.owl");
+    }
+
     @Test
     public void oboFileWithoutOntologyTagYieldsNoEntry() throws IOException {
         // No "ontology:" tag means no IRI can be derived: the file must be
