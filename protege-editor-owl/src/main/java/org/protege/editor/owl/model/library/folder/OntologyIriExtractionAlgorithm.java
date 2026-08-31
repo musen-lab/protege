@@ -9,13 +9,19 @@ import org.xml.sax.helpers.DefaultHandler;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Extracts the IRI(s) under which a local ontology document should be listed in a
@@ -44,9 +50,92 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
 
     private static final String RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
+    /*
+     * Text-based formats declare the ontology within the first lines of the
+     * document; a bounded scan keeps huge data files cheap to reject.
+     */
+    private static final int MAX_LINES_TO_EXAMINE = 100;
+
+    /*
+     * Turtle: '@base <iri>' (or SPARQL-style 'BASE <iri>') sets the base URI;
+     * the ontology declaration is '<iri> a owl:Ontology', where 'a' can also be
+     * written rdf:type or as the full rdf:type IRI, and the object can be the
+     * conventional owl:Ontology prefix form or the full OWL IRI. Prefixed
+     * subjects (':onto a owl:Ontology') are out of scope for this bounded scan.
+     */
+    private static final Pattern TURTLE_BASE = Pattern.compile(
+            "^\\s*(?:@base|BASE)\\s+<([^>]*)>", Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern TURTLE_ONTOLOGY = Pattern.compile(
+            "^\\s*<([^>]*)>\\s+(?:a|rdf:type|<http://www\\.w3\\.org/1999/02/22-rdf-syntax-ns#type>)\\s+"
+                    + "(?:owl:Ontology|<http://www\\.w3\\.org/2002/07/owl#Ontology>)\\s*[.;]");
+
     @Override
     public Set<URI> getSuggestions(File f) {
-        return extractFromXml(f);
+        Set<URI> suggestions = extractFromXml(f);
+        if (suggestions.isEmpty()) {
+            suggestions = extractFromTextHead(f);
+        }
+        return suggestions;
+    }
+
+    private Set<URI> extractFromTextHead(File f) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8))) {
+            URI base = null;
+            String line;
+            int linesExamined = 0;
+            while ((line = reader.readLine()) != null && linesExamined++ < MAX_LINES_TO_EXAMINE) {
+                Matcher baseMatcher = TURTLE_BASE.matcher(line);
+                if (baseMatcher.find()) {
+                    base = parseUri(baseMatcher.group(1));
+                    continue;
+                }
+                Matcher ontologyMatcher = TURTLE_ONTOLOGY.matcher(line);
+                if (ontologyMatcher.find()) {
+                    URI iri = resolveOntologyIri(ontologyMatcher.group(1), base);
+                    return iri != null ? Collections.singleton(iri) : Collections.emptySet();
+                }
+            }
+        }
+        catch (Throwable t) {
+            logger.debug("Could not examine {} as a text-based ontology format: {}", f, t.toString());
+        }
+        return Collections.emptySet();
+    }
+
+    /**
+     * Resolves a declared ontology IRI against a base URI. An empty declaration
+     * ("this document") means exactly the base; URI.resolve("") cannot express
+     * that, because it follows RFC 2396 and drops the base's last path segment.
+     * Returns null when no absolute IRI can be produced.
+     */
+    private static URI resolveOntologyIri(String declared, URI base) {
+        if (declared == null) {
+            return null;
+        }
+        boolean baseUsable = base != null && base.isAbsolute();
+        if (declared.isEmpty()) {
+            return baseUsable ? base : null;
+        }
+        URI declaredUri = parseUri(declared);
+        if (declaredUri == null) {
+            return null;
+        }
+        if (declaredUri.isAbsolute()) {
+            return declaredUri;
+        }
+        return baseUsable ? base.resolve(declaredUri) : null;
+    }
+
+    private static URI parseUri(String value) {
+        try {
+            return new URI(value);
+        }
+        catch (URISyntaxException e) {
+            logger.debug("Ignoring malformed IRI '{}'", value);
+            return null;
+        }
     }
 
     private Set<URI> extractFromXml(File f) {
@@ -130,7 +219,7 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
 
         Set<URI> collectedSuggestions() {
             Set<URI> suggestions = new TreeSet<>();
-            URI declared = resolveDeclaredIri();
+            URI declared = resolveOntologyIri(declaredOntologyIri, xmlBase);
             if (declared != null) {
                 suggestions.add(declared);
             }
@@ -138,33 +227,6 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
                 suggestions.add(xmlBase);
             }
             return suggestions.isEmpty() ? Collections.emptySet() : suggestions;
-        }
-
-        private URI resolveDeclaredIri() {
-            if (declaredOntologyIri == null) {
-                return null;
-            }
-            if (declaredOntologyIri.isEmpty()) {
-                // rdf:about="" means "this document", i.e. exactly the base URI.
-                // Not expressible via URI.resolve(""), which follows RFC 2396 and
-                // drops the last path segment of a base like .../pizza.owl.
-                return xmlBase != null && xmlBase.isAbsolute() ? xmlBase : null;
-            }
-            try {
-                URI declared = new URI(declaredOntologyIri);
-                if (declared.isAbsolute()) {
-                    return declared;
-                }
-                if (xmlBase != null && xmlBase.isAbsolute()) {
-                    return xmlBase.resolve(declared);
-                }
-                // Relative declaration with no base to resolve against: unusable.
-                return null;
-            }
-            catch (java.net.URISyntaxException e) {
-                logger.debug("Ignoring malformed ontology IRI '{}'", declaredOntologyIri);
-                return null;
-            }
         }
     }
 }
