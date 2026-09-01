@@ -177,7 +177,11 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
         return head;
     }
 
-    private static Set<URI> extractFromTurtle(List<String> head) {
+    private static Set<URI> extractFromTurtle(List<String> rawHead) {
+        // Strings and comments cannot contain a declaration; strip them first so a
+        // look-alike inside a literal is never indexed and a trailing comment does
+        // not hide a statement's ';' or '.' (review finding F5).
+        List<String> head = TurtleCodeFilter.codeLines(rawHead);
         URI base = null;
         for (int i = 0; i < head.size(); i++) {
             String line = head.get(i);

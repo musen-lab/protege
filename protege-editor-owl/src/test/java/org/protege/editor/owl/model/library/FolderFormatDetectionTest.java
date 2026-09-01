@@ -172,6 +172,40 @@ public class FolderFormatDetectionTest {
         }
     }
 
+    /*
+     * Turtle lexical handling (review finding F5): text inside long-string
+     * literals or comments must never produce a catalog entry, and comments must
+     * not hide a real declaration or its version IRI.
+     */
+
+    @Test
+    public void turtleTextInsideLongStringLiteralsIsNotAnOntology() throws IOException {
+        XMLCatalog catalog = catalogFor("turtle-literal-lookalike.ttl");
+        GroupEntry group = (GroupEntry) catalog.getEntries().get(0);
+        assertTrue("Expected no entries for declarations that occur only inside string literals",
+                   group.getEntries().isEmpty());
+    }
+
+    @Test
+    public void turtleCommentsAreIgnoredAndDoNotHideTheVersionIri() throws IOException {
+        XMLCatalog catalog = catalogFor("turtle-comments.ttl");
+        assertLocalCopyDetected("turtle-comments.ttl",
+                                "http://import-test.invalid/formats/turtle-comments",
+                                "http://import-test.invalid/formats/turtle-comments/v1");
+        GroupEntry group = (GroupEntry) catalog.getEntries().get(0);
+        for (org.protege.xmlcatalog.entry.Entry entry : group.getEntries()) {
+            String name = ((org.protege.xmlcatalog.entry.UriEntry) entry).getName();
+            assertTrue("Commented-out declaration leaked into the catalog: " + name,
+                       !name.startsWith("http://commented.test/"));
+        }
+    }
+
+    @Test
+    public void turtleDeclarationAfterALongStringClosingMidLineIsFound() throws IOException {
+        assertLocalCopyDetected("turtle-literal-closes-midline.ttl",
+                                "http://import-test.invalid/formats/turtle-midline");
+    }
+
     @Test
     public void oboFileWithoutOntologyTagYieldsNoEntry() throws IOException {
         // No "ontology:" tag means no IRI can be derived: the file must be
