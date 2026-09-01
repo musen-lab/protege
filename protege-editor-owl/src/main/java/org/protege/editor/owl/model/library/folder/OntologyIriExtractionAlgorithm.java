@@ -279,7 +279,13 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
         if (declaredUri.isAbsolute()) {
             return declaredUri;
         }
-        return baseUsable ? base.resolve(declaredUri) : null;
+        if (!baseUsable) {
+            return null;
+        }
+        URI resolved = base.resolve(declaredUri);
+        // Resolution against an opaque base (urn:...) hands the relative reference
+        // back unchanged; a catalog entry must name an absolute IRI or nothing.
+        return resolved.isAbsolute() ? resolved : null;
     }
 
     private static URI parseUri(String value) {
@@ -415,7 +421,10 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
             if (declared != null) {
                 suggestions.add(declared);
             }
-            if (xmlBase != null && xmlBase.isAbsolute() && !xmlBase.equals(declared)) {
+            // Compatibility with XmlBaseAlgorithm, which indexed every file under its
+            // raw xml:base, relative or not: keep emitting it whenever it differs
+            // from the declared IRI, so no historical mapping disappears.
+            if (xmlBase != null && !xmlBase.equals(declared)) {
                 suggestions.add(xmlBase);
             }
             URI version = resolveOntologyIri(declaredVersionIri, xmlBase);

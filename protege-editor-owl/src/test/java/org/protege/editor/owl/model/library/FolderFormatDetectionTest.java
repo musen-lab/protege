@@ -144,6 +144,34 @@ public class FolderFormatDetectionTest {
                                 "http://purl.obolibrary.org/obo/t1vtoppings/2026-08-01/t1vtoppings.owl");
     }
 
+    /*
+     * Compatibility with the historical xml:base-only algorithm (review findings
+     * F4 and F7): whatever xml:base it emitted must still be emitted, even a
+     * relative one, while declared IRIs that cannot be resolved to an absolute
+     * IRI must not leak into the catalog as relative entries.
+     */
+
+    @Test
+    public void keepsRelativeXmlBaseMappingOfLegacyAlgorithm() throws IOException {
+        // The old algorithm indexed this file under the raw string "relative/base";
+        // catalog lookups accept that key, so the mapping must survive.
+        assertLocalCopyDetected("relative-xmlbase.owl", "relative/base");
+    }
+
+    @Test
+    public void opaqueBaseYieldsOnlyAbsoluteEntries() throws IOException {
+        // rdf:about="#onto" cannot be resolved against an opaque urn: base into an
+        // absolute IRI, so it must not be recorded; the raw xml:base still is.
+        XMLCatalog catalog = catalogFor("opaque-base.owl");
+        assertEquals(new File(new File(TEST_ROOT, "opaque-base-owl"), "opaque-base.owl").toURI(),
+                     CatalogUtilities.getRedirect(URI.create("urn:example:base"), catalog));
+        GroupEntry group = (GroupEntry) catalog.getEntries().get(0);
+        for (org.protege.xmlcatalog.entry.Entry entry : group.getEntries()) {
+            String name = ((org.protege.xmlcatalog.entry.UriEntry) entry).getName();
+            assertTrue("Unexpected non-absolute catalog entry: " + name, URI.create(name).isAbsolute());
+        }
+    }
+
     @Test
     public void oboFileWithoutOntologyTagYieldsNoEntry() throws IOException {
         // No "ontology:" tag means no IRI can be derived: the file must be
@@ -167,16 +195,19 @@ public class FolderFormatDetectionTest {
                                 "http://import-test.invalid/formats/toppings-owx");
     }
 
-    private void assertLocalCopyDetected(String fixtureName, String... ontologyIris) throws IOException {
+    private XMLCatalog catalogFor(String fixtureName) throws IOException {
         File folder = new File(TEST_ROOT, fixtureName.replace('.', '-'));
         folder.mkdirs();
-        File localCopy = new File(folder, fixtureName);
-        Files.copy(new File(SOURCE_DIR, fixtureName).toPath(), localCopy.toPath(),
+        Files.copy(new File(SOURCE_DIR, fixtureName).toPath(), new File(folder, fixtureName).toPath(),
                    StandardCopyOption.REPLACE_EXISTING);
-
         OntologyCatalogManager catalogManager
                 = new OntologyCatalogManager(Collections.singletonList(new FolderGroupManager()));
-        XMLCatalog catalog = catalogManager.ensureCatalogExists(folder);
+        return catalogManager.ensureCatalogExists(folder);
+    }
+
+    private void assertLocalCopyDetected(String fixtureName, String... ontologyIris) throws IOException {
+        XMLCatalog catalog = catalogFor(fixtureName);
+        File localCopy = new File(new File(TEST_ROOT, fixtureName.replace('.', '-')), fixtureName);
 
         for (String ontologyIri : ontologyIris) {
             URI redirect = CatalogUtilities.getRedirect(URI.create(ontologyIri), catalog);
