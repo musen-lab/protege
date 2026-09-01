@@ -75,4 +75,41 @@ public class FolderCatalogUpgradeTest {
         assertNotNull("Upgraded catalog must gain the version IRI for an unchanged file", versionRedirect);
         assertEquals(localCopy.toURI(), versionRedirect);
     }
+
+    @Test
+    public void legacyCatalogMigrationKeepsRootLevelUserEntries() throws IOException {
+        File folder = new File(TEST_ROOT, "legacy-with-user-entry");
+        folder.mkdirs();
+        File localCopy = new File(folder, "versioned-rdfxml.owl");
+        Files.copy(new File(SOURCE_DIR, "versioned-rdfxml.owl").toPath(), localCopy.toPath(),
+                   StandardCopyOption.REPLACE_EXISTING);
+        File userMapped = new File(folder, "elsewhere.owl");
+        Files.copy(new File(SOURCE_DIR, "toppings-rdfxml-xmlbase.owl").toPath(), userMapped.toPath(),
+                   StandardCopyOption.REPLACE_EXISTING);
+
+        // The "Resolve missing import?" dialog writes its mapping as a root-level
+        // catalog entry, outside the auto-generated group. Regenerating the group
+        // for the version bump must not touch it.
+        String userIri = "http://user.invalid/manually-mapped";
+        long farFuture = System.currentTimeMillis() + 24L * 60 * 60 * 1000;
+        String legacyCatalog = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n"
+                + "<catalog prefer=\"public\" xmlns=\"urn:oasis:names:tc:entity:xmlns:xml:catalog\">\n"
+                + "    <uri id=\"User Entered Import Resolution\" name=\"" + userIri + "\" uri=\"elsewhere.owl\"/>\n"
+                + "    <group id=\"Folder Repository, directory=, recursive=true, Auto-Update=true, version=2\" prefer=\"public\">\n"
+                + "        <uri id=\"Automatically generated entry, Timestamp=" + farFuture + "\""
+                + " name=\"" + ONTOLOGY_IRI + "\" uri=\"versioned-rdfxml.owl\"/>\n"
+                + "    </group>\n"
+                + "</catalog>\n";
+        Files.write(new File(folder, "catalog-v001.xml").toPath(),
+                    legacyCatalog.getBytes(StandardCharsets.UTF_8));
+
+        OntologyCatalogManager catalogManager
+                = new OntologyCatalogManager(Collections.singletonList(new FolderGroupManager()));
+        XMLCatalog catalog = catalogManager.ensureCatalogExists(folder);
+
+        assertEquals("User entry must survive the migration",
+                     userMapped.toURI(), CatalogUtilities.getRedirect(URI.create(userIri), catalog));
+        assertEquals("Generated group must be rebuilt with the version IRI",
+                     localCopy.toURI(), CatalogUtilities.getRedirect(URI.create(VERSION_IRI), catalog));
+    }
 }
