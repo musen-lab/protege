@@ -1,5 +1,6 @@
 package org.protege.editor.owl.model.library.folder;
 
+import com.google.common.io.ByteStreams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.Attributes;
@@ -7,11 +8,13 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import javax.xml.XMLConstants;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
@@ -47,6 +50,14 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
      * rather than parsed to the end.
      */
     private static final int MAX_ELEMENTS_TO_EXAMINE = 1000;
+
+    /*
+     * Hard cap on bytes read from any file, on both the XML and the text path.
+     * Line and element counts alone do not bound memory: one enormous line, or one
+     * enormous text node, would be read whole. Real ontology declarations sit
+     * within the first few KiB; 1 MiB leaves a wide margin.
+     */
+    private static final long MAX_BYTES_TO_EXAMINE = 1024L * 1024L;
 
     private static final String OWL_NS = "http://www.w3.org/2002/07/owl#";
 
@@ -151,15 +162,17 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
 
     private static List<String> readHead(File f) {
         List<String> head = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                ByteStreams.limit(new FileInputStream(f), MAX_BYTES_TO_EXAMINE), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null && head.size() < MAX_LINES_TO_EXAMINE) {
                 head.add(line);
             }
         }
-        catch (Throwable t) {
-            logger.debug("Could not read {} as text: {}", f, t.toString());
+        catch (IOException | RuntimeException e) {
+            // Unreadable or undecodable text: no suggestions. Errors are not caught
+            // (see extractFromXml).
+            logger.debug("Could not read {} as text: {}", f, e.toString());
         }
         return head;
     }
@@ -300,7 +313,7 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
 
     private Set<URI> extractFromXml(File f) {
         XmlOntologyHandler handler = new XmlOntologyHandler();
-        try (InputStream is = new FileInputStream(f)) {
+        try (InputStream is = ByteStreams.limit(new FileInputStream(f), MAX_BYTES_TO_EXAMINE)) {
             SAXParserFactory factory = SAXParserFactory.newInstance();
             factory.setNamespaceAware(true);
             // A folder scan must never touch the network or the filesystem beyond f.
@@ -315,10 +328,12 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
         catch (ScanCompleteException e) {
             // expected: the handler found what it needed or hit the element bound
         }
-        catch (Throwable t) {
-            // Not XML, or malformed XML: fall through with whatever was captured
-            // before the failure (possibly nothing). Never a user-facing warning.
-            logger.debug("Could not examine {} as XML: {}", f, t.toString());
+        catch (IOException | SAXException | ParserConfigurationException | RuntimeException e) {
+            // Not XML, malformed XML, or the byte cap cut the document short: fall
+            // through with whatever was captured before the failure (possibly
+            // nothing). Never a user-facing warning. Errors such as OutOfMemoryError
+            // are deliberately not caught here: a folder scan must not hide them.
+            logger.debug("Could not examine {} as XML: {}", f, e.toString());
         }
         return handler.collectedSuggestions();
     }
