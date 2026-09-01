@@ -1,0 +1,78 @@
+package org.protege.editor.owl.model.library;
+
+import org.junit.Before;
+import org.junit.Test;
+import org.protege.editor.owl.model.library.folder.FolderGroupManager;
+import org.protege.xmlcatalog.CatalogUtilities;
+import org.protege.xmlcatalog.XMLCatalog;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.Collections;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+
+/**
+ * A catalog written by an older Protege must gain the new mappings the first time
+ * it is updated, even for files that have not changed since. Catalog updates keep
+ * entries whose file is older than the entry, and skip the extraction algorithms
+ * for such files, so the only way a legacy catalog learns about declared and
+ * version IRIs is a version bump that forces one full regeneration.
+ */
+public class FolderCatalogUpgradeTest {
+
+    private static final File SOURCE_DIR = new File("src/test/resources/ontologies/formats");
+    private static final File TEST_ROOT = new File("target/catalog-upgrade.test");
+
+    private static final String ONTOLOGY_IRI = "http://import-test.invalid/versioned/rdfxml";
+    private static final String VERSION_IRI = "http://import-test.invalid/versioned/rdfxml/1.0";
+
+    @Before
+    public void cleanTestRoot() throws IOException {
+        if (TEST_ROOT.exists()) {
+            Files.walk(TEST_ROOT.toPath()).sorted(java.util.Comparator.reverseOrder())
+                 .forEach(p -> p.toFile().delete());
+        }
+        TEST_ROOT.mkdirs();
+    }
+
+    @Test
+    public void legacyVersion2CatalogGainsVersionIriForUnchangedFile() throws IOException {
+        File folder = new File(TEST_ROOT, "legacy");
+        folder.mkdirs();
+        File localCopy = new File(folder, "versioned-rdfxml.owl");
+        Files.copy(new File(SOURCE_DIR, "versioned-rdfxml.owl").toPath(), localCopy.toPath(),
+                   StandardCopyOption.REPLACE_EXISTING);
+
+        // A catalog as the xml:base-only algorithm of Protege 5.6.x wrote it: group
+        // version 2, one entry for the ontology IRI, timestamp far enough in the
+        // future that the file counts as unchanged and the entry is retained.
+        long farFuture = System.currentTimeMillis() + 24L * 60 * 60 * 1000;
+        String legacyCatalog = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n"
+                + "<catalog prefer=\"public\" xmlns=\"urn:oasis:names:tc:entity:xmlns:xml:catalog\">\n"
+                + "    <group id=\"Folder Repository, directory=, recursive=true, Auto-Update=true, version=2\" prefer=\"public\">\n"
+                + "        <uri id=\"Automatically generated entry, Timestamp=" + farFuture + "\""
+                + " name=\"" + ONTOLOGY_IRI + "\" uri=\"versioned-rdfxml.owl\"/>\n"
+                + "    </group>\n"
+                + "</catalog>\n";
+        Files.write(new File(folder, "catalog-v001.xml").toPath(),
+                    legacyCatalog.getBytes(StandardCharsets.UTF_8));
+
+        OntologyCatalogManager catalogManager
+                = new OntologyCatalogManager(Collections.singletonList(new FolderGroupManager()));
+        XMLCatalog catalog = catalogManager.ensureCatalogExists(folder);
+
+        URI ontologyRedirect = CatalogUtilities.getRedirect(URI.create(ONTOLOGY_IRI), catalog);
+        assertNotNull("Legacy mapping must survive the upgrade", ontologyRedirect);
+        assertEquals(localCopy.toURI(), ontologyRedirect);
+
+        URI versionRedirect = CatalogUtilities.getRedirect(URI.create(VERSION_IRI), catalog);
+        assertNotNull("Upgraded catalog must gain the version IRI for an unchanged file", versionRedirect);
+        assertEquals(localCopy.toURI(), versionRedirect);
+    }
+}

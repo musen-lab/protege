@@ -29,7 +29,14 @@ public class FolderGroupManager extends CatalogEntryManager {
 
     public static final int FOLDER_BY_URI_VERSION = 1;
 
-    public static final int CURRENT_VERSION = 2;
+    /*
+     * Bumping this forces one full regeneration of every existing folder catalog
+     * (see ensureLatestVersion). Version 3: catalogs written by version 2 carry
+     * only xml:base mappings and never re-examine unchanged files, so they would
+     * otherwise never learn the declared ontology IRIs, version IRIs, and non-XML
+     * formats that OntologyIriExtractionAlgorithm now provides.
+     */
+    public static final int CURRENT_VERSION = 3;
 
     public static final String ID_PREFIX = "Folder Repository";
 
