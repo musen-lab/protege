@@ -381,7 +381,17 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
 
     private static class XmlOntologyHandler extends DefaultHandler {
 
+        /** The root element's raw xml:base, kept verbatim for the compatibility entry. */
         private URI xmlBase;
+
+        /**
+         * Base URI in effect at each open element (xml:base scopes to its element).
+         * A plain list, not a Deque: the base is null for documents without one.
+         */
+        private final List<URI> baseScopes = new ArrayList<>();
+
+        /** Base URI in effect where the ontology was declared; resolves its relative IRIs. */
+        private URI declarationBase;
 
         private String declaredOntologyIri;
 
@@ -395,19 +405,34 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
         public void startElement(String uri, String localName, String qName, Attributes atts)
                 throws SAXException {
             elementsExamined++;
-            if (elementsExamined == 1) {
-                String base = atts.getValue(XMLConstants.XML_NS_URI, "base");
-                if (base != null) {
-                    try {
-                        xmlBase = new URI(base);
+            URI inheritedBase = baseScopes.isEmpty() ? null : baseScopes.get(baseScopes.size() - 1);
+            URI currentBase = inheritedBase;
+            String baseAttribute = atts.getValue(XMLConstants.XML_NS_URI, "base");
+            if (baseAttribute != null) {
+                URI declaredBase = parseUri(baseAttribute);
+                if (declaredBase != null) {
+                    if (elementsExamined == 1) {
+                        xmlBase = declaredBase;
                     }
-                    catch (java.net.URISyntaxException e) {
-                        logger.debug("Ignoring malformed xml:base '{}'", base);
-                    }
+                    // A relative xml:base on an inner element is itself resolved
+                    // against the base inherited from its ancestors.
+                    boolean canResolve = !declaredBase.isAbsolute()
+                            && inheritedBase != null && inheritedBase.isAbsolute();
+                    currentBase = canResolve ? inheritedBase.resolve(declaredBase) : declaredBase;
                 }
             }
+            baseScopes.add(currentBase);
+
             if (OWL_NS.equals(uri) && "Ontology".equals(localName)) {
+                declarationBase = currentBase;
                 declaredOntologyIri = atts.getValue(RDF_NS, "about");
+                if (declaredOntologyIri == null) {
+                    String id = atts.getValue(RDF_NS, "ID");
+                    if (id != null) {
+                        // rdf:ID="x" names the resource base#x (Protege 3-era files).
+                        declaredOntologyIri = "#" + id;
+                    }
+                }
                 if (declaredOntologyIri == null) {
                     // OWL/XML declares both IRIs as unqualified attributes on this element
                     declaredOntologyIri = atts.getValue("ontologyIRI");
@@ -428,6 +453,9 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
 
         @Override
         public void endElement(String uri, String localName, String qName) throws SAXException {
+            if (!baseScopes.isEmpty()) {
+                baseScopes.remove(baseScopes.size() - 1);
+            }
             if (inOntologyElement && OWL_NS.equals(uri) && "Ontology".equals(localName)) {
                 // Ontology element closed without a version IRI: nothing more to find.
                 throw new ScanCompleteException();
@@ -436,7 +464,8 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
 
         Set<URI> collectedSuggestions() {
             Set<URI> suggestions = new TreeSet<>();
-            URI declared = resolveOntologyIri(declaredOntologyIri, xmlBase);
+            URI resolutionBase = declarationBase != null ? declarationBase : xmlBase;
+            URI declared = resolveOntologyIri(declaredOntologyIri, resolutionBase);
             if (declared != null) {
                 suggestions.add(declared);
             }
@@ -446,7 +475,7 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
             if (xmlBase != null && !xmlBase.equals(declared)) {
                 suggestions.add(xmlBase);
             }
-            URI version = resolveOntologyIri(declaredVersionIri, xmlBase);
+            URI version = resolveOntologyIri(declaredVersionIri, resolutionBase);
             if (version != null && !version.equals(declared)) {
                 suggestions.add(version);
             }

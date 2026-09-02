@@ -206,6 +206,31 @@ public class FolderFormatDetectionTest {
                                 "http://import-test.invalid/formats/turtle-midline");
     }
 
+    /*
+     * Historical RDF/XML shapes (review finding F6): Protege 3-era serializers
+     * wrote rdf:ID declarations and xml:base on the owl:Ontology element itself.
+     * Expected IRIs are what OWL API 4.5.29 assigns when loading each fixture.
+     */
+
+    @Test
+    public void detectsRdfIdOntologyDeclaration() throws IOException {
+        // rdf:ID="onto" under xml:base B means B#onto.
+        assertLocalCopyDetected("rdfid-ontology.owl", "http://import-test.invalid/formats/rdfid#onto");
+    }
+
+    @Test
+    public void detectsAbsoluteXmlBaseOnTheOntologyElement() throws IOException {
+        assertLocalCopyDetected("nested-xmlbase-absolute.owl",
+                                "http://import-test.invalid/formats/nested/onto");
+    }
+
+    @Test
+    public void detectsRelativeXmlBaseOnTheOntologyElementResolvedAgainstTheRootBase() throws IOException {
+        // xml:base="sub/" on the element resolves against the root's base first.
+        assertLocalCopyDetected("nested-xmlbase-relative.owl",
+                                "http://import-test.invalid/formats/root/sub/onto");
+    }
+
     @Test
     public void oboFileWithoutOntologyTagYieldsNoEntry() throws IOException {
         // No "ontology:" tag means no IRI can be derived: the file must be
