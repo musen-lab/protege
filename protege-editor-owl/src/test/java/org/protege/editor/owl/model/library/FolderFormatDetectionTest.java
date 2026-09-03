@@ -26,13 +26,8 @@ import static org.junit.Assert.assertNotNull;
  * These tests specify the intended behavior. At the time of writing only the
  * RDF/XML-with-xml:base case passes: FolderGroupManager extracts ontology IRIs
  * solely via XmlBaseAlgorithm, which reads the xml:base attribute off the first
- * XML element and silently gives up on anything else.
- *
- * The cases that reproduce the defect (T1.1) are marked
- * {@code @Test(expected = AssertionError.class)}: they pass while the defect is
- * present, which makes them the executable reproduction, and they will fail the
- * moment detection is fixed. The T1.3 fix removes those annotations, turning the
- * same tests into the permanent regression suite.
+ * XML element and silently gives up on anything else. The remaining cases fail
+ * until the T1.3 detection fix lands.
  */
 public class FolderFormatDetectionTest {
 
@@ -51,31 +46,31 @@ public class FolderFormatDetectionTest {
                                 "http://import-test.invalid/formats/toppings-rdfxml-xmlbase");
     }
 
-    @Test(expected = AssertionError.class)
+    @Test
     public void detectsRdfXmlWithoutXmlBase() throws IOException {
         assertLocalCopyDetected("toppings-rdfxml-no-xmlbase.owl",
                                 "http://import-test.invalid/formats/toppings-rdfxml-no-xmlbase");
     }
 
-    @Test(expected = AssertionError.class)
+    @Test
     public void detectsTurtle() throws IOException {
         assertLocalCopyDetected("toppings.ttl",
                                 "http://import-test.invalid/formats/toppings-ttl");
     }
 
-    @Test(expected = AssertionError.class)
+    @Test
     public void detectsFunctionalSyntax() throws IOException {
         assertLocalCopyDetected("toppings.ofn",
                                 "http://import-test.invalid/formats/toppings-ofn");
     }
 
-    @Test(expected = AssertionError.class)
+    @Test
     public void detectsManchesterSyntax() throws IOException {
         assertLocalCopyDetected("toppings.omn",
                                 "http://import-test.invalid/formats/toppings-omn");
     }
 
-    @Test(expected = AssertionError.class)
+    @Test
     public void detectsOboFormat() throws IOException {
         // The OBO parser derives the ontology IRI from the "ontology:" tag
         // using the OBO Foundry convention.
@@ -83,7 +78,7 @@ public class FolderFormatDetectionTest {
                                 "http://purl.obolibrary.org/obo/t1toppings.owl");
     }
 
-    @Test(expected = AssertionError.class)
+    @Test
     public void detectsOwlXmlWithoutXmlBase() throws IOException {
         assertLocalCopyDetected("toppings.owx",
                                 "http://import-test.invalid/formats/toppings-owx");
