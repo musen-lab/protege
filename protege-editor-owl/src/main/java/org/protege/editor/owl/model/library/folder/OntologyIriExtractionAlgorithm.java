@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
  * that catalogs and imports built against the historical xml:base-only behavior
  * (XmlBaseAlgorithm) keep resolving.
  */
-public class OntologyIriExtractionAlgorithm implements Algorithm {
+public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
 
     private static final Logger logger = LoggerFactory.getLogger(OntologyIriExtractionAlgorithm.class);
 
@@ -139,10 +139,26 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
 
     @Override
     public Set<URI> getSuggestions(File f) {
-        Set<URI> suggestions = extractFromXml(f);
-        if (suggestions.isEmpty()) {
-            suggestions = extractFromTextHead(f);
+        Suggestions suggestions = getPrioritizedSuggestions(f);
+        if (suggestions.secondary.isEmpty()) {
+            return suggestions.primary;
         }
+        Set<URI> all = new TreeSet<>(suggestions.primary);
+        all.addAll(suggestions.secondary);
+        return all;
+    }
+
+    /**
+     * IRIs read from the document are primary; IRIs derived by convention (OBO
+     * purls) are secondary. See {@link PrioritizedAlgorithm}.
+     */
+    @Override
+    public Suggestions getPrioritizedSuggestions(File f) {
+        Set<URI> declared = extractFromXml(f);
+        if (!declared.isEmpty()) {
+            return new Suggestions(declared, Collections.emptySet());
+        }
+        Suggestions suggestions = extractFromTextHead(f);
         if (suggestions.isEmpty()) {
             logger.debug("No ontology IRI could be extracted from {}", f);
         }
@@ -154,16 +170,17 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
      * The head of the file is read once into memory; each format then examines
      * it with its own small method. First format to find a declaration wins.
      */
-    private Set<URI> extractFromTextHead(File f) {
+    private Suggestions extractFromTextHead(File f) {
         List<String> head = readHead(f);
-        Set<URI> suggestions = extractFromTurtle(head);
-        if (suggestions.isEmpty()) {
-            suggestions = extractFromFrameSyntax(head);
+        Set<URI> declared = extractFromTurtle(head);
+        if (declared.isEmpty()) {
+            declared = extractFromFrameSyntax(head);
         }
-        if (suggestions.isEmpty()) {
-            suggestions = extractFromObo(head);
+        if (!declared.isEmpty()) {
+            return new Suggestions(declared, Collections.emptySet());
         }
-        return suggestions;
+        Set<URI> derived = extractFromObo(head);
+        return derived.isEmpty() ? Suggestions.NONE : new Suggestions(Collections.emptySet(), derived);
     }
 
     private static List<String> readHead(File f) {

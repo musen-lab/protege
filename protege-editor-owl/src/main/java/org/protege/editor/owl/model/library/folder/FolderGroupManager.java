@@ -5,6 +5,8 @@ import org.protege.editor.core.log.LogBanner;
 import org.protege.editor.owl.model.library.CatalogEntryManager;
 import org.protege.editor.owl.model.library.LibraryUtilities;
 import org.protege.editor.owl.model.library.OntologyCatalogManager;
+import org.protege.editor.owl.model.library.folder.PrioritizedAlgorithm.Priority;
+import org.protege.editor.owl.model.library.folder.PrioritizedAlgorithm.Suggestions;
 import org.protege.editor.owl.ui.UIHelper;
 import org.protege.editor.owl.ui.library.NewEntryPanel;
 import org.protege.editor.owl.ui.library.plugins.FolderGroupPanel;
@@ -46,6 +48,16 @@ public class FolderGroupManager extends CatalogEntryManager {
 
     public static final String FILE_KEY = "FILE";
 
+    /*
+     * Generated entries record where their IRI came from, so that later catalog
+     * updates (which keep entries for unchanged files instead of rescanning them)
+     * can still let a declared IRI win over one derived by convention. Absent
+     * property = primary; entries written before version 3 were all primary.
+     */
+    static final String PRIORITY_PROP = "Priority";
+
+    static final String SECONDARY_PRIORITY_VALUE = "secondary";
+
     private static final int NON_ONTOLOGY_DOCUMENT_TERMINATION_LIMIT = 1000;
 
     private final Logger logger = LoggerFactory.getLogger(FolderGroupManager.class);
@@ -69,9 +81,10 @@ public class FolderGroupManager extends CatalogEntryManager {
 
     private boolean modified = false;
 
-    private Map<File, Collection<URI>> retainedFileToWebLocationMap = new TreeMap<>();
+    private Map<File, Map<URI, Priority>> retainedFileToWebLocationMap = new TreeMap<>();
 
-    private Map<URI, Collection<URI>> webLocationToFileLocationMap = new TreeMap<>();
+    /** IRI claimed -> (file claiming it -> whether the claim is declared or derived). */
+    private Map<URI, Map<URI, Priority>> webLocationToFileLocationMap = new TreeMap<>();
 
 
     public FolderGroupManager() {
@@ -299,7 +312,7 @@ public class FolderGroupManager extends CatalogEntryManager {
                         if(logger.isDebugEnabled()) {
                             logger.debug("Map for file " + f + " is still good and will be kept");
                         }
-                        recordRetainedEntry(URI.create(ue.getName()), f.getCanonicalFile());
+                        recordRetainedEntry(URI.create(ue.getName()), f.getCanonicalFile(), priorityOf(ue));
                     }
                 } catch(Throwable t) {
                     logger.error("Exception caught updating catalog entry.", t);
@@ -359,7 +372,7 @@ public class FolderGroupManager extends CatalogEntryManager {
             logger.debug("Applying algorithms to " + physicalLocation);
         }
         URI shortLocation = folder.toURI().relativize(physicalLocation.toURI());
-        Collection<URI> retainedSuggestions = null;
+        Map<URI, Priority> retainedSuggestions = null;
         try {
             retainedSuggestions = retainedFileToWebLocationMap.get(physicalLocation.getCanonicalFile());
         } catch(IOException e) {
@@ -369,56 +382,71 @@ public class FolderGroupManager extends CatalogEntryManager {
             if(logger.isDebugEnabled()) {
                 logger.debug("Adding mappings retained from previous version of the catalog");
             }
-            recordEntries(retainedSuggestions, shortLocation, webLocationsFoundInParentDirectory, newWebLocations);
+            for(Map.Entry<URI, Priority> retained : retainedSuggestions.entrySet()) {
+                recordEntries(Collections.singleton(retained.getKey()), shortLocation,
+                              webLocationsFoundInParentDirectory, newWebLocations, retained.getValue());
+            }
         }
         else {
             if(logger.isDebugEnabled()) {
                 logger.debug("Adding new mappings not found in the previous version of the catalog");
             }
             for(Algorithm algorithm : algorithms) {
-                Set<URI> webLocations = algorithm.getSuggestions(physicalLocation);
-                modified = modified || !webLocations.isEmpty();
-                recordEntries(webLocations, shortLocation, webLocationsFoundInParentDirectory, newWebLocations);
+                Suggestions suggestions = prioritizedSuggestions(algorithm, physicalLocation);
+                modified = modified || !suggestions.isEmpty();
+                recordEntries(suggestions.primary, shortLocation, webLocationsFoundInParentDirectory, newWebLocations, Priority.PRIMARY);
+                recordEntries(suggestions.secondary, shortLocation, webLocationsFoundInParentDirectory, newWebLocations, Priority.SECONDARY);
             }
         }
+    }
+
+    private static Suggestions prioritizedSuggestions(Algorithm algorithm, File physicalLocation) {
+        if(algorithm instanceof PrioritizedAlgorithm) {
+            return ((PrioritizedAlgorithm) algorithm).getPrioritizedSuggestions(physicalLocation);
+        }
+        // Plain algorithms make no distinction: everything they return counts as declared.
+        return new Suggestions(algorithm.getSuggestions(physicalLocation), Collections.emptySet());
+    }
+
+    private static Priority priorityOf(UriEntry entry) {
+        String value = LibraryUtilities.getStringProperty(entry, PRIORITY_PROP);
+        return SECONDARY_PRIORITY_VALUE.equalsIgnoreCase(value) ? Priority.SECONDARY : Priority.PRIMARY;
     }
 
     private void recordEntries(Collection<URI> webLocations,
                                URI physicalLocation,
                                Set<URI> webLocationsFoundInParentDirectory,
-                               Set<URI> newWebLocations) {
+                               Set<URI> newWebLocations,
+                               Priority priority) {
         for(URI webLocation : webLocations) {
             if(!webLocationsFoundInParentDirectory.contains(webLocation)) {
                 newWebLocations.add(webLocation);
-                recordEntry(webLocation, physicalLocation);
+                recordEntry(webLocation, physicalLocation, priority);
             }
             else {
-                recordEntry(appendScheme(webLocation, CatalogEntryManager.SHADOWED_SCHEME), physicalLocation);
+                recordEntry(appendScheme(webLocation, CatalogEntryManager.SHADOWED_SCHEME), physicalLocation, priority);
             }
         }
     }
 
     private void recordEntry(URI webLocation,
-                             URI physicalLocation) {
+                             URI physicalLocation,
+                             Priority priority) {
         if(logger.isDebugEnabled()) {
-            logger.debug("Found mapping from import location " + webLocation + " to physical file " + physicalLocation);
+            logger.debug("Found " + priority + " mapping from import location " + webLocation + " to physical file " + physicalLocation);
         }
-        Collection<URI> possibleFileLocations = webLocationToFileLocationMap.get(webLocation);
-        if(possibleFileLocations == null) {
-            possibleFileLocations = new ArrayList<>();
-            webLocationToFileLocationMap.put(webLocation, possibleFileLocations);
+        Map<URI, Priority> claims = webLocationToFileLocationMap.computeIfAbsent(webLocation, k -> new LinkedHashMap<>());
+        Priority existing = claims.get(physicalLocation);
+        if(existing != Priority.PRIMARY) {   // a declared claim by the same file is never downgraded
+            claims.put(physicalLocation, priority);
         }
-        possibleFileLocations.add(physicalLocation);
     }
 
     private void recordRetainedEntry(URI webLocation,
-                                     File f) {
-        Collection<URI> possibleWebLocations = retainedFileToWebLocationMap.get(f);
-        if(possibleWebLocations == null) {
-            possibleWebLocations = new ArrayList<>();
-            retainedFileToWebLocationMap.put(f, possibleWebLocations);
-        }
-        possibleWebLocations.add(removeIgnoredSchemes(webLocation));
+                                     File f,
+                                     Priority priority) {
+        retainedFileToWebLocationMap.computeIfAbsent(f, k -> new LinkedHashMap<>())
+                                    .put(removeIgnoredSchemes(webLocation), priority);
     }
 
     private void clearEntries() {
@@ -430,26 +458,44 @@ public class FolderGroupManager extends CatalogEntryManager {
         }
     }
 
+    /*
+     * One IRI, several files: a single declared claim wins outright and derived
+     * claims for the same IRI are dropped; several declared claims are a duplicate
+     * as before; derived claims compete among themselves only when no file
+     * declares the IRI.
+     */
     private void writeEntries() {
         if(logger.isDebugEnabled()) {
             logger.debug("Catalog must be modified - writing new data");
         }
-        for(URI webLocation : webLocationToFileLocationMap.keySet()) {
-            Collection<URI> physicalLocations = webLocationToFileLocationMap.get(webLocation);
+        for(Map.Entry<URI, Map<URI, Priority>> claim : webLocationToFileLocationMap.entrySet()) {
+            URI webLocation = claim.getKey();
+            List<URI> declared = new ArrayList<>();
+            List<URI> derived = new ArrayList<>();
+            for(Map.Entry<URI, Priority> byFile : claim.getValue().entrySet()) {
+                (byFile.getValue() == Priority.PRIMARY ? declared : derived).add(byFile.getKey());
+            }
+            Priority priority = declared.isEmpty() ? Priority.SECONDARY : Priority.PRIMARY;
+            List<URI> physicalLocations = declared.isEmpty() ? derived : declared;
             if(physicalLocations.size() > 1 && !isIgnored(webLocation)) {
-                writeEntries(appendScheme(webLocation, CatalogEntryManager.DUPLICATE_SCHEME), physicalLocations);
+                writeEntries(appendScheme(webLocation, CatalogEntryManager.DUPLICATE_SCHEME), physicalLocations, priority);
             }
             else {
-                writeEntries(webLocation, physicalLocations);
+                writeEntries(webLocation, physicalLocations, priority);
             }
         }
     }
 
     private void writeEntries(URI webLocation,
-                              Collection<URI> physicalLocations) {
+                              Collection<URI> physicalLocations,
+                              Priority priority) {
         for(URI physicalLocation : physicalLocations) {
-            String entryId = "Automatically generated entry, " + OntologyCatalogManager.TIMESTAMP + "=" + timeOfCurrentUpdate;
-            UriEntry u = new UriEntry(entryId, ge, webLocation.toString(), physicalLocation, null);
+            StringBuilder entryId = new StringBuilder("Automatically generated entry, ")
+                    .append(OntologyCatalogManager.TIMESTAMP).append("=").append(timeOfCurrentUpdate);
+            if(priority == Priority.SECONDARY) {
+                entryId.append(", ").append(PRIORITY_PROP).append("=").append(SECONDARY_PRIORITY_VALUE);
+            }
+            UriEntry u = new UriEntry(entryId.toString(), ge, webLocation.toString(), physicalLocation, null);
             ge.addEntry(u);
             modified = true;
         }
