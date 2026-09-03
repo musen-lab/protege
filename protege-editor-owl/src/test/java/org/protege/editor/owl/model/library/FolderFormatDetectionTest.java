@@ -231,6 +231,24 @@ public class FolderFormatDetectionTest {
                                 "http://import-test.invalid/formats/root/sub/onto");
     }
 
+    /*
+     * Text-format layouts beyond the OWL API writers' own (review finding F8):
+     * a UTF-8 byte order mark, as Windows editors often prepend, and a
+     * functional-syntax header with the IRIs on the lines after "Ontology(".
+     */
+
+    @Test
+    public void detectsFunctionalSyntaxWithUtf8ByteOrderMark() throws IOException {
+        assertLocalCopyDetected("bom.ofn", "http://import-test.invalid/formats/bom-ofn");
+    }
+
+    @Test
+    public void detectsFunctionalSyntaxWithIrisOnTheLinesAfterOntologyKeyword() throws IOException {
+        assertLocalCopyDetected("split-lines.ofn",
+                                "http://import-test.invalid/formats/split-ofn",
+                                "http://import-test.invalid/formats/split-ofn/1.0");
+    }
+
     @Test
     public void oboFileWithoutOntologyTagYieldsNoEntry() throws IOException {
         // No "ontology:" tag means no IRI can be derived: the file must be

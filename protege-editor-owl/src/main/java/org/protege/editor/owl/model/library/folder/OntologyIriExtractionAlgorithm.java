@@ -101,6 +101,12 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
 
     private static final Pattern BARE_IRI_LINE = Pattern.compile("^\\s*<([^>]*)>\\s*$");
 
+    /*
+     * Functional syntax written by hand often puts "Ontology(" alone on its line,
+     * with the ontology IRI (and optionally the version IRI) on the lines below.
+     */
+    private static final Pattern FUNCTIONAL_ONTOLOGY_OPEN = Pattern.compile("^\\s*Ontology\\s*\\(\\s*$");
+
     private static final Pattern[] FRAME_DECLARATIONS = {FUNCTIONAL_ONTOLOGY, MANCHESTER_ONTOLOGY};
 
     /*
@@ -166,6 +172,9 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
                 ByteStreams.limit(new FileInputStream(f), MAX_BYTES_TO_EXAMINE), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null && head.size() < MAX_LINES_TO_EXAMINE) {
+                if (head.isEmpty() && !line.isEmpty() && line.charAt(0) == '\uFEFF') {
+                    line = line.substring(1); // UTF-8 byte order mark, common from Windows editors
+                }
                 head.add(line);
             }
         }
@@ -219,6 +228,11 @@ public class OntologyIriExtractionAlgorithm implements Algorithm {
 
     private static Set<URI> extractFromFrameSyntax(List<String> head) {
         for (int i = 0; i < head.size(); i++) {
+            if (FUNCTIONAL_ONTOLOGY_OPEN.matcher(head.get(i)).find()) {
+                URI ontologyIri = bareIriOnLine(head, i + 1);
+                URI versionIri = ontologyIri != null ? bareIriOnLine(head, i + 2) : null;
+                return collectSuggestions(ontologyIri, versionIri);
+            }
             for (Pattern format : FRAME_DECLARATIONS) {
                 Matcher declaration = format.matcher(head.get(i));
                 if (declaration.find()) {
