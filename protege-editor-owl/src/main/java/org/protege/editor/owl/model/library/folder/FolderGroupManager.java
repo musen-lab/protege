@@ -278,13 +278,31 @@ public class FolderGroupManager extends CatalogEntryManager {
         }
     }
 
+    /*
+     * A version bump means one regeneration of the generated group, nothing more.
+     * The directory property is kept as written: an empty value means "the folder
+     * holding this catalog", which is what lets a folder be moved or shared. The
+     * bump is itself a change that must reach disk, even when the folder turns out
+     * to hold no ontology documents.
+     */
     private void ensureLatestVersion() {
         int version = LibraryUtilities.getVersion(ge);
         if(version < CURRENT_VERSION) {
             boolean autoUpdate = LibraryUtilities.getBooleanProperty(ge, LibraryUtilities.AUTO_UPDATE_PROP, this.autoUpdate);
-            ge.setId(getIdString(getIdPrefix(), folder.toURI(), recursive, autoUpdate));
+            ge.setId(getIdString(getIdPrefix(), migratedDirectoryProperty(version), recursive, autoUpdate));
             clearEntries();
+            modified = true;
         }
+    }
+
+    private String migratedDirectoryProperty(int version) {
+        String dirName = LibraryUtilities.getStringProperty(ge, DIR_PROP);
+        if(version >= FOLDER_BY_URI_VERSION || folder == null) {
+            return dirName;   // already a URI relative to the catalog
+        }
+        // Before FOLDER_BY_URI_VERSION the property held a plain file system path;
+        // store it the way new catalogs do.
+        return CatalogUtilities.relativize(folder.toURI(), ge).toString();
     }
 
     private void retainEntries() {

@@ -11,10 +11,15 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Declared IRIs take precedence over derived ones (review finding F3). An OBO
@@ -35,10 +40,13 @@ public class FolderCatalogPrecedenceTest {
     @Before
     public void cleanTestRoot() throws IOException {
         if (TEST_ROOT.exists()) {
-            Files.walk(TEST_ROOT.toPath()).sorted(java.util.Comparator.reverseOrder())
-                 .forEach(p -> p.toFile().delete());
+            try (Stream<Path> paths = Files.walk(TEST_ROOT.toPath())) {
+                for (Path p : paths.sorted(Comparator.reverseOrder()).collect(Collectors.toList())) {
+                    Files.delete(p);
+                }
+            }
         }
-        TEST_ROOT.mkdirs();
+        assertTrue("Could not create " + TEST_ROOT, TEST_ROOT.mkdirs());
     }
 
     @Test
@@ -54,19 +62,19 @@ public class FolderCatalogPrecedenceTest {
     }
 
     @Test
-    public void declaredOwlFileWinsWhenItSortsBeforeTheOboFile() throws IOException {
-        File folder = new File(TEST_ROOT, "owl-first");
-        File owl = writeOwl(folder, "a-shared.owl");
-        writeObo(folder, "z-shared.obo");
-        assertEquals(owl.toURI(), redirect(scan(folder), OWL_IRI));
-    }
+    public void declaredOwlFileWinsWhateverTheFileNames() throws IOException {
+        // File.listFiles() order is not controlled by names, so this cannot force a
+        // scan order. It shows the outcome does not depend on names either: the
+        // winner is chosen from the collected claims when entries are written.
+        File first = new File(TEST_ROOT, "names-1");
+        File owlA = writeOwl(first, "a-shared.owl");
+        writeObo(first, "z-shared.obo");
+        assertEquals(owlA.toURI(), redirect(scan(first), OWL_IRI));
 
-    @Test
-    public void declaredOwlFileWinsWhenItSortsAfterTheOboFile() throws IOException {
-        File folder = new File(TEST_ROOT, "obo-first");
-        writeObo(folder, "a-shared.obo");
-        File owl = writeOwl(folder, "z-shared.owl");
-        assertEquals(owl.toURI(), redirect(scan(folder), OWL_IRI));
+        File second = new File(TEST_ROOT, "names-2");
+        writeObo(second, "a-shared.obo");
+        File owlZ = writeOwl(second, "z-shared.owl");
+        assertEquals(owlZ.toURI(), redirect(scan(second), OWL_IRI));
     }
 
     @Test

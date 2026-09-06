@@ -11,11 +11,17 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * A catalog written by an older Protege must gain the new mappings the first time
@@ -35,10 +41,13 @@ public class FolderCatalogUpgradeTest {
     @Before
     public void cleanTestRoot() throws IOException {
         if (TEST_ROOT.exists()) {
-            Files.walk(TEST_ROOT.toPath()).sorted(java.util.Comparator.reverseOrder())
-                 .forEach(p -> p.toFile().delete());
+            try (Stream<Path> paths = Files.walk(TEST_ROOT.toPath())) {
+                for (Path p : paths.sorted(Comparator.reverseOrder()).collect(Collectors.toList())) {
+                    Files.delete(p);
+                }
+            }
         }
-        TEST_ROOT.mkdirs();
+        assertTrue("Could not create " + TEST_ROOT, TEST_ROOT.mkdirs());
     }
 
     @Test
@@ -111,5 +120,83 @@ public class FolderCatalogUpgradeTest {
                      userMapped.toURI(), CatalogUtilities.getRedirect(URI.create(userIri), catalog));
         assertEquals("Generated group must be rebuilt with the version IRI",
                      localCopy.toURI(), CatalogUtilities.getRedirect(URI.create(VERSION_IRI), catalog));
+    }
+
+    @Test
+    public void migrationKeepsTheRelativeDirectoryOfAPortableCatalog() throws IOException {
+        File folder = new File(TEST_ROOT, "portable");
+        folder.mkdirs();
+        Files.copy(new File(SOURCE_DIR, "versioned-rdfxml.owl").toPath(),
+                   new File(folder, "versioned-rdfxml.owl").toPath(), StandardCopyOption.REPLACE_EXISTING);
+        writeLegacyCatalog(folder, "");
+
+        newManager().ensureCatalogExists(folder);
+
+        String saved = new String(Files.readAllBytes(new File(folder, "catalog-v001.xml").toPath()), StandardCharsets.UTF_8);
+        assertTrue("The migrated group must keep 'directory=' (relative to the catalog), got:\n" + saved,
+                   saved.contains("directory=, recursive=true, Auto-Update=true, version=3"));
+    }
+
+    @Test
+    public void migratedCatalogStillUpdatesAfterItsFolderMoves() throws IOException {
+        File original = new File(TEST_ROOT, "movable");
+        original.mkdirs();
+        Files.copy(new File(SOURCE_DIR, "versioned-rdfxml.owl").toPath(),
+                   new File(original, "versioned-rdfxml.owl").toPath(), StandardCopyOption.REPLACE_EXISTING);
+        writeLegacyCatalog(original, "");
+        newManager().ensureCatalogExists(original);
+
+        File moved = new File(TEST_ROOT, "moved");
+        Files.move(original.toPath(), moved.toPath());
+        File added = new File(moved, "toppings.owl");
+        Files.copy(new File(SOURCE_DIR, "toppings-rdfxml-xmlbase.owl").toPath(), added.toPath());
+        XMLCatalog catalog = newManager().ensureCatalogExists(moved);
+
+        assertEquals("A file added after the move must be scanned in the new location",
+                     added.toURI(),
+                     CatalogUtilities.getRedirect(URI.create("http://import-test.invalid/formats/toppings-rdfxml-xmlbase"), catalog));
+    }
+
+    @Test
+    public void emptyLegacyCatalogIsSavedAtTheNewVersion() throws IOException {
+        File folder = new File(TEST_ROOT, "empty-legacy");
+        folder.mkdirs();
+        writeLegacyCatalog(folder, "");
+
+        newManager().ensureCatalogExists(folder);
+
+        String saved = new String(Files.readAllBytes(new File(folder, "catalog-v001.xml").toPath()), StandardCharsets.UTF_8);
+        assertTrue("An empty folder's catalog must still be written at version 3, got:\n" + saved,
+                   saved.contains("version=3"));
+    }
+
+    @Test
+    public void legacyCatalogWithOnlyAStaleEntryIsRewrittenWithoutIt() throws IOException {
+        File folder = new File(TEST_ROOT, "stale-legacy");
+        folder.mkdirs();
+        long farFuture = System.currentTimeMillis() + 24L * 60 * 60 * 1000;
+        writeLegacyCatalog(folder, "        <uri id=\"Automatically generated entry, Timestamp=" + farFuture + "\""
+                + " name=\"http://import-test.invalid/gone\" uri=\"missing.owl\"/>\n");
+
+        newManager().ensureCatalogExists(folder);
+
+        String saved = new String(Files.readAllBytes(new File(folder, "catalog-v001.xml").toPath()), StandardCharsets.UTF_8);
+        assertTrue("Catalog must be saved at version 3, got:\n" + saved, saved.contains("version=3"));
+        assertFalse("The entry for a file that no longer exists must be gone, got:\n" + saved,
+                    saved.contains("missing.owl"));
+    }
+
+    private static void writeLegacyCatalog(File folder, String groupChildren) throws IOException {
+        String legacyCatalog = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n"
+                + "<catalog prefer=\"public\" xmlns=\"urn:oasis:names:tc:entity:xmlns:xml:catalog\">\n"
+                + "    <group id=\"Folder Repository, directory=, recursive=true, Auto-Update=true, version=2\" prefer=\"public\">\n"
+                + groupChildren
+                + "    </group>\n"
+                + "</catalog>\n";
+        Files.write(new File(folder, "catalog-v001.xml").toPath(), legacyCatalog.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static OntologyCatalogManager newManager() {
+        return new OntologyCatalogManager(Collections.singletonList(new FolderGroupManager()));
     }
 }
