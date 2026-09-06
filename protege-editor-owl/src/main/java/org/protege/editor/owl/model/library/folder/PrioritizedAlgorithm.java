@@ -6,19 +6,17 @@ import java.util.Collections;
 import java.util.Set;
 
 /**
- * An {@link Algorithm} that can tell declared IRIs from derived ones.
+ * An {@link Algorithm} that keeps the IRIs it read from a file apart from the
+ * IRIs it built by convention.
  * <p>
- * A <em>primary</em> suggestion is an IRI the document itself states (an
- * {@code owl:Ontology} declaration, a version IRI, an {@code xml:base}). A
- * <em>secondary</em> suggestion is derived by convention rather than read from
- * the document, such as the OBO Foundry purls computed for an OBO file. When two
- * files claim the same IRI, {@link FolderGroupManager} lets a primary claim win
- * over secondary ones instead of recording a duplicate, so the OWL rendering of
- * an ontology keeps resolving when its OBO rendering sits in the same folder.
+ * A <em>primary</em> IRI is one the file states itself: an {@code owl:Ontology}
+ * declaration, a version IRI, an {@code xml:base}. A <em>secondary</em> IRI is
+ * worked out from other information, such as the OBO Foundry address built from
+ * an OBO file's {@code ontology:} line. When two files give the same IRI,
+ * {@link FolderGroupManager} lets a primary one win over a secondary one, so that
+ * {@code x.owl} still resolves when {@code x.obo} sits next to it.
  * <p>
- * Package-private on purpose: this refines the folder scan without widening the
- * public {@code Algorithm} plugin API. Implementations must produce both sets
- * from a single read of the file.
+ * Implementations must return both sets from a single read of the file.
  */
 interface PrioritizedAlgorithm extends Algorithm {
 

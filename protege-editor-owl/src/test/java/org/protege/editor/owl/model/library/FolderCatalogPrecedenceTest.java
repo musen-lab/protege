@@ -22,13 +22,12 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Declared IRIs take precedence over derived ones (review finding F3). An OBO
- * file's IRIs are derived by convention, and the OWL rendering of the same
- * ontology, when present, declares the same IRI. Without precedence the catalog
- * would call that a duplicate and resolve neither, breaking OBO Foundry style
- * folders that ship {@code x.owl} next to {@code x.obo}. Precedence must also
- * survive later catalog updates, where earlier claims come back from the catalog
- * file rather than from a fresh scan, so provenance is persisted per entry.
+ * When {@code x.owl} and {@code x.obo} describe the same ontology, both give the
+ * same IRI: the OWL file states it, the OBO file's is built from its
+ * {@code ontology:} line. The OWL file must win, or the catalog would call it a
+ * duplicate and resolve neither. This must still hold on later updates, when
+ * entries come back from the catalog file instead of a fresh scan, so each
+ * entry records where its IRI came from.
  */
 public class FolderCatalogPrecedenceTest {
 

@@ -25,10 +25,9 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * A catalog written by an older Protege must gain the new mappings the first time
- * it is updated, even for files that have not changed since. Catalog updates keep
- * entries whose file is older than the entry, and skip the extraction algorithms
- * for such files, so the only way a legacy catalog learns about declared and
- * version IRIs is a version bump that forces one full regeneration.
+ * it is updated, even for files that have not changed. Updates keep entries for
+ * unchanged files and do not rescan them, so the only way an old catalog learns
+ * the new IRIs is a version bump that rebuilds it once.
  */
 public class FolderCatalogUpgradeTest {
 

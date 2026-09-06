@@ -19,17 +19,10 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * T1 (Import Management): a local copy of an imported ontology must be auto-detected
- * by the folder scan that builds catalog-v001.xml, whatever OWL serialization the
- * copy uses. Each test places a single fixture in an empty folder, generates the
- * catalog for that folder, and asserts the catalog redirects the ontology IRI to
- * the local file.
- *
- * These tests specify the intended behavior. At the time of writing only the
- * RDF/XML-with-xml:base case passes: FolderGroupManager extracts ontology IRIs
- * solely via XmlBaseAlgorithm, which reads the xml:base attribute off the first
- * XML element and silently gives up on anything else. The remaining cases fail
- * until the T1.3 detection fix lands.
+ * A local copy of an imported ontology must be found by the folder scan that
+ * builds catalog-v001.xml, whatever format the copy is in. Each test puts one
+ * file in an empty folder, builds the catalog, and checks that the catalog points
+ * the ontology IRI at that file.
  */
 public class FolderFormatDetectionTest {
 
@@ -136,8 +129,7 @@ public class FolderFormatDetectionTest {
 
     @Test
     public void detectsVersionIriInObo() throws IOException {
-        // data-version derives the version purl: obo/<id>/<data-version>/<id>.owl
-        // (verified against OWL API 4.5.29, full id repeated even when slashed).
+        // data-version gives the version IRI obo/<id>/<data-version>/<id>.owl, as the OWL API builds it.
         assertLocalCopyDetected("versioned.obo",
                                 "http://purl.obolibrary.org/obo/t1vtoppings.owl",
                                 "http://purl.obolibrary.org/obo/t1vtoppings.obo",
@@ -145,10 +137,9 @@ public class FolderFormatDetectionTest {
     }
 
     /*
-     * Compatibility with the historical xml:base-only algorithm (review findings
-     * F4 and F7): whatever xml:base it emitted must still be emitted, even a
-     * relative one, while declared IRIs that cannot be resolved to an absolute
-     * IRI must not leak into the catalog as relative entries.
+     * Compatibility with the older scan, which indexed every XML file by its
+     * xml:base: that value must still be listed, even a relative one. A declared
+     * IRI that cannot be made absolute must not be listed at all.
      */
 
     @Test
@@ -173,9 +164,8 @@ public class FolderFormatDetectionTest {
     }
 
     /*
-     * Turtle lexical handling (review finding F5): text inside long-string
-     * literals or comments must never produce a catalog entry, and comments must
-     * not hide a real declaration or its version IRI.
+     * Turtle: text inside strings or comments must never produce a catalog entry,
+     * and a comment must not hide a real declaration or its version IRI.
      */
 
     @Test
@@ -207,9 +197,9 @@ public class FolderFormatDetectionTest {
     }
 
     /*
-     * Historical RDF/XML shapes (review finding F6): Protege 3-era serializers
-     * wrote rdf:ID declarations and xml:base on the owl:Ontology element itself.
-     * Expected IRIs are what OWL API 4.5.29 assigns when loading each fixture.
+     * Older RDF/XML shapes, as Protege 3 wrote them: rdf:ID declarations, and
+     * xml:base on the owl:Ontology element itself. The expected IRIs are the ones
+     * the OWL API assigns when it loads each file.
      */
 
     @Test
@@ -232,9 +222,9 @@ public class FolderFormatDetectionTest {
     }
 
     /*
-     * Text-format layouts beyond the OWL API writers' own (review finding F8):
-     * a UTF-8 byte order mark, as Windows editors often prepend, and a
-     * functional-syntax header with the IRIs on the lines after "Ontology(".
+     * Text layouts the OWL API itself does not write: a UTF-8 byte order mark at
+     * the start of the file (common from Windows editors), and functional syntax
+     * with the IRIs on the lines after "Ontology(".
      */
 
     @Test

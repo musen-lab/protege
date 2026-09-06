@@ -4,21 +4,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Reduces the head of a Turtle document to its "code" so that regex-based
- * detection of the ontology declaration cannot be fooled by look-alike text
- * (review finding F5). Per line, in document order:
+ * Strips the start of a Turtle document down to its structure, so the ontology
+ * declaration can be found with simple patterns that are not fooled by text
+ * inside strings or comments. For each line, in order:
  * <ul>
- * <li>long string literals ({@code """..."""} and {@code '''...'''}), including
- *     ones spanning several lines, are replaced by an empty literal {@code ""};</li>
- * <li>short string literals ({@code "..."} and {@code '...'}, with backslash
- *     escapes) are replaced by {@code ""};</li>
- * <li>IRIs in angle brackets are kept verbatim (a {@code #} inside one is a
- *     fragment, not a comment);</li>
- * <li>a {@code #} outside strings and IRIs starts a comment that runs to the end
- *     of the line and is dropped.</li>
+ * <li>string literals become {@code ""}, whether short ({@code "..."},
+ *     {@code '...'}) or long ({@code """..."""}, {@code '''...'''}, possibly
+ *     spanning several lines);</li>
+ * <li>IRIs in angle brackets are kept as they are (a {@code #} inside one is
+ *     not a comment);</li>
+ * <li>a {@code #} outside strings and IRIs starts a comment, which is dropped
+ *     to the end of the line.</li>
  * </ul>
- * Everything else is copied unchanged, so line numbers and statement
- * terminators ({@code ;} and {@code .}) survive for the caller's patterns.
+ * Everything else is kept, so line numbers and the {@code ;} and {@code .} that
+ * end statements stay where they were.
  */
 final class TurtleCodeFilter {
 

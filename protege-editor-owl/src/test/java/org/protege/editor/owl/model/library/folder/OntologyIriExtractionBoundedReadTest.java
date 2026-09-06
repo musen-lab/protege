@@ -18,11 +18,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The folder scan promises bounded reads (issue #11): a file is examined by
- * reading at most a fixed number of bytes, whatever its size or line structure,
- * so that scanning a folder can never exhaust the desktop process's heap
- * (review finding F2). One mebibyte is far beyond any real ontology declaration
- * offset (largest seen in the local corpus: about 2 KiB).
+ * The folder scan reads at most a fixed number of bytes from any file, whatever
+ * its size or line structure, so scanning a folder can never run Protege out of
+ * memory. One megabyte is far more than any real declaration needs.
  */
 public class OntologyIriExtractionBoundedReadTest {
 

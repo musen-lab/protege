@@ -32,11 +32,10 @@ public class FolderGroupManager extends CatalogEntryManager {
     public static final int FOLDER_BY_URI_VERSION = 1;
 
     /*
-     * Bumping this forces one full regeneration of every existing folder catalog
-     * (see ensureLatestVersion). Version 3: catalogs written by version 2 carry
-     * only xml:base mappings and never re-examine unchanged files, so they would
-     * otherwise never learn the declared ontology IRIs, version IRIs, and non-XML
-     * formats that OntologyIriExtractionAlgorithm now provides.
+     * Raising this number makes every existing catalog rebuild itself once (see
+     * ensureLatestVersion). Version 3: older catalogs only ever indexed files by
+     * xml:base, and updates never re-read unchanged files, so without a rebuild
+     * they would never learn the IRIs the new scan finds.
      */
     public static final int CURRENT_VERSION = 3;
 
@@ -49,10 +48,11 @@ public class FolderGroupManager extends CatalogEntryManager {
     public static final String FILE_KEY = "FILE";
 
     /*
-     * Generated entries record where their IRI came from, so that later catalog
-     * updates (which keep entries for unchanged files instead of rescanning them)
-     * can still let a declared IRI win over one derived by convention. Absent
-     * property = primary; entries written before version 3 were all primary.
+     * Each generated entry records whether its IRI was read from the file or built
+     * by convention. Later updates keep entries for unchanged files instead of
+     * rescanning them, so this is how a read IRI can still win over a built one.
+     * No property means "read from the file"; entries older than version 3 all
+     * count as such.
      */
     static final String PRIORITY_PROP = "Priority";
 
@@ -477,10 +477,9 @@ public class FolderGroupManager extends CatalogEntryManager {
     }
 
     /*
-     * One IRI, several files: a single declared claim wins outright and derived
-     * claims for the same IRI are dropped; several declared claims are a duplicate
-     * as before; derived claims compete among themselves only when no file
-     * declares the IRI.
+     * One IRI, several files. A file that states the IRI wins over files that only
+     * imply it. Several files stating it are a duplicate, as before. Implied claims
+     * compete among themselves only when no file states the IRI.
      */
     private void writeEntries() {
         if(logger.isDebugEnabled()) {

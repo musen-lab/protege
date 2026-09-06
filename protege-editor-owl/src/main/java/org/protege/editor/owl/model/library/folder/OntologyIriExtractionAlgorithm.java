@@ -29,33 +29,26 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Extracts the IRI(s) under which a local ontology document should be listed in a
- * folder catalog, without fully loading the ontology (T1, import management).
- *
- * XML documents (RDF/XML, OWL/XML) are examined with a bounded SAX parse. The
- * declared ontology IRI (an owl:Ontology element's rdf:about or ontologyIRI
- * attribute) is the primary suggestion. xml:base resolves a relative declaration,
- * and stands in as the only suggestion when no ontology IRI is declared. When a
- * declared IRI and a differing xml:base are both present, both are suggested, so
- * that catalogs and imports built against the historical xml:base-only behavior
- * (XmlBaseAlgorithm) keep resolving.
+ * Finds the IRI (the web address) of the ontology stored in a local file, so the
+ * folder catalog can point that address at the file. Reads only the start of the
+ * file and never loads the ontology.
+ * <p>
+ * Handles RDF/XML, OWL/XML, Turtle, OWL functional syntax, Manchester syntax and
+ * OBO. Returns the ontology IRI, the version IRI when the file states one, and,
+ * for XML files, the {@code xml:base} value that older versions of the scan
+ * indexed by. Returns nothing for a file it cannot read.
  */
 public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
 
     private static final Logger logger = LoggerFactory.getLogger(OntologyIriExtractionAlgorithm.class);
 
-    /*
-     * RDF/XML puts owl:Ontology at or near the top of the document; a document
-     * that deep in shows no ontology declaration is indexed by xml:base alone
-     * rather than parsed to the end.
-     */
+    // Stop parsing XML after this many elements. Real files declare the ontology near the top.
     private static final int MAX_ELEMENTS_TO_EXAMINE = 1000;
 
     /*
-     * Hard cap on bytes read from any file, on both the XML and the text path.
-     * Line and element counts alone do not bound memory: one enormous line, or one
-     * enormous text node, would be read whole. Real ontology declarations sit
-     * within the first few KiB; 1 MiB leaves a wide margin.
+     * Never read more than this from a file, in any format. Counting lines or
+     * elements is not enough: one huge line would still be read whole. Real
+     * declarations sit in the first few KB.
      */
     private static final long MAX_BYTES_TO_EXAMINE = 1024L * 1024L;
 
@@ -63,18 +56,14 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
 
     private static final String RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
-    /*
-     * Text-based formats declare the ontology within the first lines of the
-     * document; a bounded scan keeps huge data files cheap to reject.
-     */
+    // Text formats declare the ontology within the first lines of the file.
     private static final int MAX_LINES_TO_EXAMINE = 100;
 
     /*
-     * Turtle: '@base <iri>' (or SPARQL-style 'BASE <iri>') sets the base URI;
-     * the ontology declaration is '<iri> a owl:Ontology', where 'a' can also be
-     * written rdf:type or as the full rdf:type IRI, and the object can be the
-     * conventional owl:Ontology prefix form or the full OWL IRI. Prefixed
-     * subjects (':onto a owl:Ontology') are out of scope for this bounded scan.
+     * Turtle. '@base <iri>' or 'BASE <iri>' sets the base. The declaration is
+     * '<iri> a owl:Ontology'; 'a' may also be written rdf:type or as its full IRI,
+     * and owl:Ontology may be written in full. A subject written as a prefixed
+     * name (':onto') is not detected.
      */
     private static final Pattern TURTLE_BASE = Pattern.compile(
             "^\\s*(?:@base|BASE)\\s+<([^>]*)>", Pattern.CASE_INSENSITIVE);
@@ -84,14 +73,10 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
                     + "(?:owl:Ontology|<http://www\\.w3\\.org/2002/07/owl#Ontology>)\\s*[.;]");
 
     /*
-     * Functional syntax: 'Ontology(<iri>' opens the ontology frame; Manchester
-     * syntax: 'Ontology: <iri>'. Same shapes the OWL API's AutoIRIMapper has
-     * matched for years (its 'pattern' and 'manPattern'), except anchored with
-     * find() rather than Matcher.matches(), so trailing content on the line
-     * (a version IRI, an annotation) does not defeat the match. In both formats
-     * an optional version IRI follows the ontology IRI, either on the same line
-     * (second group) or alone on the following line (the OWL API writers'
-     * layout, matched by BARE_IRI_LINE).
+     * Functional syntax opens with 'Ontology(<iri>', Manchester syntax with
+     * 'Ontology: <iri>'. A version IRI may follow on the same line (second group)
+     * or alone on the next line. Matched with find(), so text after the IRI does
+     * not break the match.
      */
     private static final Pattern FUNCTIONAL_ONTOLOGY = Pattern.compile(
             "^\\s*Ontology\\s*\\(\\s*<([^>]*)>(?:\\s+<([^>]*)>)?");
@@ -101,38 +86,24 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
 
     private static final Pattern BARE_IRI_LINE = Pattern.compile("^\\s*<([^>]*)>\\s*$");
 
-    /*
-     * Functional syntax written by hand often puts "Ontology(" alone on its line,
-     * with the ontology IRI (and optionally the version IRI) on the lines below.
-     */
+    // Hand-written functional syntax often puts 'Ontology(' alone on its line, with the IRIs below.
     private static final Pattern FUNCTIONAL_ONTOLOGY_OPEN = Pattern.compile("^\\s*Ontology\\s*\\(\\s*$");
 
     private static final Pattern[] FRAME_DECLARATIONS = {FUNCTIONAL_ONTOLOGY, MANCHESTER_ONTOLOGY};
 
-    /*
-     * Turtle: the OWL API's writer continues the ontology statement onto the
-     * next line for the version ('<iri> rdf:type owl:Ontology ;' then
-     * 'owl:versionIRI <viri> .'), so this is matched anywhere in a line while
-     * the ontology statement is still open, not just at line start.
-     */
+    // Turtle usually puts the version IRI on its own line while the ontology
+    // statement is still open (the line before ends with ';'), so match it anywhere in a line.
     private static final Pattern TURTLE_VERSION = Pattern.compile(
             "(?:^|\\s)owl:versionIRI\\s+<([^>]*)>");
 
     /*
-     * OBO: the header's 'ontology: <id>' tag carries no IRI; the OWL API derives
-     * one by the OBO Foundry convention (purl prefix + id + ".owl", slashed
-     * subset ids included), so the catalog must list the same IRI the loader
-     * will assign. The .obo document URL is listed too, because OBO import
-     * lines conventionally reference the document rather than the derived IRI.
-     * Lowercase 'ontology:' cannot collide with Manchester's 'Ontology:'.
+     * OBO. The 'ontology: <id>' header line has no IRI. The OWL API builds one
+     * when it loads the file: purl prefix + id + '.owl'. The catalog must list
+     * that same IRI, plus the '.obo' address, which OBO import lines often use.
      */
     private static final Pattern OBO_ONTOLOGY = Pattern.compile("^ontology:\\s*(\\S+)\\s*$");
 
-    /*
-     * OBO: 'data-version: <v>' derives the version IRI by the same Foundry
-     * convention, with the full id repeated: obo/<id>/<v>/<id>.owl (verified
-     * against OWL API 4.5.29, slashed ids included).
-     */
+    // OBO 'data-version: <v>' gives the version IRI obo/<id>/<v>/<id>.owl, as the OWL API builds it.
     private static final Pattern OBO_DATA_VERSION = Pattern.compile("^data-version:\\s*(\\S+)\\s*$");
 
     private static final String OBO_PURL_PREFIX = "http://purl.obolibrary.org/obo/";
@@ -148,10 +119,7 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
         return all;
     }
 
-    /**
-     * IRIs read from the document are primary; IRIs derived by convention (OBO
-     * purls) are secondary. See {@link PrioritizedAlgorithm}.
-     */
+    /** IRIs read from the file are primary; IRIs built by convention (OBO) are secondary. */
     @Override
     public Suggestions getPrioritizedSuggestions(File f) {
         Set<URI> declared = extractFromXml(f);
@@ -165,11 +133,8 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
         return suggestions;
     }
 
-    /*
-     * Text-based formats (Turtle, functional syntax, Manchester syntax, OBO).
-     * The head of the file is read once into memory; each format then examines
-     * it with its own small method. First format to find a declaration wins.
-     */
+    // Text formats. Read the start of the file once, then let each format look at
+    // it in turn. The first format that finds a declaration wins.
     private Suggestions extractFromTextHead(File f) {
         List<String> head = readHead(f);
         Set<URI> declared = extractFromTurtle(head);
@@ -204,9 +169,8 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
     }
 
     private static Set<URI> extractFromTurtle(List<String> rawHead) {
-        // Strings and comments cannot contain a declaration; strip them first so a
-        // look-alike inside a literal is never indexed and a trailing comment does
-        // not hide a statement's ';' or '.' (review finding F5).
+        // Strip strings and comments first: a look-alike inside a string must not be
+        // indexed, and a trailing comment must not hide the ';' or '.' that ends a statement.
         List<String> head = TurtleCodeFilter.codeLines(rawHead);
         URI base = null;
         for (int i = 0; i < head.size(); i++) {
@@ -306,11 +270,10 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
         return suggestions.isEmpty() ? Collections.emptySet() : suggestions;
     }
 
-    /**
-     * Resolves a declared ontology IRI against a base URI. An empty declaration
-     * ("this document") means exactly the base; URI.resolve("") cannot express
-     * that, because it follows RFC 2396 and drops the base's last path segment.
-     * Returns null when no absolute IRI can be produced.
+    /*
+     * Resolves a declared IRI against a base. An empty declaration means "this
+     * document", so it is the base itself; URI.resolve("") would drop the last part
+     * of the base's path instead. Returns null when no absolute IRI results.
      */
     private static URI resolveOntologyIri(String declared, URI base) {
         if (declared == null) {
@@ -401,9 +364,7 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
         }
     }
 
-    /**
-     * Thrown by the handler to stop the SAX parse early; never leaves this class.
-     */
+    /** Stops the XML parse early, once the handler has what it needs. */
     private static class ScanCompleteException extends SAXException {
         ScanCompleteException() {
             super("Ontology declaration scan complete");
@@ -412,16 +373,13 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
 
     private static class XmlOntologyHandler extends DefaultHandler {
 
-        /** The root element's raw xml:base, kept verbatim for the compatibility entry. */
+        // The root element's xml:base, as written. Listed for compatibility with the older scan.
         private URI xmlBase;
 
-        /**
-         * Base URI in effect at each open element (xml:base scopes to its element).
-         * A plain list, not a Deque: the base is null for documents without one.
-         */
+        // Base IRI in effect at each open element. Entries are null when there is none.
         private final List<URI> baseScopes = new ArrayList<>();
 
-        /** Base URI in effect where the ontology was declared; resolves its relative IRIs. */
+        // Base IRI in effect at the owl:Ontology element.
         private URI declarationBase;
 
         private String declaredOntologyIri;
