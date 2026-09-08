@@ -1,0 +1,14 @@
+@prefix : <http://example.invalid/declarations/base#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# The imported ontology.  It declares two of the five terms the module test names, and no more:
+# SharedTerm, which the module declares as well, and BaseOnly, which the module only references.
+# Borrowed and MisplacedTerm are deliberately absent, though they live in this namespace.
+
+<http://example.invalid/declarations/base> a owl:Ontology .
+
+:SharedTerm a owl:Class .
+
+:BaseOnly a owl:Class .

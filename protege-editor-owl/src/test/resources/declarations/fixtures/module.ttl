@@ -1,0 +1,29 @@
+@prefix : <http://example.invalid/declarations/module#> .
+@prefix base: <http://example.invalid/declarations/base#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# The ontology under test: a module that imports a base ontology.  Every awkward case the
+# acceptance table names is here, and each term earns its place.
+
+<http://example.invalid/declarations/module> a owl:Ontology ;
+    owl:imports <http://example.invalid/declarations/base> .
+
+# Declared here, in this ontology's own namespace.  A save must always write it.
+:LocalTerm a owl:Class .
+
+# Declared here and by the import too.  The duplicate must survive: dropping it would change
+# what this document says on its own.
+base:SharedTerm a owl:Class .
+
+# Declared here, in a namespace the import owns.  Misplaced, but stated, so it must survive.
+base:MisplacedTerm a owl:Class .
+
+# Referenced and declared by nobody.  This is the declaration Protege adds for you, and the one
+# the preference suppresses.
+:LocalTerm rdfs:subClassOf base:Borrowed .
+
+# Referenced here, declared by the import.  Protege never adds a declaration for it, whatever
+# the preference says.
+base:MisplacedTerm rdfs:subClassOf base:BaseOnly .

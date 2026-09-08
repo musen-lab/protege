@@ -38,3 +38,19 @@ the question is what changed the output, not how to make the test green again.
 
 When a change to the output is intended and understood, `DeclarationBaseline.main` rewrites
 every baseline document. It needs the module directory as its working directory.
+
+## fixtures/
+
+`base.ttl` and `module.ttl` are the fixture for `EntityDeclarationBehaviour_TestCase`: a module
+that imports a base ontology. Five terms, each for one row of the acceptance table.
+
+| Term | Declared by | What it proves |
+|---|---|---|
+| `module#LocalTerm` | the module | an explicit declaration always survives |
+| `base#SharedTerm` | the module and the import | a duplicated declaration still survives |
+| `base#MisplacedTerm` | the module | a declaration in a namespace the import owns still survives |
+| `base#Borrowed` | nobody | the declaration Protege adds, and the preference suppresses |
+| `base#BaseOnly` | the import | Protege never adds this one, whatever the preference says |
+
+The import resolves through an IRI mapper in the test. Nothing here reaches the network:
+`example.invalid` cannot resolve, by RFC 2606.
