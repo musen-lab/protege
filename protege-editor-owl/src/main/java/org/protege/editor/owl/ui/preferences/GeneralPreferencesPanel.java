@@ -7,6 +7,7 @@ import org.protege.editor.core.ui.preferences.PreferencesLayoutPanel;
 import org.protege.editor.core.ui.view.View;
 import org.protege.editor.owl.model.axiom.FreshAxiomLocation;
 import org.protege.editor.owl.model.axiom.FreshAxiomLocationPreferences;
+import org.protege.editor.owl.model.declaration.EntityDeclarationPreferences;
 import org.protege.editor.owl.model.search.SearchManagePluginListCellRenderer;
 import org.protege.editor.owl.model.search.SearchManagerPlugin;
 import org.protege.editor.owl.model.search.SearchManagerSelector;
@@ -35,6 +36,16 @@ public class GeneralPreferencesPanel extends OWLPreferencesPanel {
 
     private static final String SECOND_TOOL_TIP = "1000 = 1 second";
 
+    private static final String SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_LABEL =
+            "Suppress automatic entity declarations when saving";
+
+    private static final String SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_TOOLTIP =
+            "<html>This option controls whether missing entity declarations are added automatically when "
+                    + "serializing an ontology.<br><br>"
+                    + "When selected, automatic type declaration is switched off so saving does not add "
+                    + "entity declarations directly to the active ontology, as these declarations would "
+                    + "otherwise introduce duplicates.";
+
     private JCheckBox alwaysCentreDialogsCheckbox;
 
     private JCheckBox detachedWindowsFloat;
@@ -42,6 +53,8 @@ public class GeneralPreferencesPanel extends OWLPreferencesPanel {
     private JRadioButton addFreshAxiomsToActiveOntologyRadioButton;
 
     private JRadioButton addFreshAxiomsToSubjectDefiningOntology;
+
+    private JCheckBox keepDeclarationsInDefiningOntologyCheckBox;
 
 
     private JCheckBox autoExpandEnabledCheckBox;
@@ -72,6 +85,9 @@ public class GeneralPreferencesPanel extends OWLPreferencesPanel {
         else if (addFreshAxiomsToSubjectDefiningOntology.isSelected()) {
             axiomPrefs.setFreshAxiomLocation(FreshAxiomLocation.SUBJECT_DEFINING_ONTOLOGY);
         }
+
+        EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(
+                keepDeclarationsInDefiningOntologyCheckBox.isSelected());
 
         OWLTreePreferences prefs = OWLTreePreferences.getInstance();
         prefs.setAutoExpansionEnabled(autoExpandEnabledCheckBox.isSelected());
@@ -120,6 +136,16 @@ public class GeneralPreferencesPanel extends OWLPreferencesPanel {
         panel.addGroup("Axioms");
         panel.addGroupComponent(addFreshAxiomsToActiveOntologyRadioButton);
         panel.addGroupComponent(addFreshAxiomsToSubjectDefiningOntology);
+
+        // Declarations
+
+        keepDeclarationsInDefiningOntologyCheckBox = new JCheckBox(SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_LABEL,
+                EntityDeclarationPreferences.getInstance().isSuppressingAutomaticDeclarations());
+        keepDeclarationsInDefiningOntologyCheckBox.setToolTipText(SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_TOOLTIP);
+
+        panel.addSeparator();
+        panel.addGroup("Declarations");
+        panel.addGroupComponent(keepDeclarationsInDefiningOntologyCheckBox);
 
 
         // Tree preferences
