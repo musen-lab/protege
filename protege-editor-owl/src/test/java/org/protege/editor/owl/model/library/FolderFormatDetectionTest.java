@@ -5,6 +5,7 @@ import org.junit.Test;
 import org.protege.editor.owl.model.library.folder.FolderGroupManager;
 import org.protege.xmlcatalog.CatalogUtilities;
 import org.protege.xmlcatalog.XMLCatalog;
+import org.protege.xmlcatalog.entry.GroupEntry;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,24 +16,13 @@ import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
- * T1 (Import Management): a local copy of an imported ontology must be auto-detected
- * by the folder scan that builds catalog-v001.xml, whatever OWL serialization the
- * copy uses. Each test places a single fixture in an empty folder, generates the
- * catalog for that folder, and asserts the catalog redirects the ontology IRI to
- * the local file.
- *
- * These tests specify the intended behavior. At the time of writing only the
- * RDF/XML-with-xml:base case passes: FolderGroupManager extracts ontology IRIs
- * solely via XmlBaseAlgorithm, which reads the xml:base attribute off the first
- * XML element and silently gives up on anything else.
- *
- * The cases that reproduce the defect (T1.1) are marked
- * {@code @Test(expected = AssertionError.class)}: they pass while the defect is
- * present, which makes them the executable reproduction, and they will fail the
- * moment detection is fixed. The T1.3 fix removes those annotations, turning the
- * same tests into the permanent regression suite.
+ * A local copy of an imported ontology must be found by the folder scan that
+ * builds catalog-v001.xml, whatever format the copy is in. Each test puts one
+ * file in an empty folder, builds the catalog, and checks that the catalog points
+ * the ontology IRI at that file.
  */
 public class FolderFormatDetectionTest {
 
@@ -51,58 +41,321 @@ public class FolderFormatDetectionTest {
                                 "http://import-test.invalid/formats/toppings-rdfxml-xmlbase");
     }
 
-    @Test(expected = AssertionError.class)
+    @Test
     public void detectsRdfXmlWithoutXmlBase() throws IOException {
         assertLocalCopyDetected("toppings-rdfxml-no-xmlbase.owl",
                                 "http://import-test.invalid/formats/toppings-rdfxml-no-xmlbase");
     }
 
-    @Test(expected = AssertionError.class)
+    @Test
     public void detectsTurtle() throws IOException {
         assertLocalCopyDetected("toppings.ttl",
                                 "http://import-test.invalid/formats/toppings-ttl");
     }
 
-    @Test(expected = AssertionError.class)
+    @Test
     public void detectsFunctionalSyntax() throws IOException {
         assertLocalCopyDetected("toppings.ofn",
                                 "http://import-test.invalid/formats/toppings-ofn");
     }
 
-    @Test(expected = AssertionError.class)
+    @Test
     public void detectsManchesterSyntax() throws IOException {
         assertLocalCopyDetected("toppings.omn",
                                 "http://import-test.invalid/formats/toppings-omn");
     }
 
-    @Test(expected = AssertionError.class)
+    @Test
     public void detectsOboFormat() throws IOException {
-        // The OBO parser derives the ontology IRI from the "ontology:" tag
-        // using the OBO Foundry convention.
+        // The OBO parser derives the ontology IRI from the "ontology:" tag using
+        // the OBO Foundry convention. The .obo document URL is also expected,
+        // because OBO import lines conventionally reference the document.
         assertLocalCopyDetected("toppings.obo",
-                                "http://purl.obolibrary.org/obo/t1toppings.owl");
+                                "http://purl.obolibrary.org/obo/t1toppings.owl",
+                                "http://purl.obolibrary.org/obo/t1toppings.obo");
     }
 
-    @Test(expected = AssertionError.class)
+    @Test
+    public void detectsOboFormatWithSlashedId() throws IOException {
+        // OBO Foundry subset ontologies use slashed ids (e.g. go/subsets/goslim_generic).
+        assertLocalCopyDetected("toppings-subset.obo",
+                                "http://purl.obolibrary.org/obo/t1toppings/subsets/basic.owl",
+                                "http://purl.obolibrary.org/obo/t1toppings/subsets/basic.obo");
+    }
+
+    /*
+     * Version IRIs (decided 2026-08-31, #11): a versioned local copy must also be
+     * importable by its owl:versionIRI, in every supported serialization. The
+     * fixtures mirror the OWL API's own serializer output line-for-line, which is
+     * the population these files overwhelmingly come from.
+     */
+
+    @Test
+    public void detectsVersionIriInRdfXml() throws IOException {
+        assertLocalCopyDetected("versioned-rdfxml.owl",
+                                "http://import-test.invalid/versioned/rdfxml",
+                                "http://import-test.invalid/versioned/rdfxml/1.0");
+    }
+
+    @Test
+    public void detectsVersionIriInOwlXml() throws IOException {
+        assertLocalCopyDetected("versioned.owx",
+                                "http://import-test.invalid/versioned/owx",
+                                "http://import-test.invalid/versioned/owx/1.0");
+    }
+
+    @Test
+    public void detectsVersionIriInTurtle() throws IOException {
+        // The OWL API's Turtle writer puts owl:versionIRI on a continuation line.
+        assertLocalCopyDetected("versioned.ttl",
+                                "http://import-test.invalid/versioned/ttl",
+                                "http://import-test.invalid/versioned/ttl/1.0");
+    }
+
+    @Test
+    public void detectsVersionIriInFunctionalSyntax() throws IOException {
+        // The OWL API's functional writer puts the version IRI alone on the next line.
+        assertLocalCopyDetected("versioned.ofn",
+                                "http://import-test.invalid/versioned/ofn",
+                                "http://import-test.invalid/versioned/ofn/1.0");
+    }
+
+    @Test
+    public void detectsVersionIriInManchesterSyntax() throws IOException {
+        assertLocalCopyDetected("versioned.omn",
+                                "http://import-test.invalid/versioned/omn",
+                                "http://import-test.invalid/versioned/omn/1.0");
+    }
+
+    @Test
+    public void detectsVersionIriInObo() throws IOException {
+        // data-version gives the version IRI obo/<id>/<data-version>/<id>.owl, as the OWL API builds it.
+        assertLocalCopyDetected("versioned.obo",
+                                "http://purl.obolibrary.org/obo/t1vtoppings.owl",
+                                "http://purl.obolibrary.org/obo/t1vtoppings.obo",
+                                "http://purl.obolibrary.org/obo/t1vtoppings/2026-08-01/t1vtoppings.owl");
+    }
+
+    /*
+     * Compatibility with the older scan, which indexed every XML file by its
+     * xml:base: that value must still be listed, even a relative one. A declared
+     * IRI that cannot be made absolute must not be listed at all.
+     */
+
+    @Test
+    public void keepsRelativeXmlBaseMappingOfLegacyAlgorithm() throws IOException {
+        // The old algorithm indexed this file under the raw string "relative/base";
+        // catalog lookups accept that key, so the mapping must survive.
+        assertLocalCopyDetected("relative-xmlbase.owl", "relative/base");
+    }
+
+    @Test
+    public void opaqueBaseYieldsOnlyAbsoluteEntries() throws IOException {
+        // rdf:about="#onto" cannot be resolved against an opaque urn: base into an
+        // absolute IRI, so it must not be recorded; the raw xml:base still is.
+        XMLCatalog catalog = catalogFor("opaque-base.owl");
+        assertEquals(new File(new File(TEST_ROOT, "opaque-base-owl"), "opaque-base.owl").toURI(),
+                     CatalogUtilities.getRedirect(URI.create("urn:example:base"), catalog));
+        GroupEntry group = (GroupEntry) catalog.getEntries().get(0);
+        for (org.protege.xmlcatalog.entry.Entry entry : group.getEntries()) {
+            String name = ((org.protege.xmlcatalog.entry.UriEntry) entry).getName();
+            assertTrue("Unexpected non-absolute catalog entry: " + name, URI.create(name).isAbsolute());
+        }
+    }
+
+    /*
+     * Turtle: text inside strings or comments must never produce a catalog entry,
+     * and a comment must not hide a real declaration or its version IRI.
+     */
+
+    @Test
+    public void turtleTextInsideLongStringLiteralsIsNotAnOntology() throws IOException {
+        XMLCatalog catalog = catalogFor("turtle-literal-lookalike.ttl");
+        GroupEntry group = (GroupEntry) catalog.getEntries().get(0);
+        assertTrue("Expected no entries for declarations that occur only inside string literals",
+                   group.getEntries().isEmpty());
+    }
+
+    @Test
+    public void turtleCommentsAreIgnoredAndDoNotHideTheVersionIri() throws IOException {
+        XMLCatalog catalog = catalogFor("turtle-comments.ttl");
+        assertLocalCopyDetected("turtle-comments.ttl",
+                                "http://import-test.invalid/formats/turtle-comments",
+                                "http://import-test.invalid/formats/turtle-comments/v1");
+        GroupEntry group = (GroupEntry) catalog.getEntries().get(0);
+        for (org.protege.xmlcatalog.entry.Entry entry : group.getEntries()) {
+            String name = ((org.protege.xmlcatalog.entry.UriEntry) entry).getName();
+            assertTrue("Commented-out declaration leaked into the catalog: " + name,
+                       !name.startsWith("http://commented.test/"));
+        }
+    }
+
+    /*
+     * Turtle as common tools write it: the subject on its own line, the type after
+     * other properties, prefixed names instead of full IRIs, and the declaration
+     * well past the first hundred lines. Shapes taken from a survey of the Turtle
+     * ontologies hosted on BioPortal.
+     */
+
+    @Test
+    public void turtleSubjectOnItsOwnLineIsFound() throws IOException {
+        assertLocalCopyDetected("turtle-subject-own-line.ttl",
+                                "http://import-test.invalid/formats/subject-own-line",
+                                "http://import-test.invalid/formats/subject-own-line/2.0");
+    }
+
+    @Test
+    public void turtleTypeAfterOtherPropertiesIsFound() throws IOException {
+        assertLocalCopyDetected("turtle-type-after-properties.ttl",
+                                "http://import-test.invalid/formats/type-after-properties",
+                                "http://import-test.invalid/formats/type-after-properties/1.0.0");
+    }
+
+    @Test
+    public void turtlePrefixedSubjectAndVersionAreExpanded() throws IOException {
+        assertLocalCopyDetected("turtle-prefixed-subject.ttl",
+                                "http://import-test.invalid/formats/prefixed.owl.ttl",
+                                "http://import-test.invalid/formats/prefixed-1.2");
+    }
+
+    @Test
+    public void turtleEmptyPrefixIsExpanded() throws IOException {
+        assertLocalCopyDetected("turtle-empty-prefix-subject.ttl",
+                                "http://import-test.invalid/formats/empty-prefix/ns",
+                                "http://import-test.invalid/formats/empty-prefix/");
+    }
+
+    @Test
+    public void turtlePrefixDeclaredRelativeToTheBaseIsExpanded() throws IOException {
+        // '@prefix odo: <.>' means "the folder of the base IRI", as one BioPortal ontology writes it.
+        assertLocalCopyDetected("turtle-relative-prefix.ttl",
+                                "http://import-test.invalid/formats/relprefix/ONTO_",
+                                "http://import-test.invalid/formats/relprefix/ONTO_/1.0.0");
+    }
+
+    @Test
+    public void turtleOntologyTypeInsideATypeListIsFound() throws IOException {
+        // 'a voaf:Vocabulary, owl:Ontology;' as vocabularies published with VOAF write it.
+        assertLocalCopyDetected("turtle-type-list.ttl", "http://import-test.invalid/formats/type-list");
+    }
+
+    @Test
+    public void turtleSavedWithOwlExtensionIsFound() throws IOException {
+        assertLocalCopyDetected("turtle-in-owl-extension.owl",
+                                "http://import-test.invalid/formats/turtle-in-owl",
+                                "http://import-test.invalid/formats/turtle-in-owl/2.0");
+    }
+
+    @Test
+    public void turtleDeclarationPastLineOneHundredIsFound() throws IOException {
+        File folder = new File(TEST_ROOT, "turtle-deep");
+        folder.mkdirs();
+        StringBuilder ttl = new StringBuilder("@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+                + "@prefix ex: <http://import-test.invalid/formats/deep#> .\n\n");
+        for (int i = 0; i < 500; i++) {
+            ttl.append("ex:C").append(i).append(" a owl:Class .\n");
+        }
+        ttl.append("\n<http://import-test.invalid/formats/deep> a owl:Ontology .\n");
+        File deep = new File(folder, "turtle-deep.ttl");
+        Files.write(deep.toPath(), ttl.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        OntologyCatalogManager catalogManager
+                = new OntologyCatalogManager(Collections.singletonList(new FolderGroupManager()));
+        XMLCatalog catalog = catalogManager.ensureCatalogExists(folder);
+        URI redirect = CatalogUtilities.getRedirect(URI.create("http://import-test.invalid/formats/deep"), catalog);
+        assertEquals("A declaration on line 504 must still be found", deep.toURI(), redirect);
+    }
+
+    @Test
+    public void turtleDeclarationAfterALongStringClosingMidLineIsFound() throws IOException {
+        assertLocalCopyDetected("turtle-literal-closes-midline.ttl",
+                                "http://import-test.invalid/formats/turtle-midline");
+    }
+
+    /*
+     * Older RDF/XML shapes, as Protege 3 wrote them: rdf:ID declarations, and
+     * xml:base on the owl:Ontology element itself. The expected IRIs are the ones
+     * the OWL API assigns when it loads each file.
+     */
+
+    @Test
+    public void detectsRdfIdOntologyDeclaration() throws IOException {
+        // rdf:ID="onto" under xml:base B means B#onto.
+        assertLocalCopyDetected("rdfid-ontology.owl", "http://import-test.invalid/formats/rdfid#onto");
+    }
+
+    @Test
+    public void detectsAbsoluteXmlBaseOnTheOntologyElement() throws IOException {
+        assertLocalCopyDetected("nested-xmlbase-absolute.owl",
+                                "http://import-test.invalid/formats/nested/onto");
+    }
+
+    @Test
+    public void detectsRelativeXmlBaseOnTheOntologyElementResolvedAgainstTheRootBase() throws IOException {
+        // xml:base="sub/" on the element resolves against the root's base first.
+        assertLocalCopyDetected("nested-xmlbase-relative.owl",
+                                "http://import-test.invalid/formats/root/sub/onto");
+    }
+
+    /*
+     * Text layouts the OWL API itself does not write: a UTF-8 byte order mark at
+     * the start of the file (common from Windows editors), and functional syntax
+     * with the IRIs on the lines after "Ontology(".
+     */
+
+    @Test
+    public void detectsFunctionalSyntaxWithUtf8ByteOrderMark() throws IOException {
+        assertLocalCopyDetected("bom.ofn", "http://import-test.invalid/formats/bom-ofn");
+    }
+
+    @Test
+    public void detectsFunctionalSyntaxWithIrisOnTheLinesAfterOntologyKeyword() throws IOException {
+        assertLocalCopyDetected("split-lines.ofn",
+                                "http://import-test.invalid/formats/split-ofn",
+                                "http://import-test.invalid/formats/split-ofn/1.0");
+    }
+
+    @Test
+    public void oboFileWithoutOntologyTagYieldsNoEntry() throws IOException {
+        // No "ontology:" tag means no IRI can be derived: the file must be
+        // skipped silently (the anonymous-ontology rule).
+        File folder = new File(TEST_ROOT, "toppings-notag-obo");
+        folder.mkdirs();
+        Files.copy(new File(SOURCE_DIR, "toppings-notag.obo").toPath(),
+                   new File(folder, "toppings-notag.obo").toPath(),
+                   StandardCopyOption.REPLACE_EXISTING);
+        OntologyCatalogManager catalogManager
+                = new OntologyCatalogManager(Collections.singletonList(new FolderGroupManager()));
+        XMLCatalog catalog = catalogManager.ensureCatalogExists(folder);
+        GroupEntry group = (GroupEntry) catalog.getEntries().get(0);
+        assertTrue("Expected no catalog entries for an OBO file without an ontology tag",
+                   group.getEntries().isEmpty());
+    }
+
+    @Test
     public void detectsOwlXmlWithoutXmlBase() throws IOException {
         assertLocalCopyDetected("toppings.owx",
                                 "http://import-test.invalid/formats/toppings-owx");
     }
 
-    private void assertLocalCopyDetected(String fixtureName, String ontologyIri) throws IOException {
+    private XMLCatalog catalogFor(String fixtureName) throws IOException {
         File folder = new File(TEST_ROOT, fixtureName.replace('.', '-'));
         folder.mkdirs();
-        File localCopy = new File(folder, fixtureName);
-        Files.copy(new File(SOURCE_DIR, fixtureName).toPath(), localCopy.toPath(),
+        Files.copy(new File(SOURCE_DIR, fixtureName).toPath(), new File(folder, fixtureName).toPath(),
                    StandardCopyOption.REPLACE_EXISTING);
-
         OntologyCatalogManager catalogManager
                 = new OntologyCatalogManager(Collections.singletonList(new FolderGroupManager()));
-        XMLCatalog catalog = catalogManager.ensureCatalogExists(folder);
+        return catalogManager.ensureCatalogExists(folder);
+    }
 
-        URI redirect = CatalogUtilities.getRedirect(URI.create(ontologyIri), catalog);
-        assertNotNull("Local copy " + fixtureName + " was not auto-detected as " + ontologyIri, redirect);
-        assertEquals(localCopy.toURI(), redirect);
+    private void assertLocalCopyDetected(String fixtureName, String... ontologyIris) throws IOException {
+        XMLCatalog catalog = catalogFor(fixtureName);
+        File localCopy = new File(new File(TEST_ROOT, fixtureName.replace('.', '-')), fixtureName);
+
+        for (String ontologyIri : ontologyIris) {
+            URI redirect = CatalogUtilities.getRedirect(URI.create(ontologyIri), catalog);
+            assertNotNull("Local copy " + fixtureName + " was not auto-detected as " + ontologyIri, redirect);
+            assertEquals(localCopy.toURI(), redirect);
+        }
     }
 
     private static void removeDirectory(File dir) {
