@@ -22,7 +22,9 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -47,30 +49,44 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
 
     /*
      * Never read more than this from a file, in any format. Counting lines or
-     * elements is not enough: one huge line would still be read whole. Real
-     * declarations sit in the first few KB.
+     * elements is not enough: one huge line would still be read whole. XML files
+     * declare the ontology near the top. Turtle written by tools that sort their
+     * statements can put it anywhere, so the limit is generous: reading 8 MB of
+     * Turtle takes well under a second, once per file.
      */
-    private static final long MAX_BYTES_TO_EXAMINE = 1024L * 1024L;
+    private static final long MAX_BYTES_TO_EXAMINE = 8L * 1024L * 1024L;
 
     private static final String OWL_NS = "http://www.w3.org/2002/07/owl#";
 
     private static final String RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
-    // Text formats declare the ontology within the first lines of the file.
-    private static final int MAX_LINES_TO_EXAMINE = 100;
-
     /*
-     * Turtle. '@base <iri>' or 'BASE <iri>' sets the base. The declaration is
-     * '<iri> a owl:Ontology'; 'a' may also be written rdf:type or as its full IRI,
-     * and owl:Ontology may be written in full. A subject written as a prefixed
-     * name (':onto') is not detected.
+     * Turtle. '@base <iri>' or 'BASE <iri>' sets the base; '@prefix p: <iri>' or
+     * 'PREFIX p: <iri>' declares a prefix. A statement starts with its subject and
+     * ends with a period; lines in between start with a predicate. The ontology is
+     * the subject of the statement that contains 'a owl:Ontology' ('a' may also be
+     * written rdf:type or as its full IRI, owl:Ontology may be written in full).
+     * Subjects and IRIs may be written in full, '<iri>', or as prefixed names,
+     * 'ex:onto' or ':onto'.
      */
     private static final Pattern TURTLE_BASE = Pattern.compile(
-            "^\\s*(?:@base|BASE)\\s+<([^>]*)>", Pattern.CASE_INSENSITIVE);
+            "^(?:@base|BASE)\\s+<([^>]*)>", Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern TURTLE_ONTOLOGY = Pattern.compile(
-            "^\\s*<([^>]*)>\\s+(?:a|rdf:type|<http://www\\.w3\\.org/1999/02/22-rdf-syntax-ns#type>)\\s+"
-                    + "(?:owl:Ontology|<http://www\\.w3\\.org/2002/07/owl#Ontology>)\\s*[.;]");
+    private static final Pattern TURTLE_PREFIX = Pattern.compile(
+            "^(?:@prefix|PREFIX)\\s+([A-Za-z0-9_.\\-]*):\\s*<([^>]*)>", Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern TURTLE_PREFIXED_NAME = Pattern.compile("^[A-Za-z0-9_.\\-]*:[^\\s;,]*");
+
+    /*
+     * 'a owl:Ontology'. The type may also come later in a comma-separated list, as
+     * in 'a voaf:Vocabulary, owl:Ontology' or 'a <http://x.org/Thing>, owl:Ontology'.
+     * Assumes the usual prefix names: 'rdf:' for the RDF namespace and 'owl:' for
+     * OWL, which is how the OWL API, Protege and every surveyed file write them.
+     */
+    private static final Pattern TURTLE_ONTOLOGY_TYPE = Pattern.compile(
+            "(?:^|\\s)(?:a|rdf:type|<http://www\\.w3\\.org/1999/02/22-rdf-syntax-ns#type>)\\s+"
+                    + "(?:(?:<[^>]*>|[^\\s,;.]+)\\s*,\\s*)*"
+                    + "(?:owl:Ontology|<http://www\\.w3\\.org/2002/07/owl#Ontology>)(?=[\\s;,.]|$)");
 
     /*
      * Functional syntax opens with 'Ontology(<iri>', Manchester syntax with
@@ -91,10 +107,10 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
 
     private static final Pattern[] FRAME_DECLARATIONS = {FUNCTIONAL_ONTOLOGY, MANCHESTER_ONTOLOGY};
 
-    // Turtle usually puts the version IRI on its own line while the ontology
-    // statement is still open (the line before ends with ';'), so match it anywhere in a line.
+    // The version IRI is usually on its own line inside the ontology statement, so
+    // it is matched anywhere in a line. Full IRI or prefixed name.
     private static final Pattern TURTLE_VERSION = Pattern.compile(
-            "(?:^|\\s)owl:versionIRI\\s+<([^>]*)>");
+            "(?:^|\\s)owl:versionIRI\\s+(<[^>]*>|[A-Za-z0-9_.\\-]*:[^\\s;,]*)");
 
     /*
      * OBO. The 'ontology: <id>' header line has no IRI. The OWL API builds one
@@ -153,7 +169,7 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(
                 ByteStreams.limit(new FileInputStream(f), MAX_BYTES_TO_EXAMINE), StandardCharsets.UTF_8))) {
             String line;
-            while ((line = reader.readLine()) != null && head.size() < MAX_LINES_TO_EXAMINE) {
+            while ((line = reader.readLine()) != null) {
                 if (head.isEmpty() && !line.isEmpty() && line.charAt(0) == '\uFEFF') {
                     line = line.substring(1); // UTF-8 byte order mark, common from Windows editors
                 }
@@ -173,38 +189,86 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
         // indexed, and a trailing comment must not hide the ';' or '.' that ends a statement.
         List<String> head = TurtleCodeFilter.codeLines(rawHead);
         URI base = null;
-        for (int i = 0; i < head.size(); i++) {
-            String line = head.get(i);
-            Matcher baseMatcher = TURTLE_BASE.matcher(line);
-            if (baseMatcher.find()) {
-                base = parseUri(baseMatcher.group(1));
+        Map<String, String> prefixes = new HashMap<>();
+        boolean inStatement = false;
+        String subject = null;            // the current statement's subject, null when it is a blank node
+        URI ontologyIri = null;           // set once the current statement says 'a owl:Ontology'
+        URI versionIri = null;
+        for (String rawLine : head) {
+            String line = rawLine.trim();
+            if (line.isEmpty()) {
                 continue;
             }
-            Matcher declaration = TURTLE_ONTOLOGY.matcher(line);
-            if (declaration.find()) {
-                URI ontologyIri = resolveOntologyIri(declaration.group(1), base);
-                // A line ending in ';' continues the statement: the version, if
-                // any, is on one of the following lines.
-                URI versionIri = line.trim().endsWith(";")
-                        ? turtleVersionInStatement(head, i + 1, base) : null;
-                return collectSuggestions(ontologyIri, versionIri);
+            if (!inStatement) {
+                Matcher baseMatcher = TURTLE_BASE.matcher(line);
+                if (baseMatcher.find()) {
+                    base = parseUri(baseMatcher.group(1));
+                    continue;
+                }
+                Matcher prefixMatcher = TURTLE_PREFIX.matcher(line);
+                if (prefixMatcher.find()) {
+                    // A relative prefix IRI, such as <.> or <#>, is relative to the base.
+                    URI namespace = resolveOntologyIri(prefixMatcher.group(2), base);
+                    prefixes.put(prefixMatcher.group(1), namespace != null ? namespace.toString() : prefixMatcher.group(2));
+                    continue;
+                }
+                inStatement = true;
+                subject = subjectToken(line);
+                if (subject != null) {
+                    line = line.substring(subject.length());
+                }
+            }
+            if (subject != null) {
+                if (ontologyIri == null && TURTLE_ONTOLOGY_TYPE.matcher(line).find()) {
+                    ontologyIri = turtleIri(subject, base, prefixes);
+                }
+                if (ontologyIri != null && versionIri == null) {
+                    Matcher version = TURTLE_VERSION.matcher(line);
+                    if (version.find()) {
+                        versionIri = turtleIri(version.group(1), base, prefixes);
+                    }
+                }
+            }
+            if (line.endsWith(".")) {
+                if (ontologyIri != null) {
+                    return collectSuggestions(ontologyIri, versionIri);
+                }
+                inStatement = false;
+                subject = null;
             }
         }
-        return Collections.emptySet();
+        return ontologyIri != null ? collectSuggestions(ontologyIri, versionIri) : Collections.emptySet();
     }
 
-    private static URI turtleVersionInStatement(List<String> head, int firstLine, URI base) {
-        for (int i = firstLine; i < head.size(); i++) {
-            String line = head.get(i);
-            Matcher version = TURTLE_VERSION.matcher(line);
-            if (version.find()) {
-                return resolveOntologyIri(version.group(1), base);
-            }
-            if (line.trim().endsWith(".")) {
-                return null; // statement closed without a version
-            }
+    // The token a statement starts with: '<iri>' or a prefixed name. Null for anything
+    // else, such as a blank node '[' or '_:b1', whose statement is then skipped.
+    private static String subjectToken(String line) {
+        if (line.startsWith("<")) {
+            int close = line.indexOf('>');
+            return close > 0 ? line.substring(0, close + 1) : null;
         }
-        return null;
+        if (line.startsWith("_:")) {
+            return null;
+        }
+        Matcher name = TURTLE_PREFIXED_NAME.matcher(line);
+        return name.find() ? name.group() : null;
+    }
+
+    // '<iri>' resolved against the base, or 'p:name' expanded with its prefix.
+    private static URI turtleIri(String token, URI base, Map<String, String> prefixes) {
+        if (token.startsWith("<")) {
+            return resolveOntologyIri(token.substring(1, token.length() - 1), base);
+        }
+        int colon = token.indexOf(':');
+        String namespace = prefixes.get(token.substring(0, colon));
+        if (namespace == null) {
+            return null;
+        }
+        String local = token.substring(colon + 1);
+        while (local.endsWith(".")) {   // a period right after the name ends the statement
+            local = local.substring(0, local.length() - 1);
+        }
+        return resolveOntologyIri(namespace + local, base);
     }
 
     private static Set<URI> extractFromFrameSyntax(List<String> head) {

@@ -190,6 +190,81 @@ public class FolderFormatDetectionTest {
         }
     }
 
+    /*
+     * Turtle as common tools write it: the subject on its own line, the type after
+     * other properties, prefixed names instead of full IRIs, and the declaration
+     * well past the first hundred lines. Shapes taken from a survey of the Turtle
+     * ontologies hosted on BioPortal.
+     */
+
+    @Test
+    public void turtleSubjectOnItsOwnLineIsFound() throws IOException {
+        assertLocalCopyDetected("turtle-subject-own-line.ttl",
+                                "http://import-test.invalid/formats/subject-own-line",
+                                "http://import-test.invalid/formats/subject-own-line/2.0");
+    }
+
+    @Test
+    public void turtleTypeAfterOtherPropertiesIsFound() throws IOException {
+        assertLocalCopyDetected("turtle-type-after-properties.ttl",
+                                "http://import-test.invalid/formats/type-after-properties",
+                                "http://import-test.invalid/formats/type-after-properties/1.0.0");
+    }
+
+    @Test
+    public void turtlePrefixedSubjectAndVersionAreExpanded() throws IOException {
+        assertLocalCopyDetected("turtle-prefixed-subject.ttl",
+                                "http://import-test.invalid/formats/prefixed.owl.ttl",
+                                "http://import-test.invalid/formats/prefixed-1.2");
+    }
+
+    @Test
+    public void turtleEmptyPrefixIsExpanded() throws IOException {
+        assertLocalCopyDetected("turtle-empty-prefix-subject.ttl",
+                                "http://import-test.invalid/formats/empty-prefix/ns",
+                                "http://import-test.invalid/formats/empty-prefix/");
+    }
+
+    @Test
+    public void turtlePrefixDeclaredRelativeToTheBaseIsExpanded() throws IOException {
+        // '@prefix odo: <.>' means "the folder of the base IRI", as one BioPortal ontology writes it.
+        assertLocalCopyDetected("turtle-relative-prefix.ttl",
+                                "http://import-test.invalid/formats/relprefix/ONTO_",
+                                "http://import-test.invalid/formats/relprefix/ONTO_/1.0.0");
+    }
+
+    @Test
+    public void turtleOntologyTypeInsideATypeListIsFound() throws IOException {
+        // 'a voaf:Vocabulary, owl:Ontology;' as vocabularies published with VOAF write it.
+        assertLocalCopyDetected("turtle-type-list.ttl", "http://import-test.invalid/formats/type-list");
+    }
+
+    @Test
+    public void turtleSavedWithOwlExtensionIsFound() throws IOException {
+        assertLocalCopyDetected("turtle-in-owl-extension.owl",
+                                "http://import-test.invalid/formats/turtle-in-owl",
+                                "http://import-test.invalid/formats/turtle-in-owl/2.0");
+    }
+
+    @Test
+    public void turtleDeclarationPastLineOneHundredIsFound() throws IOException {
+        File folder = new File(TEST_ROOT, "turtle-deep");
+        folder.mkdirs();
+        StringBuilder ttl = new StringBuilder("@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+                + "@prefix ex: <http://import-test.invalid/formats/deep#> .\n\n");
+        for (int i = 0; i < 500; i++) {
+            ttl.append("ex:C").append(i).append(" a owl:Class .\n");
+        }
+        ttl.append("\n<http://import-test.invalid/formats/deep> a owl:Ontology .\n");
+        File deep = new File(folder, "turtle-deep.ttl");
+        Files.write(deep.toPath(), ttl.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        OntologyCatalogManager catalogManager
+                = new OntologyCatalogManager(Collections.singletonList(new FolderGroupManager()));
+        XMLCatalog catalog = catalogManager.ensureCatalogExists(folder);
+        URI redirect = CatalogUtilities.getRedirect(URI.create("http://import-test.invalid/formats/deep"), catalog);
+        assertEquals("A declaration on line 504 must still be found", deep.toURI(), redirect);
+    }
+
     @Test
     public void turtleDeclarationAfterALongStringClosingMidLineIsFound() throws IOException {
         assertLocalCopyDetected("turtle-literal-closes-midline.ttl",
