@@ -15,19 +15,18 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Checks the automatic declaration checkbox in Preferences &gt; General.
+ * Verifies the automatic declaration checkbox in Preferences &gt; Axioms.
  *
- * <p>A selected checkbox stores {@code true}, which leaves automatic declarations out when saving.
- * A cleared checkbox stores {@code false}, which keeps the default save behavior.
+ * <p>When the panel opens, the checkbox reflects the stored preference. Applying the panel stores
+ * the current checkbox value. A selected checkbox leaves automatic declarations out when saving;
+ * a cleared checkbox keeps the default behavior and includes them.
  *
- * <p>In this isolated test, panel setup reaches the checkbox before the later Search section asks
- * for a running editor. The test stops at that point because the checkbox is already ready to use.
+ * <p>Each test starts without a stored value and restores the value that existed before the test.
  */
-public class GeneralPreferencesPanelDeclarations_TestCase {
+public class AxiomsPreferencesPanelDeclarations_TestCase {
 
     private static final String PREFERENCES_KEY = "org.protege.editor.owl.declaration";
 
@@ -39,6 +38,7 @@ public class GeneralPreferencesPanelDeclarations_TestCase {
 
     @Before
     public void setUp() {
+        // Opposite default values distinguish a missing value from a stored true or false value.
         boolean withTrueDefault = raw().getBoolean(SUPPRESS_KEY, true);
         boolean withFalseDefault = raw().getBoolean(SUPPRESS_KEY, false);
         hadStoredValue = withTrueDefault == withFalseDefault;
@@ -58,29 +58,28 @@ public class GeneralPreferencesPanelDeclarations_TestCase {
     public void shouldShowAnUntickedBoxWhenNotSuppressing() {
         EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(false);
         assertFalse("the preference off should read as an unticked box",
-                declarationCheckBox().isSelected());
+                declarationCheckBoxOf(buildPanel()).isSelected());
     }
 
     @Test
     public void shouldShowATickedBoxWhenSuppressing() {
         EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(true);
         assertTrue("the preference on should read as a ticked box",
-                declarationCheckBox().isSelected());
+                declarationCheckBoxOf(buildPanel()).isSelected());
     }
 
     /** The checkbox is cleared when no value has been stored. */
     @Test
     public void shouldShowAnUntickedBoxWhenNothingIsStored() {
-        assertFalse(declarationCheckBox().isSelected());
+        assertFalse(declarationCheckBoxOf(buildPanel()).isSelected());
     }
 
     @Test
     public void shouldSuppressWhenTheBoxIsTicked() {
         EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(false);
-        GeneralPreferencesPanel panel = buildPanel();
+        AxiomsPreferencesPanel panel = buildPanel();
 
-        JCheckBox checkBox = declarationCheckBoxOf(panel);
-        checkBox.setSelected(true);
+        declarationCheckBoxOf(panel).setSelected(true);
         panel.applyChanges();
 
         assertTrue(EntityDeclarationPreferences.getInstance().isSuppressingAutomaticDeclarations());
@@ -89,10 +88,9 @@ public class GeneralPreferencesPanelDeclarations_TestCase {
     @Test
     public void shouldNotSuppressWhenTheBoxIsCleared() {
         EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(true);
-        GeneralPreferencesPanel panel = buildPanel();
+        AxiomsPreferencesPanel panel = buildPanel();
 
-        JCheckBox checkBox = declarationCheckBoxOf(panel);
-        checkBox.setSelected(false);
+        declarationCheckBoxOf(panel).setSelected(false);
         panel.applyChanges();
 
         assertFalse(EntityDeclarationPreferences.getInstance().isSuppressingAutomaticDeclarations());
@@ -109,17 +107,13 @@ public class GeneralPreferencesPanelDeclarations_TestCase {
         assertEquals("expected a single declaration control", 1, matches.size());
     }
 
-    private JCheckBox declarationCheckBox() {
-        return declarationCheckBoxOf(buildPanel());
-    }
-
-    private JCheckBox declarationCheckBoxOf(GeneralPreferencesPanel panel) {
+    private JCheckBox declarationCheckBoxOf(AxiomsPreferencesPanel panel) {
         for (JCheckBox checkBox : checkBoxesOf(panel)) {
             if (mentionsDeclarations(checkBox)) {
                 return checkBox;
             }
         }
-        throw new AssertionError("No declaration control found in the General preferences panel");
+        throw new AssertionError("No declaration control found in the Axioms preferences panel");
     }
 
     private boolean mentionsDeclarations(JCheckBox checkBox) {
@@ -127,17 +121,13 @@ public class GeneralPreferencesPanelDeclarations_TestCase {
         return text != null && text.toLowerCase().contains("declaration");
     }
 
-    /** Initializes enough of the panel to create the declaration checkbox. */
-    private GeneralPreferencesPanel buildPanel() {
-        GeneralPreferencesPanel panel = new GeneralPreferencesPanel();
+    private AxiomsPreferencesPanel buildPanel() {
+        AxiomsPreferencesPanel panel = new AxiomsPreferencesPanel();
         try {
             panel.initialise();
-        } catch (NullPointerException expected) {
-            // Expected when the later Search section requests an editor kit.
         } catch (Exception e) {
-            throw new AssertionError("Panel failed before the Search section", e);
+            throw new AssertionError("The Axioms preferences panel failed to build", e);
         }
-        assertNotNull(panel);
         return panel;
     }
 
