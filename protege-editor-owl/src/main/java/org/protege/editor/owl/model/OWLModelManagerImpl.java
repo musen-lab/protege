@@ -9,6 +9,8 @@ import org.protege.editor.owl.model.cache.OWLEntityRenderingCache;
 import org.protege.editor.owl.model.cache.OWLEntityRenderingCacheImpl;
 import org.protege.editor.owl.model.cache.OWLObjectRenderingCache;
 import org.protege.editor.owl.model.classexpression.anonymouscls.AnonymousDefinedClassManager;
+import org.protege.editor.owl.model.declaration.EntityDeclarationPreferences;
+import org.protege.editor.owl.model.declaration.SaveFormatResolver;
 import org.protege.editor.owl.model.entity.CustomOWLEntityFactory;
 import org.protege.editor.owl.model.entity.OWLEntityFactory;
 import org.protege.editor.owl.model.event.EventType;
@@ -104,6 +106,10 @@ public class OWLModelManagerImpl extends AbstractModelManager implements OWLMode
     private final DeprecationCache deprecationCache;
 
     private final UserResolvedIRIMapper userResolvedIRIMapper = new UserResolvedIRIMapper(new MissingImportHandlerImpl());
+
+    private final SaveFormatResolver saveFormatResolver =
+            new SaveFormatResolver(() -> EntityDeclarationPreferences.getInstance()
+                    .isSuppressingAutomaticDeclarations());
 
     private final List<OWLModelManagerListener> modelManagerChangeListeners = new ArrayList<>();
 
@@ -588,17 +594,18 @@ public class OWLModelManagerImpl extends AbstractModelManager implements OWLMode
             format = previousFormat;
         }
         /*
-         * Using the addMissingTypes call here for RDF/XML files can result in OWL Full output
-         * and can also result in data corruption.
+         * Resolve the document format based on the entity declaration setting for this save 
+         * without changing the format stored by the ontology manager.
          *
          * See http://protegewiki.stanford.edu/wiki/OWL2RDFParserDeclarationRequirement
          */
+        final OWLDocumentFormat saveFormat = saveFormatResolver.getSaveFormat(format);
         IRI documentIRI = IRI.create(documentURI);
-        OntologySaver saver = OntologySaver.builder().addOntology(ont, format, documentIRI).build();
+        OntologySaver saver = OntologySaver.builder().addOntology(ont, saveFormat, documentIRI).build();
         saver.saveOntologies();
 
         manager.setOntologyDocumentIRI(ont, documentIRI);
-        logger.info("Saved ontology {} to {} in {} format", ont.getOntologyID(), documentIRI, format);
+        logger.info("Saved ontology {} to {} in {} format", ont.getOntologyID(), documentIRI, saveFormat);
 
         dirtyOntologies.remove(ont.getOntologyID());
 

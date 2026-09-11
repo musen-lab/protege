@@ -1588,6 +1588,14 @@
         <class value="org.protege.editor.owl.ui.preferences.GeneralPreferencesPanel"/>
     </extension>
 
+    <!-- Axiom prefs -->
+
+    <extension id="ui.axioms.prefs"
+               point="org.protege.editor.core.application.preferencespanel">
+        <label value="Axioms"/>
+        <class value="org.protege.editor.owl.ui.preferences.AxiomsPreferencesPanel"/>
+    </extension>
+
     <extension id="ui.user.prefs"
                point="org.protege.editor.core.application.preferencespanel">
         <label value="User details"/>

@@ -1,0 +1,27 @@
+@prefix : <http://example.invalid/declarations/module#> .
+@prefix base: <http://example.invalid/declarations/base#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# This is the ontology saved by EntityDeclarationBehaviour_TestCase. It imports base.ttl.
+
+<http://example.invalid/declarations/module> a owl:Ontology ;
+    owl:imports <http://example.invalid/declarations/base> .
+
+# Declared in this ontology. Every save must include this declaration.
+:LocalTerm a owl:Class .
+
+# Declared in both ontologies. Saving this ontology must include its own declaration.
+base:SharedTerm a owl:Class .
+
+# Declared in this ontology, although its IRI starts with the imported ontology's IRI. Where the IRI
+# starts does not change which ontology contains the declaration.
+base:MisplacedTerm a owl:Class .
+
+# Used here but not declared in either ontology. Saving adds an automatic declaration by default.
+:LocalTerm rdfs:subClassOf base:Borrowed .
+
+# Used here but declared only in the imported ontology. Saving does not copy that declaration into
+# this ontology.
+base:MisplacedTerm rdfs:subClassOf base:BaseOnly .
