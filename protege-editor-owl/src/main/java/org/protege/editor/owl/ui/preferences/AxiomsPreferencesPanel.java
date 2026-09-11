@@ -19,11 +19,13 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
             "Suppress automatic entity declarations when saving";
 
     private static final String SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_TOOLTIP =
-            "<html>By default, saving adds declarations for entities that are used but not "
-                    + "declared in the ontology or its imports.<br><br>"
-                    + "Select this option to leave those automatic declarations out. "
-                    + "Declarations already present in the ontology are still saved.<br><br>"
-                    + "This setting applies to RDF/XML, Turtle, OWL/XML, and Functional Syntax.";
+            "<html>By default, Protégé adds a declaration axiom for an entity to each "
+                    + "ontology in which the entity is not already declared. We strongly "
+                    + "recommend keeping this behavior enabled, because declaration axioms "
+                    + "make ontology parsing much more robust, particularly when imported "
+                    + "ontologies cannot be resolved or loaded.<br><br>"
+                    + "You can disable this behavior to prevent declaration axioms from "
+                    + "being added automatically.";
 
     private JCheckBox suppressAutomaticEntityDeclarationsCheckBox;
 
