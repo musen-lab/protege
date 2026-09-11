@@ -25,10 +25,12 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The acceptance table, one test per row, in every format that adds missing entity declarations.
+ * Shows which declarations are written when automatic declarations are included or left out.
  *
- * <p>The fixture is a module that imports a base ontology, so the awkward cases are real: a
- * declaration the import also carries, and a declaration whose namespace the import owns.
+ * <p>The ontology under test imports a second ontology. The tests verify that declarations in the
+ * ontology being saved are always kept, an entity declared only by the import is not copied, and an
+ * entity declared by neither ontology is added only when automatic declarations are included. The
+ * same rules are checked in RDF/XML, Turtle, OWL/XML, and Functional Syntax.
  */
 public class EntityDeclarationBehaviour_TestCase {
 
@@ -42,7 +44,7 @@ public class EntityDeclarationBehaviour_TestCase {
 
     private static final String MISPLACED_TERM = "Class " + BASE_NS + "MisplacedTerm";
 
-    /** Referenced by the module, declared by neither ontology: the one Protege declares for you. */
+    /** An entity referenced by the module but not declared by either ontology. */
     private static final String REFERENCED_ONLY = "Class " + BASE_NS + "Borrowed";
 
     private static final String BASE_ONLY = "Class " + BASE_NS + "BaseOnly";
@@ -54,7 +56,7 @@ public class EntityDeclarationBehaviour_TestCase {
     @Before
     public void setUp() throws Exception {
         OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
-        // Resolve the import locally: the test must not reach the network.
+        // Load the imported ontology from the local test file instead of the network.
         manager.getIRIMappers().add(new SimpleIRIMapper(
                 IRI.create("http://example.invalid/declarations/base"),
                 IRI.create(new File(FIXTURES, "base.ttl"))));
@@ -69,31 +71,25 @@ public class EntityDeclarationBehaviour_TestCase {
         assertThat(module.getImportsClosure().size(), is(2));
     }
 
-    /**
-     * Scenarios "An automatic declaration is gone", "An explicit declaration survives",
-     * "A duplicated declaration is still written" and "A declaration in a namespace an import owns
-     * is still written".
-     */
+    /** Leaves out the undeclared entity while keeping declarations already in the ontology. */
     @Test
     public void shouldWriteOnlyTheStatedDeclarationsWhenSuppressing() throws Exception {
         for (OWLDocumentFormat format : formats()) {
             SortedSet<String> declarations = declarationsWhenSaved(format, true);
             String where = format.getClass().getSimpleName();
 
-            assertThat(where + ": the automatic declaration should be gone",
+            assertThat(where + ": an automatic declaration was written",
                     declarations, not(hasItem(REFERENCED_ONLY)));
-            assertThat(where + ": an explicit declaration must survive",
+            assertThat(where + ": a declaration from the module is missing",
                     declarations, hasItem(LOCAL_TERM));
-            assertThat(where + ": a declaration the import also carries must survive",
+            assertThat(where + ": a declaration shared with the import is missing",
                     declarations, hasItem(SHARED_TERM));
-            assertThat(where + ": a declaration in the import's namespace must survive",
+            assertThat(where + ": a declaration that uses the import's namespace is missing",
                     declarations, hasItem(MISPLACED_TERM));
         }
     }
 
-    /**
-     * Scenario "An undeclared entity keeps the type Protege adds for it".
-     */
+    /** The default behavior adds a declaration for an entity that neither ontology declares. */
     @Test
     public void shouldAddTheMissingDeclarationByDefault() throws Exception {
         for (OWLDocumentFormat format : formats()) {
@@ -107,9 +103,7 @@ public class EntityDeclarationBehaviour_TestCase {
         }
     }
 
-    /**
-     * An entity the import declares is never declared here, whatever the preference says.
-     */
+    /** A declaration found only in the import is not copied into the saved ontology. */
     @Test
     public void shouldNeverAddADeclarationTheImportAlreadyCarries() throws Exception {
         for (OWLDocumentFormat format : formats()) {
@@ -128,10 +122,7 @@ public class EntityDeclarationBehaviour_TestCase {
         return DeclarationBaseline.declarationsOf(target.toString());
     }
 
-    /**
-     * Every format whose renderer adds missing declarations, and so every format the preference
-     * reaches.
-     */
+    /** Returns the four formats covered by the automatic declaration setting. */
     private static OWLDocumentFormat[] formats() {
         return new OWLDocumentFormat[]{
                 new RDFXMLDocumentFormat(),

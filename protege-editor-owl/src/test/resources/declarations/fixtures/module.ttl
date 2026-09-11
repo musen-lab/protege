@@ -4,26 +4,24 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
-# The ontology under test: a module that imports a base ontology.  Every awkward case the
-# acceptance table names is here, and each term earns its place.
+# This is the ontology saved by EntityDeclarationBehaviour_TestCase. It imports base.ttl.
 
 <http://example.invalid/declarations/module> a owl:Ontology ;
     owl:imports <http://example.invalid/declarations/base> .
 
-# Declared here, in this ontology's own namespace.  A save must always write it.
+# Declared in this ontology. Every save must include this declaration.
 :LocalTerm a owl:Class .
 
-# Declared here and by the import too.  The duplicate must survive: dropping it would change
-# what this document says on its own.
+# Declared in both ontologies. Saving this ontology must include its own declaration.
 base:SharedTerm a owl:Class .
 
-# Declared here, in a namespace the import owns.  Misplaced, but stated, so it must survive.
+# Declared in this ontology, although its IRI starts with the imported ontology's IRI. Where the IRI
+# starts does not change which ontology contains the declaration.
 base:MisplacedTerm a owl:Class .
 
-# Referenced and declared by nobody.  This is the declaration Protege adds for you, and the one
-# the preference suppresses.
+# Used here but not declared in either ontology. Saving adds an automatic declaration by default.
 :LocalTerm rdfs:subClassOf base:Borrowed .
 
-# Referenced here, declared by the import.  Protege never adds a declaration for it, whatever
-# the preference says.
+# Used here but declared only in the imported ontology. Saving does not copy that declaration into
+# this ontology.
 base:MisplacedTerm rdfs:subClassOf base:BaseOnly .

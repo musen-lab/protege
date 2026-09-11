@@ -10,10 +10,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The stored preference, read and written through {@code EntityDeclarationPreferences}.
+ * Verifies how {@link EntityDeclarationPreferences} stores and reads the user's choice.
  *
- * <p>It is backed by real user preferences, so this test records what it found and puts it back.
- * Running the suite must not change the developer's settings.
+ * <p>The tests cover the default value, both stored values, and changes made after an earlier read.
+ * They restore the value that was present before each test.
  */
 public class EntityDeclarationPreferences_TestCase {
 
@@ -30,7 +30,7 @@ public class EntityDeclarationPreferences_TestCase {
     @Before
     public void setUp() {
         preferences = EntityDeclarationPreferences.getInstance();
-        // Reading with both defaults tells a stored value apart from an absent one.
+        // Opposite default values let the test distinguish a missing value from a stored value.
         boolean withTrueDefault = raw().getBoolean(SUPPRESS_KEY, true);
         boolean withFalseDefault = raw().getBoolean(SUPPRESS_KEY, false);
         hadStoredValue = withTrueDefault == withFalseDefault;
@@ -46,7 +46,7 @@ public class EntityDeclarationPreferences_TestCase {
         }
     }
 
-    /** Off by default: an untouched installation adds the declarations Protege has always added. */
+    /** Automatic declarations are included when no value has been stored. */
     @Test
     public void shouldNotSuppressWhenNothingIsStored() {
         assertFalse(preferences.isSuppressingAutomaticDeclarations());
@@ -65,10 +65,7 @@ public class EntityDeclarationPreferences_TestCase {
         assertFalse(preferences.isSuppressingAutomaticDeclarations());
     }
 
-    /**
-     * The accessor must read through, so a change made anywhere is seen by the next save without a
-     * restart.
-     */
+    /** A changed value is returned immediately rather than waiting for a restart. */
     @Test
     public void shouldNotCacheTheStoredValue() {
         assertFalse(preferences.isSuppressingAutomaticDeclarations());
@@ -79,7 +76,7 @@ public class EntityDeclarationPreferences_TestCase {
 
     @Test
     public void shouldUseADedicatedPreferencesNode() {
-        // Sharing a node with the application preferences would let an unrelated clear() wipe this.
+        // Keeping this setting separate prevents other settings from clearing its value.
         preferences.setSuppressingAutomaticDeclarations(true);
         assertFalse(PreferencesManager.getInstance()
                 .getApplicationPreferences(ProtegeApplication.ID)

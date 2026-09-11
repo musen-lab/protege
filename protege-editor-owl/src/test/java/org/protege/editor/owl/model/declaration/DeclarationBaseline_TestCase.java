@@ -13,56 +13,54 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 
 /**
- * The default output must not change.  Saves every corpus ontology to every format the preference
- * reaches, with the automatic declarations left on, and compares the declarations against the
- * baseline captured from {@code master} before the preference existed.
+ * Protects the default behavior of including automatic declarations when saving.
  *
- * <p>See {@code src/test/resources/declarations/README.md} before regenerating anything.
+ * <p>The test saves each ontology as RDF/XML, Turtle, OWL/XML, and Functional Syntax, then compares
+ * its declarations with documents created before the setting was added.
  */
 public class DeclarationBaseline_TestCase {
 
     @Test
     public void shouldHoldAtLeastFiveOntologies() {
-        assertThat(DeclarationBaseline.CORPUS.size(), greaterThanOrEqualTo(5));
+        assertThat(DeclarationBaseline.TEST_ONTOLOGIES.size(), greaterThanOrEqualTo(5));
     }
 
     @Test
-    public void shouldMatchBaselineDeclarationsForEveryCorpusOntology() throws Exception {
+    public void shouldMatchExpectedDeclarationsForEveryTestOntology() throws Exception {
         SortedSet<String> mismatches = new TreeSet<>();
-        for (String fileName : DeclarationBaseline.CORPUS) {
-            OWLOntology ontology = DeclarationBaseline.loadCorpusOntology(fileName);
+        for (String fileName : DeclarationBaseline.TEST_ONTOLOGIES) {
+            OWLOntology ontology = DeclarationBaseline.loadTestOntology(fileName);
             for (Format format : Format.values()) {
                 SortedSet<String> actual =
-                        DeclarationBaseline.declarationsOf(DeclarationBaseline.render(ontology, format));
-                SortedSet<String> expected = DeclarationBaseline.baselineDeclarations(fileName, format);
+                        DeclarationBaseline.declarationsOf(
+                                DeclarationBaseline.saveToString(ontology, format));
+                SortedSet<String> expected = DeclarationBaseline.expectedDeclarations(fileName, format);
                 if (!actual.equals(expected)) {
                     mismatches.add(describeMismatch(fileName, format, expected, actual));
                 }
             }
         }
-        assertEquals("Declaration output drifted from the captured baseline:\n" + String.join("\n", mismatches),
+        assertEquals("Declaration output differs from the expected files:\n" + String.join("\n", mismatches),
                 0, mismatches.size());
     }
 
-    /**
-     * Renders twice in one JVM with an unrelated parse in between.  A corpus member whose output
-     * depends on what the run parsed earlier would make the baseline flaky rather than useful.
-     */
+    /** Ensures output does not depend on other ontologies loaded by the same Java process. */
     @Test
-    public void shouldRenderEveryCorpusOntologyDeterministically() throws Exception {
-        for (String fileName : DeclarationBaseline.CORPUS) {
+    public void shouldProduceTheSameOutputOnEverySave() throws Exception {
+        for (String fileName : DeclarationBaseline.TEST_ONTOLOGIES) {
             for (Format format : Format.values()) {
                 SortedSet<String> first = declarationsFor(fileName, format);
-                DeclarationBaseline.loadCorpusOntology("pizza.owl");
+                DeclarationBaseline.loadTestOntology("pizza.owl");
                 SortedSet<String> second = declarationsFor(fileName, format);
-                assertThat(fileName + " / " + format + " is not deterministic", second, is(first));
+                assertThat(fileName + " / " + format + " changed between saves", second, is(first));
             }
         }
     }
 
     private SortedSet<String> declarationsFor(String fileName, Format format) throws Exception {
         return DeclarationBaseline.declarationsOf(
-                DeclarationBaseline.render(DeclarationBaseline.loadCorpusOntology(fileName), format));
+                DeclarationBaseline.saveToString(
+                        DeclarationBaseline.loadTestOntology(fileName), format));
     }
 
     private String describeMismatch(String fileName,

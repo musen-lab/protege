@@ -3,12 +3,14 @@ package org.protege.editor.owl.model.declaration;
 import org.protege.editor.core.prefs.PreferencesManager;
 
 /**
- * Controls whether Protégé automatically adds missing entity declarations when serializing
- * an ontology.
+ * Stores the user's choice about automatic entity declarations.
  *
- * <p>By default, Protégé writes an {@code rdf:type} declaration for every named entity when
- * saving an ontology. This preference allows that behavior to be switched off, avoiding
- * redundant declarations for entities referenced from other ontologies.
+ * <p>When saving, the OWL API normally declares an entity if the ontology uses it but neither the
+ * ontology nor its imports declare it. Enabling this setting prevents those extra declarations
+ * from being written. It does not remove declarations that already belong to the ontology.
+ *
+ * <p>The setting is disabled by default, which keeps the save behavior from before the setting was
+ * added.
  *
  * @author Josef Hardi
  */
@@ -33,10 +35,9 @@ public class EntityDeclarationPreferences {
         return instance;
     }
 
-/**
- * @return {@code true} if saving should suppress automatic declarations for entities that belong
- *         to other ontologies; {@code false} if no preference has been stored.
- */
+    /**
+     * @return {@code true} if saving should not add automatic declarations
+     */
     public boolean isSuppressingAutomaticDeclarations() {
         return PreferencesManager.getInstance()
                 .getApplicationPreferences(PREFERENCES_KEY)
@@ -44,6 +45,12 @@ public class EntityDeclarationPreferences {
                         SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_DEFAULT);
     }
 
+    /**
+     * Sets whether saving should leave automatic declarations out.
+     *
+     * @param suppressAutomaticDeclarations {@code true} to leave automatic declarations out, or
+     *                                      {@code false} to include them
+     */
     public void setSuppressingAutomaticDeclarations(boolean suppressAutomaticDeclarations) {
         PreferencesManager.getInstance()
                 .getApplicationPreferences(PREFERENCES_KEY)

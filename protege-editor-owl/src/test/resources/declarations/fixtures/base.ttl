@@ -3,9 +3,8 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
-# The imported ontology.  It declares two of the five terms the module test names, and no more:
-# SharedTerm, which the module declares as well, and BaseOnly, which the module only references.
-# Borrowed and MisplacedTerm are deliberately absent, though they live in this namespace.
+# This imported ontology declares SharedTerm and BaseOnly. The module also declares SharedTerm and
+# uses BaseOnly without declaring it.
 
 <http://example.invalid/declarations/base> a owl:Ontology .
 

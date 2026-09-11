@@ -40,11 +40,11 @@ public class GeneralPreferencesPanel extends OWLPreferencesPanel {
             "Suppress automatic entity declarations when saving";
 
     private static final String SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_TOOLTIP =
-            "<html>This option controls whether missing entity declarations are added automatically when "
-                    + "serializing an ontology.<br><br>"
-                    + "When selected, automatic type declaration is switched off so saving does not add "
-                    + "entity declarations directly to the active ontology, as these declarations would "
-                    + "otherwise introduce duplicates.";
+            "<html>By default, saving adds declarations for entities that are used but not "
+                    + "declared in the ontology or its imports.<br><br>"
+                    + "Select this option to leave those automatic declarations out. "
+                    + "Declarations already present in the ontology are still saved.<br><br>"
+                    + "This setting applies to RDF/XML, Turtle, OWL/XML, and Functional Syntax.";
 
     private JCheckBox alwaysCentreDialogsCheckbox;
 
@@ -54,7 +54,7 @@ public class GeneralPreferencesPanel extends OWLPreferencesPanel {
 
     private JRadioButton addFreshAxiomsToSubjectDefiningOntology;
 
-    private JCheckBox keepDeclarationsInDefiningOntologyCheckBox;
+    private JCheckBox suppressAutomaticEntityDeclarationsCheckBox;
 
 
     private JCheckBox autoExpandEnabledCheckBox;
@@ -87,7 +87,7 @@ public class GeneralPreferencesPanel extends OWLPreferencesPanel {
         }
 
         EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(
-                keepDeclarationsInDefiningOntologyCheckBox.isSelected());
+                suppressAutomaticEntityDeclarationsCheckBox.isSelected());
 
         OWLTreePreferences prefs = OWLTreePreferences.getInstance();
         prefs.setAutoExpansionEnabled(autoExpandEnabledCheckBox.isSelected());
@@ -139,13 +139,13 @@ public class GeneralPreferencesPanel extends OWLPreferencesPanel {
 
         // Declarations
 
-        keepDeclarationsInDefiningOntologyCheckBox = new JCheckBox(SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_LABEL,
+        suppressAutomaticEntityDeclarationsCheckBox = new JCheckBox(SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_LABEL,
                 EntityDeclarationPreferences.getInstance().isSuppressingAutomaticDeclarations());
-        keepDeclarationsInDefiningOntologyCheckBox.setToolTipText(SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_TOOLTIP);
+        suppressAutomaticEntityDeclarationsCheckBox.setToolTipText(SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_TOOLTIP);
 
         panel.addSeparator();
         panel.addGroup("Declarations");
-        panel.addGroupComponent(keepDeclarationsInDefiningOntologyCheckBox);
+        panel.addGroupComponent(suppressAutomaticEntityDeclarationsCheckBox);
 
 
         // Tree preferences

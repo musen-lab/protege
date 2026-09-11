@@ -1,9 +1,11 @@
 package org.protege.editor.owl.model.declaration;
 
+import org.semanticweb.owlapi.formats.FunctionalSyntaxDocumentFormat;
+import org.semanticweb.owlapi.formats.OWLXMLDocumentFormat;
 import org.semanticweb.owlapi.formats.PrefixDocumentFormat;
+import org.semanticweb.owlapi.formats.RDFXMLDocumentFormat;
+import org.semanticweb.owlapi.formats.TurtleDocumentFormat;
 import org.semanticweb.owlapi.model.OWLDocumentFormat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.io.Serializable;
@@ -13,42 +15,43 @@ import java.util.function.BooleanSupplier;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Resolves the document format to use when saving.
+ * Chooses the document format settings for a save.
  *
- * <p>If the user has chosen to keep declarations in their respective ontologies, this method returns
- * a <em>copy</em> of the document format with {@code addMissingTypes} disabled. Otherwise, it returns
- * the original document format instance unchanged. The provided document format is never modified, so
- * the ontology manager's instance continues to represent the format as it was loaded.
+ * <p>For the built-in RDF/XML, Turtle, OWL/XML, and Functional Syntax formats, the format controls
+ * whether saving adds declarations for entities that are used but not declared in the ontology or
+ * its imports. When the user has chosen to leave those declarations out, this class returns a copy
+ * with that option disabled. It copies the other save settings and leaves the ontology manager's
+ * format unchanged.
+ *
+ * <p>If no change is needed, the original format is returned. The same is true for all other
+ * format classes, including custom classes based on the four named formats.
  *
  * @author Josef Hardi
  */
 public class SaveFormatResolver {
 
-    private static final Logger logger = LoggerFactory.getLogger(SaveFormatResolver.class);
-
-    /**
-     * The one format parameter these renderers read, and so the one a copy must carry over.
-     */
+    /** The OWL API parameter for writing the {@code xsd:string} datatype on string literals. */
     static final String FORCE_XSD_STRING_PARAMETER = "force xsd:string on literals";
 
     @Nonnull
     private final BooleanSupplier suppressingAutomaticDeclarations;
 
     /**
-     * Creates a provider over the user's declaration setting.
+     * Creates a resolver that reads the supplied setting on every call.
      *
-     * @param suppressingAutomaticDeclarations supplies the setting, read afresh on every call
+     * @param suppressingAutomaticDeclarations returns {@code true} when automatic declarations
+     *                                         should be left out
      */
     public SaveFormatResolver(@Nonnull BooleanSupplier suppressingAutomaticDeclarations) {
         this.suppressingAutomaticDeclarations = checkNotNull(suppressingAutomaticDeclarations);
     }
 
     /**
-     * Returns the document format to use when saving the ontology.
+     * Returns the format to use when saving an ontology.
      *
-     * @param format the document format provided by the ontology manager
-     * @return {@code format} unchanged if automatic declarations are not being suppressed; otherwise
-     * a copy of {@code format} with automatic entity declarations disabled.
+     * @param format the current document format
+     * @return a copy with automatic declarations disabled when the setting is switched on and the
+     *         format supports it; otherwise, {@code format}
      */
     @Nonnull
     public OWLDocumentFormat getSaveFormat(@Nonnull OWLDocumentFormat format) {
@@ -61,19 +64,23 @@ public class SaveFormatResolver {
         if (copy.isEmpty()) {
             return format;
         }
-        OWLDocumentFormat saveFormat = copy.get();
-        copySettings(format, saveFormat);
-        saveFormat.setAddMissingTypes(false); // declare only what the ontology states.
-        return saveFormat;
+        OWLDocumentFormat copyFormat = copy.get();
+        copySettings(format, copyFormat);
+        copyFormat.setAddMissingTypes(false);
+        return copyFormat;
     }
     
     @Nonnull
     private Optional<OWLDocumentFormat> copyOf(@Nonnull OWLDocumentFormat format) {
-        try {
-            return Optional.of(format.getClass().getDeclaredConstructor().newInstance());
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            String formatName = format.getClass().getName();
-            logger.warn("Cannot copy the {} document format: {}", formatName, e.getMessage());
+        if (format.getClass().equals(RDFXMLDocumentFormat.class)) {
+            return Optional.of(new RDFXMLDocumentFormat());
+        } else if (format.getClass().equals(TurtleDocumentFormat.class)) {
+            return Optional.of(new TurtleDocumentFormat());
+        } else if (format.getClass().equals(OWLXMLDocumentFormat.class)) {
+            return Optional.of(new OWLXMLDocumentFormat());
+        } else if (format.getClass().equals(FunctionalSyntaxDocumentFormat.class)) {
+            return Optional.of(new FunctionalSyntaxDocumentFormat());
+        } else {
             return Optional.empty();
         }
     }
@@ -82,7 +89,7 @@ public class SaveFormatResolver {
         if (source.isPrefixOWLOntologyFormat() && target.isPrefixOWLOntologyFormat()) {
             PrefixDocumentFormat sourcePrefixes = source.asPrefixOWLOntologyFormat();
             PrefixDocumentFormat targetPrefixes = target.asPrefixOWLOntologyFormat();
-            // Carries every prefix, the default prefix among them: it lives in the map under ":".
+            // copyPrefixesFrom also copies the default prefix, which is stored under ":".
             targetPrefixes.copyPrefixesFrom(sourcePrefixes);
             targetPrefixes.setPrefixComparator(sourcePrefixes.getPrefixComparator());
         }

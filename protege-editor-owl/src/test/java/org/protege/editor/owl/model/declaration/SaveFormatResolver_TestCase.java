@@ -17,6 +17,7 @@ import org.semanticweb.owlapi.model.OWLDocumentFormat;
 import org.semanticweb.owlapi.util.StringComparator;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -29,18 +30,19 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The save format resolver, over every kind of document format, with the preference both ways.
+ * Verifies how {@link SaveFormatResolver} prepares a format when automatic declarations are turned
+ * off.
  *
- * <p>Pins that a format comes back as a copy of its own class, that the format handed in is never
- * modified, and that the preference is read on every call rather than cached.
+ * <p>For RDF/XML, Turtle, OWL/XML, and Functional Syntax, the resolver returns a separate format
+ * with automatic declarations disabled and the other save settings preserved. It never changes the
+ * format owned by the ontology manager. Other format classes are returned unchanged, and the
+ * user's setting is read again for every call.
  */
 public class SaveFormatResolver_TestCase {
 
-    /** The user asked to suppress the declarations Protege adds when saving. */
     private static final SaveFormatResolver SUPPRESSING_DECLARATIONS =
             new SaveFormatResolver(() -> true);
 
-    /** The default: Protege declares every entity it finds referenced. */
     private static final SaveFormatResolver ADDING_DECLARATIONS =
             new SaveFormatResolver(() -> false);
 
@@ -56,7 +58,7 @@ public class SaveFormatResolver_TestCase {
 
     @Test
     public void shouldReturnTheGivenFormatWhenNotSuppressing() {
-        for (OWLDocumentFormat format : formats()) {
+        for (OWLDocumentFormat format : allFormats()) {
             assertSame(format.getClass().getSimpleName(), format,
                     ADDING_DECLARATIONS.getSaveFormat(format));
         }
@@ -64,7 +66,7 @@ public class SaveFormatResolver_TestCase {
 
     @Test
     public void shouldReturnACopyOfTheSameFormatClassWhenSuppressing() {
-        for (OWLDocumentFormat format : formats()) {
+        for (OWLDocumentFormat format : supportedFormats()) {
             OWLDocumentFormat copy = SUPPRESSING_DECLARATIONS.getSaveFormat(format);
             assertThat(copy, not(sameInstance(format)));
             assertThat(copy, instanceOf(format.getClass()));
@@ -73,7 +75,7 @@ public class SaveFormatResolver_TestCase {
 
     @Test
     public void shouldDisableAddMissingTypesOnTheCopy() {
-        for (OWLDocumentFormat format : formats()) {
+        for (OWLDocumentFormat format : supportedFormats()) {
             assertFalse(format.getClass().getSimpleName(),
                     SUPPRESSING_DECLARATIONS.getSaveFormat(format).isAddMissingTypes());
         }
@@ -81,16 +83,21 @@ public class SaveFormatResolver_TestCase {
 
     @Test
     public void shouldNeverModifyTheGivenFormat() {
-        for (OWLDocumentFormat format : formats()) {
+        for (OWLDocumentFormat format : allFormats()) {
             SUPPRESSING_DECLARATIONS.getSaveFormat(format);
-            assertTrue("mapping mutated the format it was given: " + format.getClass().getSimpleName(),
+            assertTrue("The original format was changed: " + format.getClass().getSimpleName(),
                     format.isAddMissingTypes());
         }
     }
 
-    /**
-     * A format that already adds no missing type needs no copy.
-     */
+    @Test
+    public void shouldReturnOtherFormatsUnchangedWhenSuppressing() {
+        for (OWLDocumentFormat format : otherFormats()) {
+            assertSame(format.getClass().getSimpleName(), format,
+                    SUPPRESSING_DECLARATIONS.getSaveFormat(format));
+        }
+    }
+
     @Test
     public void shouldReturnTheGivenFormatWhenItAlreadyAddsNoMissingTypes() {
         OWLDocumentFormat format = new TurtleDocumentFormat();
@@ -98,13 +105,9 @@ public class SaveFormatResolver_TestCase {
         assertSame(format, SUPPRESSING_DECLARATIONS.getSaveFormat(format));
     }
 
-    /**
-     * A format the resolver cannot copy is returned as it is, and the save adds the declarations
-     * Protege has always added.
-     */
     @Test
-    public void shouldReturnTheGivenFormatWhenItCannotBeCopied() {
-        OWLDocumentFormat format = new FormatWithoutANoArgConstructor("turtle");
+    public void shouldReturnACustomTurtleFormatUnchanged() {
+        OWLDocumentFormat format = new CustomTurtleDocumentFormat();
         assertSame(format, SUPPRESSING_DECLARATIONS.getSaveFormat(format));
     }
 
@@ -119,10 +122,7 @@ public class SaveFormatResolver_TestCase {
         }
     }
 
-    /**
-     * The Turtle renderer writes the default prefix as the document base, so losing it would change
-     * every relative IRI in the output.
-     */
+    /** The default prefix controls how relative IRIs are written, so it must be copied. */
     @Test
     public void shouldCopyTheDefaultPrefix() {
         for (PrefixDocumentFormat source : prefixFormats()) {
@@ -148,7 +148,7 @@ public class SaveFormatResolver_TestCase {
 
     @Test
     public void shouldCopyTheForceXsdStringParameter() {
-        for (OWLDocumentFormat format : formats()) {
+        for (OWLDocumentFormat format : supportedFormats()) {
             format.setParameter(SaveFormatResolver.FORCE_XSD_STRING_PARAMETER, Boolean.TRUE);
 
             OWLDocumentFormat copy = SUPPRESSING_DECLARATIONS.getSaveFormat(format);
@@ -159,7 +159,7 @@ public class SaveFormatResolver_TestCase {
 
     @Test
     public void shouldLeaveTheForceXsdStringParameterUnsetWhenTheSourceHasNone() {
-        for (OWLDocumentFormat format : formats()) {
+        for (OWLDocumentFormat format : supportedFormats()) {
             OWLDocumentFormat copy = SUPPRESSING_DECLARATIONS.getSaveFormat(format);
             assertThat(copy.getParameter(SaveFormatResolver.FORCE_XSD_STRING_PARAMETER,
                     Boolean.FALSE), is((Object) Boolean.FALSE));
@@ -169,7 +169,7 @@ public class SaveFormatResolver_TestCase {
     @Test
     public void shouldCopyTheOntologyLoaderMetaData() {
         OWLOntologyLoaderMetaData metaData = new RDFParserMetaData();
-        for (OWLDocumentFormat format : formats()) {
+        for (OWLDocumentFormat format : supportedFormats()) {
             format.setOntologyLoaderMetaData(metaData);
 
             OWLDocumentFormat copy = SUPPRESSING_DECLARATIONS.getSaveFormat(format);
@@ -178,9 +178,7 @@ public class SaveFormatResolver_TestCase {
         }
     }
 
-    /**
-     * The preference is read on every call, so a change reaches the next save without a restart.
-     */
+    /** A setting change must take effect on the next save without a restart. */
     @Test
     public void shouldReadThePreferenceOnEveryCall() {
         boolean[] suppressing = {false};
@@ -192,16 +190,17 @@ public class SaveFormatResolver_TestCase {
         assertThat(resolver.getSaveFormat(format), not(sameInstance(format)));
     }
 
-    /**
-     * A fresh format of every kind the Save As dialog offers, plus two the ontology manager can hold
-     * after a load: prefix and non-prefix, RDF and syntax-rendered, native and Rio-backed.
-     */
-    private static OWLDocumentFormat[] formats() {
+    private static OWLDocumentFormat[] supportedFormats() {
         return new OWLDocumentFormat[]{
                 new RDFXMLDocumentFormat(),
                 new TurtleDocumentFormat(),
                 new OWLXMLDocumentFormat(),
-                new FunctionalSyntaxDocumentFormat(),
+                new FunctionalSyntaxDocumentFormat()
+        };
+    }
+
+    private static OWLDocumentFormat[] otherFormats() {
+        return new OWLDocumentFormat[]{
                 new ManchesterSyntaxDocumentFormat(),
                 new OBODocumentFormat(),
                 new LatexDocumentFormat(),
@@ -210,9 +209,16 @@ public class SaveFormatResolver_TestCase {
         };
     }
 
+    private static List<OWLDocumentFormat> allFormats() {
+        List<OWLDocumentFormat> formats = new ArrayList<>();
+        formats.addAll(Arrays.asList(supportedFormats()));
+        formats.addAll(Arrays.asList(otherFormats()));
+        return formats;
+    }
+
     private static List<PrefixDocumentFormat> prefixFormats() {
         List<PrefixDocumentFormat> prefixFormats = new ArrayList<>();
-        for (OWLDocumentFormat format : formats()) {
+        for (OWLDocumentFormat format : supportedFormats()) {
             if (format.isPrefixOWLOntologyFormat()) {
                 prefixFormats.add(format.asPrefixOWLOntologyFormat());
             }
@@ -220,10 +226,6 @@ public class SaveFormatResolver_TestCase {
         return prefixFormats;
     }
 
-    /** A format the resolver has no way to build, standing in for one a plugin might supply. */
-    private static class FormatWithoutANoArgConstructor extends TurtleDocumentFormat {
-
-        FormatWithoutANoArgConstructor(String unused) {
-        }
+    private static class CustomTurtleDocumentFormat extends TurtleDocumentFormat {
     }
 }

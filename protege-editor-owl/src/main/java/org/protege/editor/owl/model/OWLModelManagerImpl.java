@@ -107,7 +107,6 @@ public class OWLModelManagerImpl extends AbstractModelManager implements OWLMode
 
     private final UserResolvedIRIMapper userResolvedIRIMapper = new UserResolvedIRIMapper(new MissingImportHandlerImpl());
 
-    // Resolves the document format for each save, applying the user's preference for automatic entity declarations.
     private final SaveFormatResolver saveFormatResolver =
             new SaveFormatResolver(() -> EntityDeclarationPreferences.getInstance()
                     .isSuppressingAutomaticDeclarations());
@@ -595,12 +594,10 @@ public class OWLModelManagerImpl extends AbstractModelManager implements OWLMode
             format = previousFormat;
         }
         /*
-         * Using the addMissingTypes call here for RDF/XML files can result in OWL Full output
-         * and can also result in data corruption.
+         * Resolve the document format based on the entity declaration setting for this save 
+         * without changing the format stored by the ontology manager.
          *
          * See http://protegewiki.stanford.edu/wiki/OWL2RDFParserDeclarationRequirement
-         *
-         * Preferences > General offers a setting that suppresses the declarations Protégé adds.
          */
         final OWLDocumentFormat saveFormat = saveFormatResolver.getSaveFormat(format);
         IRI documentIRI = IRI.create(documentURI);

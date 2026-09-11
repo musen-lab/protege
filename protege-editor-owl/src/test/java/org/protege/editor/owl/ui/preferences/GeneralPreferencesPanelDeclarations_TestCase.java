@@ -19,14 +19,13 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The Declarations control in Preferences &gt; General, driven in both directions.
+ * Checks the automatic declaration checkbox in Preferences &gt; General.
  *
- * <p>Pins that the control, the stored preference and the save format resolver all read in the same
- * sense: ticked means suppress the automatic entity declarations a save would add.
+ * <p>A selected checkbox stores {@code true}, which leaves automatic declarations out when saving.
+ * A cleared checkbox stores {@code false}, which keeps the default save behavior.
  *
- * <p>The panel cannot be built completely outside a running application - {@code createUI} reaches
- * for the editor kit at the Search section - so the test builds as much of it as it can and asserts
- * on the control it finds.
+ * <p>In this isolated test, panel setup reaches the checkbox before the later Search section asks
+ * for a running editor. The test stops at that point because the checkbox is already ready to use.
  */
 public class GeneralPreferencesPanelDeclarations_TestCase {
 
@@ -69,7 +68,7 @@ public class GeneralPreferencesPanelDeclarations_TestCase {
                 declarationCheckBox().isSelected());
     }
 
-    /** A fresh installation shows an unticked box, and adds the declarations Protege always adds. */
+    /** The checkbox is cleared when no value has been stored. */
     @Test
     public void shouldShowAnUntickedBoxWhenNothingIsStored() {
         assertFalse(declarationCheckBox().isSelected());
@@ -128,16 +127,13 @@ public class GeneralPreferencesPanelDeclarations_TestCase {
         return text != null && text.toLowerCase().contains("declaration");
     }
 
-    /**
-     * Builds the panel as far as it will go.  The Search section needs a live editor kit and throws;
-     * everything before it, the Declarations group included, is fully built by then.
-     */
+    /** Initializes enough of the panel to create the declaration checkbox. */
     private GeneralPreferencesPanel buildPanel() {
         GeneralPreferencesPanel panel = new GeneralPreferencesPanel();
         try {
             panel.initialise();
         } catch (NullPointerException expected) {
-            // The Search section reaches for an editor kit this test does not have.
+            // Expected when the later Search section requests an editor kit.
         } catch (Exception e) {
             throw new AssertionError("Panel failed before the Search section", e);
         }
