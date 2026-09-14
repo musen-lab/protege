@@ -274,6 +274,37 @@ public class MissingDeclarationChecker_TestCase {
     }
 
     @Test
+    public void shouldDeriveEveryFindingsEntityTypeFromItsEntity() throws Exception {
+        OWLOntologyManager m = OWLManager.createOWLOntologyManager();
+        OWLDataFactory df = m.getOWLDataFactory();
+        OWLOntology o = m.createOntology(IRI.create("http://example.org/kinds"));
+        OWLClass subject = df.getOWLClass(IRI.create("http://example.org/kinds#Subject"));
+        OWLObjectProperty objectProperty =
+                df.getOWLObjectProperty(IRI.create("http://example.org/kinds#p"));
+        OWLDataProperty dataProperty = df.getOWLDataProperty(IRI.create("http://example.org/kinds#d"));
+        OWLDatatype datatype = df.getOWLDatatype(IRI.create("http://example.org/kinds#Measure"));
+        OWLNamedIndividual individual =
+                df.getOWLNamedIndividual(IRI.create("http://example.org/kinds#i"));
+        OWLAnnotationProperty annotationProperty =
+                df.getOWLAnnotationProperty(IRI.create("http://example.org/kinds#note"));
+        m.addAxiom(o, df.getOWLDeclarationAxiom(subject));
+        m.addAxiom(o, df.getOWLSubClassOfAxiom(subject,
+                df.getOWLObjectSomeValuesFrom(objectProperty, df.getOWLThing())));
+        m.addAxiom(o, df.getOWLDataPropertyAssertionAxiom(dataProperty, individual,
+                df.getOWLLiteral("1", datatype)));
+        m.addAxiom(o, df.getOWLAnnotationAssertionAxiom(annotationProperty, subject.getIRI(),
+                df.getOWLLiteral("n")));
+
+        List<MissingDeclarationFinding> findings = checker.check(o).getFindings();
+
+        assertEquals(5, findings.size());
+        for (MissingDeclarationFinding finding : findings) {
+            assertEquals(finding.getEntity().toString(),
+                    finding.getEntity().getEntityType(), finding.getEntityType());
+        }
+    }
+
+    @Test
     public void shouldLeaveEveryOntologyInTheClosureUnchanged() throws Exception {
         OWLOntology leaf = ClosureFixtures.threeLevelClosure();
         Map<OWLOntology, Set<OWLAxiom>> before = axiomsByOntology(leaf);

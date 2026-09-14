@@ -104,4 +104,13 @@ public class MissingDeclarationReport_TestCase {
         assertEquals(MissingDeclarationFinding.get(term, Collections.singleton(ontology)),
                 MissingDeclarationFinding.get(term, Collections.singleton(ontology)));
     }
+
+    @Test
+    public void shouldDeriveTheEntityTypeFromTheEntityRatherThanStoringIt() {
+        // The entity type is a concrete method over the entity the finding already carries, so the
+        // two cannot disagree and the type is not part of the value's identity.
+        assertEquals(errorClass.getEntity().getEntityType(), errorClass.getEntityType());
+        assertEquals(EntityType.NAMED_INDIVIDUAL, warningIndividual.getEntityType());
+        assertEquals(EntityType.ANNOTATION_PROPERTY, errorAnnotationProperty.getEntityType());
+    }
 }

@@ -23,7 +23,7 @@ public abstract class MissingDeclarationFinding {
      * Creates a finding for an undeclared entity.
      *
      * @param entity the undeclared entity
-     * @param referringOntologies the ontologies that use the entity
+     * @param referringOntologies the ontology identifiers that use the entity
      * @return a finding containing the entity, its severity, and the ontologies in which it is used
      */
     @Nonnull
@@ -32,7 +32,6 @@ public abstract class MissingDeclarationFinding {
         checkNotNull(entity);
         checkNotNull(referringOntologies);
         return new AutoValue_MissingDeclarationFinding(entity,
-                entity.getEntityType(),
                 DeclarationSeverity.of(entity),
                 ImmutableSet.copyOf(referringOntologies));
     }
@@ -46,14 +45,6 @@ public abstract class MissingDeclarationFinding {
     public abstract OWLEntity getEntity();
 
     /**
-     * Gets the type of the undeclared entity.
-     *
-     * @return the entity type
-     */
-    @Nonnull
-    public abstract EntityType<?> getEntityType();
-
-    /**
      * Gets the severity of the missing declaration.
      *
      * @return the severity of the missing declaration
@@ -62,10 +53,20 @@ public abstract class MissingDeclarationFinding {
     public abstract DeclarationSeverity getSeverity();
 
     /**
-     * Gets the ontologies in which the undeclared entity is used.
+     * Gets the ontology identifiers in which the undeclared entity is used.
      *
-     * @return the ontologies that use the entity
+     * @return the ontology identifiers that use the entity
      */
     @Nonnull
     public abstract ImmutableSet<OWLOntology> getReferringOntologies();
+
+    /**
+     * Gets the type of the undeclared entity.
+     *
+     * @return the entity type
+     */
+    @Nonnull
+    public EntityType<?> getEntityType() {
+        return getEntity().getEntityType();
+    }
 }
