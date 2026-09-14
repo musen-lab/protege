@@ -1,12 +1,10 @@
 package org.protege.editor.owl.model.declaration;
 
-import org.semanticweb.owlapi.model.OWLEntity;
 import org.semanticweb.owlapi.model.OWLOntology;
 
 import javax.annotation.Nonnull;
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -18,7 +16,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * that were already present in the source ontology.
  *
  * <p>When automatic declaration generation is disabled under
- * <b>Preferences &gt; General &gt; Suppress automatic entity declarations when saving</b>,
+ * <b>Preferences &gt; Axioms &gt; Suppress automatic entity declarations when saving</b>,
  * these missing declarations remain visible in the saved ontology. This checker identifies them
  * before saving.
  *
@@ -53,14 +51,11 @@ public class MissingDeclarationChecker {
     public MissingDeclarationReport check(@Nonnull OWLOntology ontology) {
         checkNotNull(ontology);
         DeclarationIndex index = DeclarationIndex.over(ontology);
-        List<MissingDeclarationFinding> findings = new ArrayList<>();
-        for (OWLEntity entity : index.getEntities()) {
-            if (StandardVocabulary.contains(entity) || index.isDeclared(entity)) {
-                continue;
-            }
-            findings.add(MissingDeclarationFinding.get(entity, index.getUsingOntologies(entity)));
-        }
-        findings.sort(BY_NAME_THEN_KIND);
-        return MissingDeclarationReport.get(findings);
+        return MissingDeclarationReport.get(index.getEntities().stream()
+                .filter(entity -> !StandardVocabulary.contains(entity))
+                .filter(entity -> !index.isDeclared(entity))
+                .map(entity -> MissingDeclarationFinding.get(entity, index.getUsingOntologies(entity)))
+                .sorted(BY_NAME_THEN_KIND)
+                .collect(Collectors.toList()));
     }
 }
