@@ -11,11 +11,9 @@ import static org.junit.Assert.*;
 /**
  * Verifies the vocabulary exclusions required by a missing-declaration check.
  *
- * <p>{@link OWLEntity#isBuiltIn()} is insufficient by itself: its result depends on the entity
- * type and it does not cover every term in the RDF, RDFS, OWL, and XSD namespaces. For example,
- * relying on it alone would report {@code xsd:date} whenever an ontology uses that datatype.
- * Combining it with {@link IRI#isReservedVocabulary()} excludes the standard vocabularies without
- * suppressing user-defined or third-party entities.
+ * <p>The builtin vocabularies (such as RDF, RDFS, OWL, and XSD namespaces) are the only
+ * entities the check never reports. Everything else an ontology uses must be declared somewhere
+ * in its import closure.
  */
 public class ExcludedVocabulary_TestCase {
 
@@ -69,25 +67,7 @@ public class ExcludedVocabulary_TestCase {
     }
 
     @Test
-    public void shouldCoverThirdPartyVocabulariesWithNeitherGuard() {
-        // These are legitimately undeclared in many real ontologies, and are
-        // genuine OWL 2 DL violations when they are. Reporting them is a product
-        // decision, not an accident: see the T4.3 PRD, open question 5.
-        OWLAnnotationProperty dcTitle = DF.getOWLAnnotationProperty(iri("http://purl.org/dc/terms/title"));
-        OWLAnnotationProperty skosPref =
-                DF.getOWLAnnotationProperty(iri("http://www.w3.org/2004/02/skos/core#prefLabel"));
-        OWLAnnotationProperty oboNamespace = DF.getOWLAnnotationProperty(
-                iri("http://www.geneontology.org/formats/oboInOwl#hasOBONamespace"));
-        OWLAnnotationProperty foafName = DF.getOWLAnnotationProperty(iri("http://xmlns.com/foaf/0.1/name"));
-
-        for (OWLAnnotationProperty property : new OWLAnnotationProperty[] {
-                dcTitle, skosPref, oboNamespace, foafName }) {
-            assertFalse(property + " must not be excluded", isExcludedVocabulary(property));
-        }
-    }
-
-    @Test
-    public void shouldLetAnUndeclaredThirdPartyPropertyReachTheCheck() throws Exception {
+    public void shouldLetAnUndeclaredExternalVocabularyPropertyReachTheCheckAsAnError() throws Exception {
         OWLOntologyManager m = OWLManager.createOWLOntologyManager();
         OWLDataFactory df = m.getOWLDataFactory();
         OWLOntology o = m.createOntology(iri("http://example.org/vocab"));
@@ -98,7 +78,9 @@ public class ExcludedVocabulary_TestCase {
 
         assertTrue(o.getSignature(Imports.INCLUDED).contains(dcTitle));
         assertFalse(o.isDeclared(dcTitle, Imports.INCLUDED));
-        assertFalse(isExcludedVocabulary(dcTitle));
+        assertFalse("an external vocabulary is not standard vocabulary",
+                isExcludedVocabulary(dcTitle));
+        assertEquals(DeclarationSeverity.ERROR, DeclarationSeverity.of(dcTitle));
     }
 
     @Test

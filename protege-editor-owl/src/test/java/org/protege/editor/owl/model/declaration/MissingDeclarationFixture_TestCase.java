@@ -60,17 +60,20 @@ public class MissingDeclarationFixture_TestCase {
     }
 
     @Test
-    public void shouldClassifyTheBorrowedClassAsAnError() {
-        assertEquals(ImmutableList.of(BASE_NS + "Borrowed"),
+    public void shouldClassifyTheBorrowedClassAndTheDublinCorePropertyAsErrors() {
+        // The Dublin Core property is an error like any other undeclared property. The fixture
+        // neither declares it nor imports a vocabulary that does.
+        assertEquals(ImmutableList.of(
+                BASE_NS + "Borrowed",
+                "http://purl.org/dc/terms/title"),
                 names(errorsOnly()));
     }
 
     @Test
-    public void shouldClassifyIndividualsAndTheDublinCorePropertyAsWarnings() {
+    public void shouldClassifyOnlyIndividualsAsWarnings() {
         assertEquals(ImmutableList.of(
                 MODULE_NS + "Duo",
-                MODULE_NS + "anInstance",
-                "http://purl.org/dc/terms/title"),
+                MODULE_NS + "anInstance"),
                 names(checker.check(module).getFindings(DeclarationSeverity.WARNING)));
     }
 

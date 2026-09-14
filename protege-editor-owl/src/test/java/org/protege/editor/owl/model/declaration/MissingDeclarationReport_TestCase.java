@@ -21,9 +21,9 @@ public class MissingDeclarationReport_TestCase {
 
     private static final OWLDataFactory DF = OWLManager.getOWLDataFactory();
 
-    private MissingDeclarationFinding error;
+    private MissingDeclarationFinding errorClass;
     private MissingDeclarationFinding warningIndividual;
-    private MissingDeclarationFinding warningThirdParty;
+    private MissingDeclarationFinding errorAnnotationProperty;
     private MissingDeclarationReport report;
 
     @Before
@@ -31,23 +31,23 @@ public class MissingDeclarationReport_TestCase {
         OWLOntology ontology = OWLManager.createOWLOntologyManager()
                 .createOntology(IRI.create("http://example.org/report"));
 
-        error = MissingDeclarationFinding.get(
+        errorClass = MissingDeclarationFinding.get(
                 DF.getOWLClass(IRI.create("http://example.org/mine#A")),
                 Collections.singleton(ontology));
         warningIndividual = MissingDeclarationFinding.get(
                 DF.getOWLNamedIndividual(IRI.create("http://example.org/mine#i")),
                 Collections.singleton(ontology));
-        warningThirdParty = MissingDeclarationFinding.get(
+        errorAnnotationProperty = MissingDeclarationFinding.get(
                 DF.getOWLAnnotationProperty(IRI.create("http://purl.org/dc/terms/title")),
                 Collections.singleton(ontology));
 
         report = MissingDeclarationReport.get(
-                ImmutableList.of(error, warningIndividual, warningThirdParty));
+                ImmutableList.of(errorClass, warningIndividual, errorAnnotationProperty));
     }
 
     @Test
     public void shouldPreserveFindingInsertionOrder() {
-        assertEquals(ImmutableList.of(error, warningIndividual, warningThirdParty),
+        assertEquals(ImmutableList.of(errorClass, warningIndividual, errorAnnotationProperty),
                 report.getFindings());
         assertEquals(3, report.size());
         assertFalse(report.isEmpty());
@@ -55,8 +55,9 @@ public class MissingDeclarationReport_TestCase {
 
     @Test
     public void shouldFilterFindingsBySeverity() {
-        assertEquals(ImmutableList.of(error), report.getFindings(DeclarationSeverity.ERROR));
-        assertEquals(ImmutableList.of(warningIndividual, warningThirdParty),
+        assertEquals(ImmutableList.of(errorClass, errorAnnotationProperty),
+                report.getFindings(DeclarationSeverity.ERROR));
+        assertEquals(ImmutableList.of(warningIndividual),
                 report.getFindings(DeclarationSeverity.WARNING));
     }
 

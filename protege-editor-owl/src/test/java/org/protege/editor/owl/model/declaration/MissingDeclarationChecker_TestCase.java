@@ -204,41 +204,22 @@ public class MissingDeclarationChecker_TestCase {
     }
 
     @Test
-    public void shouldClassifyThirdPartyVocabularyAsAWarningAndOwnVocabularyAsAnError() throws Exception {
+    public void shouldClassifyAnUndeclaredEntityByItsTypeWhateverItsNamespace() throws Exception {
         OWLOntologyManager m = OWLManager.createOWLOntologyManager();
         OWLDataFactory df = m.getOWLDataFactory();
         OWLOntology o = m.createOntology(IRI.create("http://example.org/mixed"));
         OWLClass subject = df.getOWLClass(IRI.create("http://example.org/mixed#A"));
-        OWLAnnotationProperty theirs =
-                df.getOWLAnnotationProperty(IRI.create("http://purl.org/dc/terms/title"));
-        OWLAnnotationProperty mine =
-                df.getOWLAnnotationProperty(IRI.create("http://example.org/mixed#note"));
         m.addAxiom(o, df.getOWLDeclarationAxiom(subject));
-        m.addAxiom(o, df.getOWLAnnotationAssertionAxiom(theirs, subject.getIRI(), df.getOWLLiteral("T")));
-        m.addAxiom(o, df.getOWLAnnotationAssertionAxiom(mine, subject.getIRI(), df.getOWLLiteral("N")));
 
-        MissingDeclarationReport report = checker.check(o);
-
-        // OWL requires both declarations. They differ only in who is able to add them.
-        assertEquals(ImmutableList.of("http://example.org/mixed#note"),
-                names(report.getFindings(DeclarationSeverity.ERROR)));
-        assertEquals(ImmutableList.of("http://purl.org/dc/terms/title"),
-                names(report.getFindings(DeclarationSeverity.WARNING)));
-    }
-
-    @Test
-    public void shouldClassifyEveryListedThirdPartyVocabularyAsAWarning() throws Exception {
-        OWLOntologyManager m = OWLManager.createOWLOntologyManager();
-        OWLDataFactory df = m.getOWLDataFactory();
-        OWLOntology o = m.createOntology(IRI.create("http://example.org/borrowed"));
-        OWLClass subject = df.getOWLClass(IRI.create("http://example.org/borrowed#A"));
-        m.addAxiom(o, df.getOWLDeclarationAxiom(subject));
-        String[] borrowed = {
+        // Three undeclared annotation properties: two borrowed from external vocabularies, one the
+        // author's own. OWL requires all three declarations, so all three are errors. Downgrading
+        // the borrowed ones implied the author was not expected to act, but importing the
+        // vocabulary that declares them is exactly what the author would do.
+        String[] properties = {
                 "http://purl.org/dc/terms/title",
                 "http://www.w3.org/2004/02/skos/core#prefLabel",
-                "http://www.geneontology.org/formats/oboInOwl#hasOBONamespace",
-                "http://xmlns.com/foaf/0.1/name" };
-        for (String property : borrowed) {
+                "http://example.org/mixed#note" };
+        for (String property : properties) {
             m.addAxiom(o, df.getOWLAnnotationAssertionAxiom(
                     df.getOWLAnnotationProperty(IRI.create(property)),
                     subject.getIRI(), df.getOWLLiteral("v")));
@@ -246,12 +227,38 @@ public class MissingDeclarationChecker_TestCase {
 
         MissingDeclarationReport report = checker.check(o);
 
-        assertEquals(4, report.getFindings(DeclarationSeverity.WARNING).size());
+        assertEquals(ImmutableList.of(
+                        "http://example.org/mixed#note",
+                        "http://purl.org/dc/terms/title",
+                        "http://www.w3.org/2004/02/skos/core#prefLabel"),
+                names(report.getFindings(DeclarationSeverity.ERROR)));
+        assertTrue(report.getFindings(DeclarationSeverity.WARNING).isEmpty());
+    }
+
+    @Test
+    public void shouldClassifyAnUndeclaredIndividualAsAWarningWhateverItsNamespace() throws Exception {
+        OWLOntologyManager m = OWLManager.createOWLOntologyManager();
+        OWLDataFactory df = m.getOWLDataFactory();
+        OWLOntology o = m.createOntology(IRI.create("http://example.org/people"));
+        OWLClass person = df.getOWLClass(IRI.create("http://example.org/people#Person"));
+        m.addAxiom(o, df.getOWLDeclarationAxiom(person));
+        String[] individuals = {
+                "http://example.org/people#ada",
+                "http://www.w3.org/2004/02/skos/core#grace",
+                "http://purl.org/dc/terms/alan" };
+        for (String individual : individuals) {
+            m.addAxiom(o, df.getOWLClassAssertionAxiom(
+                    person, df.getOWLNamedIndividual(IRI.create(individual))));
+        }
+
+        MissingDeclarationReport report = checker.check(o);
+
+        assertEquals(3, report.getFindings(DeclarationSeverity.WARNING).size());
         assertTrue(report.getFindings(DeclarationSeverity.ERROR).isEmpty());
     }
 
     @Test
-    public void shouldClassifyAnOboTermAsAnErrorBecauseItsNamespaceIsNotThirdParty() throws Exception {
+    public void shouldClassifyAnOboTermAsAnError() throws Exception {
         OWLOntologyManager m = OWLManager.createOWLOntologyManager();
         OWLDataFactory df = m.getOWLDataFactory();
         OWLOntology o = m.createOntology(IRI.create("http://purl.obolibrary.org/obo/mine.owl"));
@@ -262,8 +269,6 @@ public class MissingDeclarationChecker_TestCase {
 
         MissingDeclarationReport report = checker.check(o);
 
-        // Every OBO ontology puts its terms in this one namespace, and no ontology owns it.
-        // Treating that as borrowed vocabulary would demote every OBO term to a warning.
         assertEquals(1, report.size());
         assertEquals(DeclarationSeverity.ERROR, report.getFindings().get(0).getSeverity());
     }

@@ -27,8 +27,8 @@ public enum DeclarationSeverity {
     /**
      * Determines the severity of a missing declaration for the specified entity.
      *
-     * <p>A missing declaration is reported as a warning for named individuals and for entities
-     * from third-party vocabularies. All other missing declarations are reported as errors.
+     * <p>A missing declaration is reported as a warning for named individuals, whose declaration
+     * OWL 2 does not require. All other missing declarations are reported as errors.
      *
      * @param entity the entity for which a declaration is missing
      * @return the severity of the missing declaration
@@ -36,9 +36,6 @@ public enum DeclarationSeverity {
     @Nonnull
     public static DeclarationSeverity of(@Nonnull OWLEntity entity) {
         checkNotNull(entity);
-        if (entity.getEntityType() == EntityType.NAMED_INDIVIDUAL) {
-            return WARNING;
-        }
-        return ThirdPartyVocabulary.contains(entity) ? WARNING : ERROR;
+        return entity.getEntityType() == EntityType.NAMED_INDIVIDUAL ? WARNING : ERROR;
     }
 }

@@ -23,8 +23,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * before saving.
  *
  * <p>An entity is considered declared if a declaration is present either in the ontology itself
- * or in any ontology in its import closure. Entities from recognized standard vocabularies are
- * excluded from the report.
+ * or in any ontology in its import closure. Only entities from the builtin vocabularies are
+ * exempt: every other entity the closure uses must be declared somewhere within it, whoever
+ * publishes the vocabulary it belongs to.
  *
  * <p>This check is read-only and does not modify the ontology.
  *
@@ -42,7 +43,7 @@ public class MissingDeclarationChecker {
     /**
      * Finds entities used by the specified ontology that are not declared in its import closure.
      *
-     * <p>Entities from recognized standard vocabularies are not reported.
+     * <p>Entities from the builtin vocabularies are not reported.
      *
      * @param ontology the ontology to check
      * @return a report containing the missing declarations in deterministic order; an empty report
