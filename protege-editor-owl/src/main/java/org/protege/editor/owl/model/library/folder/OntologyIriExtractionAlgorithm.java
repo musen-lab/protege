@@ -1,6 +1,5 @@
 package org.protege.editor.owl.model.library.folder;
 
-import com.google.common.io.ByteStreams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.Attributes;
@@ -14,6 +13,7 @@ import javax.xml.parsers.SAXParserFactory;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -142,16 +142,16 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
         if (!declared.isEmpty()) {
             return new Suggestions(declared, Collections.emptySet());
         }
-        Suggestions suggestions = extractFromTextHead(f);
+        Suggestions suggestions = extractFromNonXmlFormats(f);
         if (suggestions.isEmpty()) {
-            logger.debug("No ontology IRI could be extracted from {}", f);
+            logger.info("No ontology IRI could be extracted from {}", f);
         }
         return suggestions;
     }
 
     // Text formats. Read the start of the file once, then let each format look at
     // it in turn. The first format that finds a declaration wins.
-    private Suggestions extractFromTextHead(File f) {
+    private Suggestions extractFromNonXmlFormats(File f) {
         List<String> head = readHead(f);
         Set<URI> declared = extractFromTurtle(head);
         if (declared.isEmpty()) {
@@ -167,7 +167,7 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
     private static List<String> readHead(File f) {
         List<String> head = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                ByteStreams.limit(new FileInputStream(f), MAX_BYTES_TO_EXAMINE), StandardCharsets.UTF_8))) {
+                new BoundedInputStream(new FileInputStream(f), MAX_BYTES_TO_EXAMINE), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 if (head.isEmpty() && !line.isEmpty() && line.charAt(0) == '\uFEFF') {
@@ -187,7 +187,7 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
     private static Set<URI> extractFromTurtle(List<String> rawHead) {
         // Strip strings and comments first: a look-alike inside a string must not be
         // indexed, and a trailing comment must not hide the ';' or '.' that ends a statement.
-        List<String> head = TurtleCodeFilter.codeLines(rawHead);
+        List<String> head = TurtleFilter.codeLines(rawHead);
         URI base = null;
         Map<String, String> prefixes = new HashMap<>();
         boolean inStatement = false;
@@ -375,7 +375,7 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
 
     private Set<URI> extractFromXml(File f) {
         XmlOntologyHandler handler = new XmlOntologyHandler();
-        try (InputStream is = ByteStreams.limit(new FileInputStream(f), MAX_BYTES_TO_EXAMINE)) {
+        try (InputStream is = new BoundedInputStream(new FileInputStream(f), MAX_BYTES_TO_EXAMINE)) {
             SAXParserFactory factory = SAXParserFactory.newInstance();
             factory.setNamespaceAware(true);
             // A folder scan must never touch the network or the filesystem beyond f.
@@ -397,7 +397,7 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
             // are deliberately not caught here: a folder scan must not hide them.
             logger.debug("Could not examine {} as XML: {}", f, e.toString());
         }
-        return handler.collectedSuggestions();
+        return handler.getCollectedSuggestions();
     }
 
     private static Set<URI> oboSuggestions(String oboId, String dataVersion) {
@@ -425,6 +425,50 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
         }
         catch (Exception e) {
             logger.debug("SAX parser does not support disabling {}", feature);
+        }
+    }
+
+    /**
+     * Reads at most a fixed number of bytes from the stream it wraps, then reports
+     * the end of the file. This is what keeps the memory a folder scan needs tied
+     * to the limit rather than to the size of the file being examined.
+     */
+    private static final class BoundedInputStream extends FilterInputStream {
+
+        private long remaining;
+
+        BoundedInputStream(InputStream in, long limit) {
+            super(in);
+            this.remaining = limit;
+        }
+
+        @Override
+        public int read() throws IOException {
+            if (remaining <= 0) {
+                return -1;
+            }
+            int read = super.read();
+            if (read != -1) {
+                remaining--;
+            }
+            return read;
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) throws IOException {
+            if (remaining <= 0) {
+                return -1;
+            }
+            int read = super.read(buffer, offset, (int) Math.min(length, remaining));
+            if (read != -1) {
+                remaining -= read;
+            }
+            return read;
+        }
+
+        @Override
+        public int available() throws IOException {
+            return (int) Math.min(super.available(), remaining);
         }
     }
 
@@ -515,7 +559,7 @@ public class OntologyIriExtractionAlgorithm implements PrioritizedAlgorithm {
             }
         }
 
-        Set<URI> collectedSuggestions() {
+        Set<URI> getCollectedSuggestions() {
             Set<URI> suggestions = new TreeSet<>();
             URI resolutionBase = declarationBase != null ? declarationBase : xmlBase;
             URI declared = resolveOntologyIri(declaredOntologyIri, resolutionBase);

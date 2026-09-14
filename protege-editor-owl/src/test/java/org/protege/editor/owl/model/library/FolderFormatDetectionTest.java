@@ -266,6 +266,22 @@ public class FolderFormatDetectionTest {
     }
 
     @Test
+    public void turtleLongStringEndingInAnEscapedQuoteStaysOpen() throws IOException {
+        // A long string whose text ends in \" is followed by the closing \"\"\", giving four
+        // quotes in a row. Reading the first three as the end would treat the string's
+        // contents as code and the real declaration as string text.
+        XMLCatalog catalog = catalogFor("turtle-escaped-quote-in-long-string.ttl");
+        assertLocalCopyDetected("turtle-escaped-quote-in-long-string.ttl",
+                                "http://import-test.invalid/formats/escaped-quote");
+        GroupEntry group = (GroupEntry) catalog.getEntries().get(0);
+        for (org.protege.xmlcatalog.entry.Entry entry : group.getEntries()) {
+            String name = ((org.protege.xmlcatalog.entry.UriEntry) entry).getName();
+            assertTrue("A declaration inside the string literal leaked into the catalog: " + name,
+                       !name.startsWith("http://evil.example/"));
+        }
+    }
+
+    @Test
     public void turtleDeclarationAfterALongStringClosingMidLineIsFound() throws IOException {
         assertLocalCopyDetected("turtle-literal-closes-midline.ttl",
                                 "http://import-test.invalid/formats/turtle-midline");

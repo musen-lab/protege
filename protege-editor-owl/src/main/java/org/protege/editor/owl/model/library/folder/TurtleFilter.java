@@ -19,9 +19,9 @@ import java.util.List;
  * Everything else is kept, so line numbers and the {@code ;} and {@code .} that
  * end statements stay where they were.
  */
-final class TurtleCodeFilter {
+final class TurtleFilter {
 
-    private TurtleCodeFilter() {
+    private TurtleFilter() {
     }
 
     static List<String> codeLines(List<String> lines) {
@@ -32,12 +32,12 @@ final class TurtleCodeFilter {
             int i = 0;
             while (i < line.length()) {
                 if (openLongString != null) {
-                    int close = line.indexOf(openLongString, i);
-                    if (close < 0) {
+                    int end = endOfLongString(line, i, openLongString);
+                    if (end < 0) {
                         i = line.length();       // whole rest of line is literal text
                     }
                     else {
-                        i = close + 3;
+                        i = end;
                         openLongString = null;
                         code.append("\"\"");
                     }
@@ -69,6 +69,28 @@ final class TurtleCodeFilter {
             out.add(code.toString());
         }
         return out;
+    }
+
+    /**
+     * Returns the index just past the delimiter that closes a long string, or -1 when
+     * the string is still open at the end of the line. Quotes that are part of a
+     * backslash escape do not close the string: a literal ending in {@code \"} puts
+     * four quotes in a row before the real delimiter.
+     */
+    private static int endOfLongString(String line, int from, String delimiter) {
+        int i = from;
+        while (i < line.length()) {
+            if (line.charAt(i) == '\\') {
+                i += 2;
+            }
+            else if (line.startsWith(delimiter, i)) {
+                return i + delimiter.length();
+            }
+            else {
+                i++;
+            }
+        }
+        return -1;
     }
 
     /** Returns the index just past the closing quote (or the line end if unterminated). */
