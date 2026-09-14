@@ -5,6 +5,7 @@ import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.*;
 import org.semanticweb.owlapi.model.parameters.Imports;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -14,7 +15,8 @@ import static org.junit.Assert.*;
  * Verifies the declaration index built from an ontology and its import closure.
  *
  * <p>The index must contain the closure signature, agree with the OWL API's declaration status,
- * and record every declaring and using ontology for each entity. The tests also cover duplicate
+ * and record every declaring and using ontology for each entity. Ontologies are recorded by
+ * {@link OWLOntologyID}, so the index holds no mutable state. The tests also cover duplicate
  * declarations, anonymous ontologies, cyclic imports, and punned IRIs.
  */
 public class DeclarationIndex_TestCase {
@@ -100,7 +102,31 @@ public class DeclarationIndex_TestCase {
 
         assertTrue(index.isDeclared(a));
         assertFalse(index.isDeclared(undeclared));
-        assertEquals(1, index.getUsingOntologies(undeclared).size());
+        // An anonymous ontology still has an identifier of its own, so it needs no special case.
+        assertEquals(Collections.singleton(anonymous.getOntologyID()),
+                index.getUsingOntologies(undeclared));
+    }
+
+    @Test
+    public void shouldGiveEachAnonymousOntologyInTheClosureADistinctIdentifier() throws Exception {
+        OWLOntologyManager m = OWLManager.createOWLOntologyManager();
+        OWLDataFactory df = m.getOWLDataFactory();
+        OWLOntology namedImport = m.createOntology(IRI.create("http://example.org/named"));
+        OWLOntology anonymous = m.createOntology();
+        m.applyChange(new AddImport(anonymous,
+                df.getOWLImportsDeclaration(IRI.create("http://example.org/named"))));
+        OWLClass inAnonymous = df.getOWLClass(IRI.create("http://example.org/anon#A"));
+        OWLClass inNamed = df.getOWLClass(IRI.create("http://example.org/named#B"));
+        m.addAxiom(anonymous, df.getOWLDeclarationAxiom(inAnonymous));
+        m.addAxiom(namedImport, df.getOWLDeclarationAxiom(inNamed));
+
+        DeclarationIndex index = DeclarationIndex.over(anonymous);
+
+        assertNotEquals(anonymous.getOntologyID(), namedImport.getOntologyID());
+        assertEquals(Collections.singleton(anonymous.getOntologyID()),
+                index.getDeclaringOntologies(inAnonymous));
+        assertEquals(Collections.singleton(namedImport.getOntologyID()),
+                index.getDeclaringOntologies(inNamed));
     }
 
     @Test
@@ -142,10 +168,10 @@ public class DeclarationIndex_TestCase {
         assertFalse(index.isDeclared(asIndividual));
     }
 
-    private static Set<String> iris(Set<OWLOntology> ontologies) {
+    private static Set<String> iris(Set<OWLOntologyID> ontologyIds) {
         Set<String> names = new HashSet<>();
-        for (OWLOntology o : ontologies) {
-            names.add(o.getOntologyID().getOntologyIRI().get().toString());
+        for (OWLOntologyID id : ontologyIds) {
+            names.add(id.getOntologyIRI().get().toString());
         }
         return names;
     }

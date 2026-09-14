@@ -4,7 +4,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
 import org.semanticweb.owlapi.model.EntityType;
 import org.semanticweb.owlapi.model.OWLEntity;
-import org.semanticweb.owlapi.model.OWLOntology;
+import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
@@ -28,7 +28,7 @@ public abstract class MissingDeclarationFinding {
      */
     @Nonnull
     public static MissingDeclarationFinding get(@Nonnull OWLEntity entity,
-                                                @Nonnull Collection<OWLOntology> referringOntologies) {
+                                                @Nonnull Collection<OWLOntologyID> referringOntologies) {
         checkNotNull(entity);
         checkNotNull(referringOntologies);
         return new AutoValue_MissingDeclarationFinding(entity,
@@ -58,7 +58,7 @@ public abstract class MissingDeclarationFinding {
      * @return the ontology identifiers that use the entity
      */
     @Nonnull
-    public abstract ImmutableSet<OWLOntology> getReferringOntologies();
+    public abstract ImmutableSet<OWLOntologyID> getReferringOntologies();
 
     /**
      * Gets the type of the undeclared entity.

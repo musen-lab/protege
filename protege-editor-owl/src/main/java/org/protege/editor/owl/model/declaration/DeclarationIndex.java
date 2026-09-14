@@ -1,15 +1,13 @@
 package org.protege.editor.owl.model.declaration;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import org.semanticweb.owlapi.model.*;
 import org.semanticweb.owlapi.model.parameters.Imports;
 
 import javax.annotation.Nonnull;
-import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -30,15 +28,15 @@ import static com.google.common.base.Preconditions.checkNotNull;
 class DeclarationIndex {
 
     @Nonnull
-    private final ImmutableMap<OWLEntity, Set<OWLOntology>> declaredBy;
+    private final ImmutableMap<OWLEntity, ImmutableSet<OWLOntologyID>> declaredBy;
 
     @Nonnull
-    private final ImmutableMap<OWLEntity, Set<OWLOntology>> usedBy;
+    private final ImmutableMap<OWLEntity, ImmutableSet<OWLOntologyID>> usedBy;
 
-    private DeclarationIndex(@Nonnull Map<OWLEntity, Set<OWLOntology>> declaredBy,
-                             @Nonnull Map<OWLEntity, Set<OWLOntology>> usedBy) {
-        this.declaredBy = ImmutableMap.copyOf(checkNotNull(declaredBy));
-        this.usedBy = ImmutableMap.copyOf(checkNotNull(usedBy));
+    private DeclarationIndex(@Nonnull ImmutableMap<OWLEntity, ImmutableSet<OWLOntologyID>> declaredBy,
+                             @Nonnull ImmutableMap<OWLEntity, ImmutableSet<OWLOntologyID>> usedBy) {
+        this.declaredBy = checkNotNull(declaredBy);
+        this.usedBy = checkNotNull(usedBy);
     }
 
     /**
@@ -51,25 +49,33 @@ class DeclarationIndex {
     @Nonnull
     static DeclarationIndex over(@Nonnull OWLOntology ontology) {
         checkNotNull(ontology);
-        Map<OWLEntity, Set<OWLOntology>> declaredBy = new LinkedHashMap<>();
-        Map<OWLEntity, Set<OWLOntology>> usedBy = new LinkedHashMap<>();
+        Map<OWLEntity, ImmutableSet.Builder<OWLOntologyID>> declaredBy = new LinkedHashMap<>();
+        Map<OWLEntity, ImmutableSet.Builder<OWLOntologyID>> usedBy = new LinkedHashMap<>();
         // getImportsClosure() includes the ontology itself and visits each import once, so a
         // cycle between two ontologies ends rather than repeating.
         for (OWLOntology importOntology : ontology.getImportsClosure()) {
+            OWLOntologyID importOntologyId = importOntology.getOntologyID();
             for (OWLDeclarationAxiom declaration : importOntology.getAxioms(AxiomType.DECLARATION)) {
-                record(declaredBy, declaration.getEntity(), importOntology);
+                record(declaredBy, declaration.getEntity(), importOntologyId);
             }
             for (OWLEntity entity : importOntology.getSignature(Imports.EXCLUDED)) {
-                record(usedBy, entity, importOntology);
+                record(usedBy, entity, importOntologyId);
             }
         }
-        return new DeclarationIndex(declaredBy, usedBy);
+        return new DeclarationIndex(build(declaredBy), build(usedBy));
     }
 
-    private static void record(Map<OWLEntity, Set<OWLOntology>> collector,
+    private static void record(Map<OWLEntity, ImmutableSet.Builder<OWLOntologyID>> collector,
                                OWLEntity entity,
-                               OWLOntology ontology) {
-        collector.computeIfAbsent(entity, key -> new LinkedHashSet<>()).add(ontology);
+                               OWLOntologyID ontologyId) {
+        collector.computeIfAbsent(entity, key -> ImmutableSet.builder()).add(ontologyId);
+    }
+
+    private static ImmutableMap<OWLEntity, ImmutableSet<OWLOntologyID>> build(
+            Map<OWLEntity, ImmutableSet.Builder<OWLOntologyID>> collector) {
+        ImmutableMap.Builder<OWLEntity, ImmutableSet<OWLOntologyID>> built = ImmutableMap.builder();
+        collector.forEach((entity, ontologyIds) -> built.put(entity, ontologyIds.build()));
+        return built.build();
     }
 
     /**
@@ -78,32 +84,34 @@ class DeclarationIndex {
      * @return the entities used within the import closure
      */
     @Nonnull
-    Set<OWLEntity> getEntities() {
-        return Collections.unmodifiableSet(usedBy.keySet());
+    ImmutableSet<OWLEntity> getEntities() {
+        return usedBy.keySet();
     }
 
     /**
-     * Gets the ontologies that explicitly declare the specified entity.
+     * Gets the ontology identifiers that explicitly declare the specified entity.
      *
      * @param entity the entity to look up
-     * @return the ontologies that declare the entity, or an empty set if it is not declared
+     * @return the ontology identifiers that declare the entity, or an empty set if it is
+     *         not declared
      */
     @Nonnull
-    Set<OWLOntology> getDeclaringOntologies(@Nonnull OWLEntity entity) {
+    ImmutableSet<OWLOntologyID> getDeclaringOntologies(@Nonnull OWLEntity entity) {
         checkNotNull(entity);
-        return Collections.unmodifiableSet(declaredBy.getOrDefault(entity, Collections.emptySet()));
+        return declaredBy.getOrDefault(entity, ImmutableSet.of());
     }
 
     /**
-     * Gets the ontologies whose signatures contain the specified entity.
+     * Gets the ontology identifiers whose signatures contain the specified entity.
      *
      * @param entity the entity to look up
-     * @return the ontologies whose signatures contain the entity, or an empty set if none do
+     * @return the ontology identifiers whose signatures contain the entity, or an empty
+     *         set if none do
      */
     @Nonnull
-    Set<OWLOntology> getUsingOntologies(@Nonnull OWLEntity entity) {
+    ImmutableSet<OWLOntologyID> getUsingOntologies(@Nonnull OWLEntity entity) {
         checkNotNull(entity);
-        return Collections.unmodifiableSet(usedBy.getOrDefault(entity, Collections.emptySet()));
+        return usedBy.getOrDefault(entity, ImmutableSet.of());
     }
 
     /**

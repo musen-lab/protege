@@ -128,7 +128,7 @@ public class MissingDeclarationChecker_TestCase {
         assertEquals(DeclarationSeverity.ERROR, finding.getSeverity());
         assertEquals(1, finding.getReferringOntologies().size());
         assertEquals(ClosureFixtures.MID, finding.getReferringOntologies().iterator().next()
-                .getOntologyID().getOntologyIRI().get().toString());
+                .getOntologyIRI().get().toString());
     }
 
     @Test
@@ -271,6 +271,32 @@ public class MissingDeclarationChecker_TestCase {
 
         assertEquals(1, report.size());
         assertEquals(DeclarationSeverity.ERROR, report.getFindings().get(0).getSeverity());
+    }
+
+    @Test
+    public void shouldNotLetAFindingChangeWhenAReferringOntologyIsRenamed() throws Exception {
+        OWLOntologyManager m = OWLManager.createOWLOntologyManager();
+        OWLDataFactory df = m.getOWLDataFactory();
+        IRI originalIri = IRI.create("http://example.org/renamed");
+        OWLOntology o = m.createOntology(originalIri);
+        OWLClass declared = df.getOWLClass(IRI.create("http://example.org/renamed#A"));
+        OWLClass undeclared = df.getOWLClass(IRI.create("http://example.org/renamed#B"));
+        m.addAxiom(o, df.getOWLDeclarationAxiom(declared));
+        m.addAxiom(o, df.getOWLSubClassOfAxiom(declared, undeclared));
+
+        MissingDeclarationFinding finding = checker.check(o).getFindings().get(0);
+        OWLOntologyID originalId = o.getOntologyID();
+        int hashBeforeRename = finding.hashCode();
+
+        // An ontology is mutable, and renaming it changes the identity it answers with. A finding
+        // that held the ontology itself would silently start reporting the new name; one that holds
+        // the identifier reports what was true when the check ran.
+        m.applyChange(new SetOntologyID(o, IRI.create("http://example.org/renamed-later")));
+
+        assertNotEquals(originalId, o.getOntologyID());
+        assertEquals(ImmutableList.of(originalId),
+                ImmutableList.copyOf(finding.getReferringOntologies()));
+        assertEquals(hashBeforeRename, finding.hashCode());
     }
 
     @Test

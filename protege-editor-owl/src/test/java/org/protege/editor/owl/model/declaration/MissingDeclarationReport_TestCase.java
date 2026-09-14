@@ -15,7 +15,8 @@ import static org.junit.Assert.*;
  *
  * <p>A report preserves finding order, exposes stable severity-based subsets, and represents an
  * empty result with an empty report rather than an absent value. A finding exposes its entity,
- * entity type, severity, and referring ontologies, and findings with equal content compare equal.
+ * entity type, severity, and referring ontology identifiers, and findings with equal content
+ * compare equal.
  */
 public class MissingDeclarationReport_TestCase {
 
@@ -28,18 +29,19 @@ public class MissingDeclarationReport_TestCase {
 
     @Before
     public void setUp() throws Exception {
-        OWLOntology ontology = OWLManager.createOWLOntologyManager()
-                .createOntology(IRI.create("http://example.org/report"));
+        OWLOntologyID ontologyId = OWLManager.createOWLOntologyManager()
+                .createOntology(IRI.create("http://example.org/report"))
+                .getOntologyID();
 
         errorClass = MissingDeclarationFinding.get(
                 DF.getOWLClass(IRI.create("http://example.org/mine#A")),
-                Collections.singleton(ontology));
+                Collections.singleton(ontologyId));
         warningIndividual = MissingDeclarationFinding.get(
                 DF.getOWLNamedIndividual(IRI.create("http://example.org/mine#i")),
-                Collections.singleton(ontology));
+                Collections.singleton(ontologyId));
         errorAnnotationProperty = MissingDeclarationFinding.get(
                 DF.getOWLAnnotationProperty(IRI.create("http://purl.org/dc/terms/title")),
-                Collections.singleton(ontology));
+                Collections.singleton(ontologyId));
 
         report = MissingDeclarationReport.get(
                 ImmutableList.of(errorClass, warningIndividual, errorAnnotationProperty));
@@ -87,22 +89,24 @@ public class MissingDeclarationReport_TestCase {
         OWLClass term = DF.getOWLClass(IRI.create("http://example.org/one#A"));
 
         MissingDeclarationFinding finding =
-                MissingDeclarationFinding.get(term, Collections.singleton(ontology));
+                MissingDeclarationFinding.get(term, Collections.singleton(ontology.getOntologyID()));
 
         assertEquals(term, finding.getEntity());
         assertEquals(EntityType.CLASS, finding.getEntityType());
         assertEquals(DeclarationSeverity.ERROR, finding.getSeverity());
-        assertEquals(Collections.singleton(ontology), finding.getReferringOntologies());
+        assertEquals(Collections.singleton(ontology.getOntologyID()),
+                finding.getReferringOntologies());
     }
 
     @Test
     public void shouldConsiderFindingsWithTheSameContentEqual() throws Exception {
-        OWLOntology ontology = OWLManager.createOWLOntologyManager()
-                .createOntology(IRI.create("http://example.org/two"));
+        OWLOntologyID ontologyId = OWLManager.createOWLOntologyManager()
+                .createOntology(IRI.create("http://example.org/two"))
+                .getOntologyID();
         OWLClass term = DF.getOWLClass(IRI.create("http://example.org/two#A"));
 
-        assertEquals(MissingDeclarationFinding.get(term, Collections.singleton(ontology)),
-                MissingDeclarationFinding.get(term, Collections.singleton(ontology)));
+        assertEquals(MissingDeclarationFinding.get(term, Collections.singleton(ontologyId)),
+                MissingDeclarationFinding.get(term, Collections.singleton(ontologyId)));
     }
 
     @Test
