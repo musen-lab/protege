@@ -1,0 +1,9 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix ex: <http://example.test/ns#> .
+ex:s ex:p """first
+<http://false-positive.test/ontology> a owl:Ontology ;
+owl:versionIRI <http://false-positive.test/version> .
+last""" .
+ex:t ex:q '''single-quoted long string
+<http://false-positive.test/ontology2> a owl:Ontology .
+end''' .
