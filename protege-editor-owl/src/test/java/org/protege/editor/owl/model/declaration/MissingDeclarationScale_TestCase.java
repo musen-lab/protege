@@ -3,42 +3,58 @@ package org.protege.editor.owl.model.declaration;
 import org.junit.Test;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.*;
+import org.semanticweb.owlapi.model.parameters.Imports;
 
 import static org.junit.Assert.*;
 
 /**
- * Verifies the declaration check's runtime at scale.
+ * Checks declaration results across a large import closure.
  *
- * <p>The test checks 100,000 entities across 20 ontologies against an absolute time budget suitable
- * for running without a progress dialog.
+ * <p>The fixture contains 100,000 classes in 20 ontologies. Every tenth class is undeclared, so the
+ * expected result is 10,000 errors. Runtime is logged but not asserted.
+ *
+ * @see ClosureWalkScale_TestCase
  */
 public class MissingDeclarationScale_TestCase {
-
-    /** A deliberately generous upper bound for checking the 100,000-entity fixture. */
-    private static final long BUDGET_MILLIS = 1000L;
 
     private static final int ONTOLOGIES = 20;
 
     private static final int ENTITIES = 100_000;
 
+    /** Every nth class is left undeclared, which fixes the number of findings to expect. */
+    private static final int UNDECLARED_EVERY = 10;
+
+    private static final int EXPECTED_FINDINGS = ENTITIES / UNDECLARED_EVERY;
+
     private final MissingDeclarationChecker checker = new MissingDeclarationChecker();
 
     @Test
-    public void shouldCheckOneHundredThousandEntitiesAcrossTwentyOntologiesWithinTheBudget() throws Exception {
+    public void shouldReportEveryUndeclaredEntityInALargeClosure() throws Exception {
         OWLOntology root = largeClosure();
+        // owl:Thing is in the signature because the undeclared classes are used as its subclasses.
+        assertEquals(ENTITIES + 1, root.getSignature(Imports.INCLUDED).size());
+        assertEquals(ONTOLOGIES, root.getImportsClosure().size());
 
         long start = System.nanoTime();
         MissingDeclarationReport report = checker.check(root);
         long elapsedMillis = (System.nanoTime() - start) / 1_000_000;
 
-        System.out.println("[scale] " + root.getImportsClosure().size() + " ontologies, "
-                + ENTITIES + " terms checked in " + elapsedMillis + " ms");
+        System.out.println("[scale] " + ONTOLOGIES + " ontologies, " + ENTITIES
+                + " terms checked in " + elapsedMillis + " ms (informational)");
 
-        assertFalse(report.isEmpty());
-        // Only the absolute budget is asserted. Comparing one measurement against another is
-        // what makes a timing test flake on a busy machine.
-        assertTrue("took " + elapsedMillis + " ms, budget is " + BUDGET_MILLIS + " ms",
-                elapsedMillis < BUDGET_MILLIS);
+        // One finding per undeclared class, so nothing was missed and nothing was double-counted.
+        assertEquals(EXPECTED_FINDINGS, report.size());
+        // Every one of them is a class, so every one is an error and none is a warning.
+        assertEquals(EXPECTED_FINDINGS, report.getFindings(DeclarationSeverity.ERROR).size());
+        assertTrue(report.getFindings(DeclarationSeverity.WARNING).isEmpty());
+
+        // And every entity reported is one the fixture actually left undeclared, so none of the
+        // 90,000 declared classes slipped into the report.
+        for (MissingDeclarationFinding finding : report.getFindings()) {
+            String iri = finding.getEntity().getIRI().toString();
+            int index = Integer.parseInt(iri.substring(iri.lastIndexOf("#C") + 2));
+            assertEquals(iri + " is declared by the fixture", 0, index % UNDECLARED_EVERY);
+        }
     }
 
     /**
@@ -67,7 +83,7 @@ public class MissingDeclarationScale_TestCase {
                                  IRI namespace, int count) {
         for (int i = 0; i < count; i++) {
             OWLClass term = df.getOWLClass(IRI.create(namespace + "#C" + i));
-            if (i % 10 == 0) {
+            if (i % UNDECLARED_EVERY == 0) {
                 // Left undeclared on purpose, so the check has real work to report.
                 m.addAxiom(o, df.getOWLSubClassOfAxiom(term, df.getOWLThing()));
             } else {
