@@ -1,5 +1,6 @@
 @prefix : <http://example.invalid/declarations/module#> .
 @prefix base: <http://example.invalid/declarations/base#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -25,3 +26,19 @@ base:MisplacedTerm a owl:Class .
 # Used here but declared only in the imported ontology. Saving does not copy that declaration into
 # this ontology.
 base:MisplacedTerm rdfs:subClassOf base:BaseOnly .
+
+# The terms below are for the missing-declaration check.  They are additions, not changes:
+# the five terms above still say exactly what they said before.
+
+# An individual, used and never declared.  OWL does not require a declaration for one, so
+# the check reports it as a warning rather than an error.
+:anInstance a :LocalTerm .
+
+# A term from a vocabulary someone else publishes, used and never declared.  Also a warning:
+# whoever edits this module is not the one who can declare a Dublin Core property.
+:LocalTerm dcterms:title "A local term" .
+
+# One name standing for two kinds of term.  The class is declared here and the individual
+# sharing its name is not, so the check must report the individual and leave the class alone.
+:Duo a owl:Class .
+:Duo a :LocalTerm .
