@@ -2,6 +2,8 @@ package org.protege.editor.owl.ui.preferences;
 
 import org.protege.editor.core.ui.preferences.PreferencesLayoutPanel;
 import org.protege.editor.owl.model.declaration.EntityDeclarationPreferences;
+import org.protege.editor.owl.model.declaration.MisplacedDeclarationPreferences;
+import org.protege.editor.owl.model.declaration.OwnershipRule;
 
 import javax.swing.*;
 import java.awt.*;
@@ -27,7 +29,34 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
                     + "You can disable this behavior to prevent declaration axioms from "
                     + "being added automatically.";
 
+    private static final String MISPLACED_GROUP_LABEL = "Misplaced declarations";
+
+    private static final String MISPLACED_HELP_TEXT =
+            "Reports when an entity is declared outside the ontology that appears to own its identifier.";
+
+    private static final String OBO_IDENTIFIER_RULE_LABEL =
+            "Decide ownership from the OBO ID spaces";
+
+    private static final String OBO_IDENTIFIER_RULE_TOOLTIP =
+            "<html>Matches the ID space in an OBO ID to an ontology's short name. "
+                    + "For example, <b>GO_0006915</b> matches <b>go.owl</b>."
+                    + "<br><br>This rule is needed for OBO terms because they share the same "
+                    + "IRI namespace.</html>";
+
+    private static final String NAMESPACE_RULE_LABEL =
+            "Decide ownership from the IRI namespace";
+
+    private static final String NAMESPACE_RULE_TOOLTIP =
+            "<html>Matches an entity's IRI namespace to an ontology IRI. "
+                    + "For example, <b>http://example.org/base#Term</b> matches "
+                    + "<b>http://example.org/base</b>."
+                    + "<br><br>Use this rule when entity IRIs are based on the ontology IRI.</html>";
+
     private JCheckBox suppressAutomaticEntityDeclarationsCheckBox;
+
+    private JCheckBox oboIdentifierRuleCheckBox;
+
+    private JCheckBox namespaceRuleCheckBox;
 
     /** Builds the panel controls from their stored preferences. */
     public void initialise() throws Exception {
@@ -41,12 +70,33 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
 
         panel.addGroup("Declarations");
         panel.addGroupComponent(suppressAutomaticEntityDeclarationsCheckBox);
+
+        MisplacedDeclarationPreferences misplacedPreferences =
+                MisplacedDeclarationPreferences.getInstance();
+        oboIdentifierRuleCheckBox = new JCheckBox(OBO_IDENTIFIER_RULE_LABEL,
+                misplacedPreferences.isRuleEnabled(OwnershipRule.OBO_IDENTIFIER));
+        oboIdentifierRuleCheckBox.setToolTipText(OBO_IDENTIFIER_RULE_TOOLTIP);
+        namespaceRuleCheckBox = new JCheckBox(NAMESPACE_RULE_LABEL,
+                misplacedPreferences.isRuleEnabled(OwnershipRule.NAMESPACE));
+        namespaceRuleCheckBox.setToolTipText(NAMESPACE_RULE_TOOLTIP);
+
+        panel.addVerticalPadding();
+        panel.addGroup(MISPLACED_GROUP_LABEL);
+        panel.addGroupComponent(oboIdentifierRuleCheckBox);
+        panel.addGroupComponent(namespaceRuleCheckBox);
+        panel.addHelpText(MISPLACED_HELP_TEXT);
     }
 
     /** Stores the values currently shown by the panel. */
     public void applyChanges() {
         EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(
                 suppressAutomaticEntityDeclarationsCheckBox.isSelected());
+        MisplacedDeclarationPreferences misplacedPreferences =
+                MisplacedDeclarationPreferences.getInstance();
+        misplacedPreferences.setRuleEnabled(OwnershipRule.OBO_IDENTIFIER,
+                oboIdentifierRuleCheckBox.isSelected());
+        misplacedPreferences.setRuleEnabled(OwnershipRule.NAMESPACE,
+                namespaceRuleCheckBox.isSelected());
     }
 
     /** This panel does not hold any resources that need to be released. */
