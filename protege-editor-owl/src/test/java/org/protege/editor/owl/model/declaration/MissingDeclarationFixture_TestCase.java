@@ -31,6 +31,7 @@ public class MissingDeclarationFixture_TestCase {
 
     private OWLOntology module;
     private MissingDeclarationChecker checker;
+    private MisplacedDeclarationChecker misplacedChecker;
 
     @Before
     public void setUp() throws Exception {
@@ -40,6 +41,7 @@ public class MissingDeclarationFixture_TestCase {
                 IRI.create(new File(FIXTURES, "base.ttl"))));
         module = manager.loadOntologyFromOntologyDocument(new File(FIXTURES, "module.ttl"));
         checker = new MissingDeclarationChecker();
+        misplacedChecker = new MisplacedDeclarationChecker();
     }
 
     @Test
@@ -104,6 +106,42 @@ public class MissingDeclarationFixture_TestCase {
         OWLOntology base = module.getImports().iterator().next();
 
         assertTrue(checker.check(base).isEmpty());
+    }
+
+    @Test
+    public void shouldReportTheTermDeclaredAwayFromTheOntologyOwningItsNamespace() {
+        // base.ttl is loaded and stays silent about MisplacedTerm, which module.ttl declares.
+        MisplacedDeclarationReport report = misplacedChecker.check(module);
+
+        assertEquals(1, report.size());
+        MisplacedDeclarationFinding finding = report.getFindings().get(0);
+        assertEquals(BASE_NS + "MisplacedTerm", finding.getEntity().getIRI().toString());
+        assertEquals(DeclarationSeverity.WARNING, finding.getSeverity());
+        assertEquals(OwnershipRule.NAMESPACE, finding.getOwnershipRule());
+        assertEquals(IRI.create("http://example.invalid/declarations/base"),
+                finding.getOwningOntology().getOntologyIRI().get());
+    }
+
+    @Test
+    public void shouldNotReportATermTheOwningOntologyDeclaresItself() {
+        List<String> misplaced = misplacedNames();
+
+        assertFalse("both ontologies declare SharedTerm, so nothing is lost",
+                misplaced.contains(BASE_NS + "SharedTerm"));
+        assertFalse("declared only by the owner", misplaced.contains(BASE_NS + "BaseOnly"));
+    }
+
+    @Test
+    public void shouldLeaveATermNothingDeclaresToTheMissingCheck() {
+        assertFalse("nothing declares Borrowed, so it cannot be misplaced",
+                misplacedNames().contains(BASE_NS + "Borrowed"));
+        assertTrue(names(checker.check(module).getFindings()).contains(BASE_NS + "Borrowed"));
+    }
+
+    private List<String> misplacedNames() {
+        return misplacedChecker.check(module).getFindings().stream()
+                .map(f -> f.getEntity().getIRI().toString())
+                .collect(Collectors.toList());
     }
 
     private List<MissingDeclarationFinding> errorsOnly() {
