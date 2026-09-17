@@ -1,6 +1,5 @@
 package org.protege.editor.owl.model.declaration;
 
-import com.google.common.collect.ImmutableSet;
 import org.junit.Test;
 import org.semanticweb.owlapi.model.OWLOntology;
 
@@ -73,7 +72,7 @@ public class DeclarationChecker_TestCase {
         private DeclarationIndex index;
 
         RecordingMisplacedChecker() {
-            super(() -> ImmutableSet.copyOf(OwnershipRule.values()));
+            super(OwnershipRules::registered);
         }
 
         @Override

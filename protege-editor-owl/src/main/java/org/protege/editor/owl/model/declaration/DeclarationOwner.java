@@ -19,12 +19,12 @@ abstract class DeclarationOwner {
      * Creates an entity ID owner.
      *
      * @param ontology the ontology that owns the entity ID
-     * @param rule the rule that found the ontology
+     * @param ruleId the identifier of the rule that made the finding
      * @return the entity ID owner
      */
     @Nonnull
-    static DeclarationOwner get(@Nonnull OWLOntologyID ontology, @Nonnull OwnershipRule rule) {
-        return new AutoValue_DeclarationOwner(checkNotNull(ontology), checkNotNull(rule));
+    static DeclarationOwner get(@Nonnull OWLOntologyID ontology, @Nonnull String ruleId) {
+        return new AutoValue_DeclarationOwner(checkNotNull(ontology), checkNotNull(ruleId));
     }
 
     /**
@@ -36,10 +36,10 @@ abstract class DeclarationOwner {
     abstract OWLOntologyID getOntology();
 
     /**
-     * Gets the rule that found the owning ontology.
+     * Gets the identifier of the rule that made the finding.
      *
-     * @return the ownership rule
+     * @return the ownership rule identifier
      */
     @Nonnull
-    abstract OwnershipRule getRule();
+    abstract String getRuleId();
 }

@@ -6,9 +6,11 @@ import org.junit.Test;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.*;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -22,7 +24,8 @@ public class MisplacedDeclarationChecker_TestCase {
 
     private static final String OBO = "http://purl.obolibrary.org/obo/";
 
-    private final MisplacedDeclarationChecker checker = checkerWith(OwnershipRule.values());
+    private final MisplacedDeclarationChecker checker =
+            new MisplacedDeclarationChecker(OwnershipRules::registered);
 
     // Correct work: nothing to report.
 
@@ -87,7 +90,7 @@ public class MisplacedDeclarationChecker_TestCase {
         MisplacedDeclarationReport report = checker.check(leaf);
 
         assertEquals(ImmutableList.of(ClosureFixtures.BASE + "#Misplaced"), names(report));
-        assertEquals(OwnershipRule.NAMESPACE, report.getFindings().get(0).getOwnershipRule());
+        assertEquals(NamespaceRule.ID, report.getFindings().get(0).getOwnershipRuleId());
     }
 
     @Test
@@ -95,7 +98,7 @@ public class MisplacedDeclarationChecker_TestCase {
         MisplacedDeclarationReport report = checker.check(ClosureFixtures.oboClosure());
 
         assertEquals(ImmutableList.of(OBO + "GO_0006915"), names(report));
-        assertEquals(OwnershipRule.OBO_IDENTIFIER, report.getFindings().get(0).getOwnershipRule());
+        assertEquals(OboIdentifierRule.ID, report.getFindings().get(0).getOwnershipRuleId());
     }
 
     @Test
@@ -164,7 +167,7 @@ public class MisplacedDeclarationChecker_TestCase {
                 finding.getDeclaringOntologies().stream()
                         .map(id -> id.getOntologyIRI().get())
                         .collect(Collectors.toSet()));
-        assertEquals(OwnershipRule.NAMESPACE, finding.getOwnershipRule());
+        assertEquals(NamespaceRule.ID, finding.getOwnershipRuleId());
     }
 
     @Test
@@ -220,9 +223,9 @@ public class MisplacedDeclarationChecker_TestCase {
         OWLOntology root = twoRuleClosure();
 
         assertEquals(ImmutableList.of(OBO + "GO_0006915"),
-                names(checkerWith(OwnershipRule.OBO_IDENTIFIER).check(root)));
+                names(checkerWith(new OboIdentifierRule()).check(root)));
         assertEquals(ImmutableList.of("http://example.org/base#Misplaced"),
-                names(checkerWith(OwnershipRule.NAMESPACE).check(root)));
+                names(checkerWith(new NamespaceRule()).check(root)));
     }
 
     @Test
@@ -235,14 +238,34 @@ public class MisplacedDeclarationChecker_TestCase {
     }
 
     @Test
+    public void shouldReportAgainstWhateverOwnerARuleDecides() throws Exception {
+        OWLOntologyManager m = OWLManager.createOWLOntologyManager();
+        OWLDataFactory df = m.getOWLDataFactory();
+        OWLOntology owner = m.createOntology(IRI.create("http://example.org/owner"));
+        OWLOntology declarer = m.createOntology(IRI.create("http://example.org/declarer"));
+        m.applyChange(new AddImport(declarer,
+                df.getOWLImportsDeclaration(IRI.create("http://example.org/owner"))));
+        OWLClass term = df.getOWLClass(IRI.create("http://example.org/somewhere/Term"));
+        m.addAxiom(declarer, df.getOWLDeclarationAxiom(term));
+
+        // Neither shipped rule can own this IRI, so only the stand-in rule can produce a finding.
+        MisplacedDeclarationReport report =
+                checkerWith(standInRuleOwning(owner.getOntologyID())).check(declarer);
+
+        assertEquals(ImmutableList.of("http://example.org/somewhere/Term"), names(report));
+        assertEquals("misplaced.rule.use.stand.in",
+                report.getFindings().get(0).getOwnershipRuleId());
+    }
+
+    @Test
     public void shouldReadTheRulesAfreshOnEveryRun() throws Exception {
         OWLOntology root = twoRuleClosure();
-        AtomicReference<Set<OwnershipRule>> rules =
-                new AtomicReference<>(ImmutableSet.copyOf(OwnershipRule.values()));
+        AtomicReference<ImmutableList<OwnershipRule>> rules =
+                new AtomicReference<>(OwnershipRules.registered());
         MisplacedDeclarationChecker rereading = new MisplacedDeclarationChecker(rules::get);
 
         assertEquals(2, rereading.check(root).size());
-        rules.set(ImmutableSet.of(OwnershipRule.NAMESPACE));
+        rules.set(ImmutableList.of(new NamespaceRule()));
         assertEquals("a cached value would need a restart to take effect",
                 1, rereading.check(root).size());
     }
@@ -279,8 +302,30 @@ public class MisplacedDeclarationChecker_TestCase {
     }
 
     private static MisplacedDeclarationChecker checkerWith(OwnershipRule... rules) {
-        Set<OwnershipRule> enabled = ImmutableSet.copyOf(rules);
+        ImmutableList<OwnershipRule> enabled = ImmutableList.copyOf(rules);
         return new MisplacedDeclarationChecker(() -> enabled);
+    }
+
+    /** An ownership rule that names one ontology as the owner of every entity. */
+    private static OwnershipRule standInRuleOwning(OWLOntologyID owner) {
+        return new OwnershipRule() {
+            @Override
+            public String getId() {
+                return "misplaced.rule.use.stand.in";
+            }
+
+            @Override
+            public OwnershipRuleDisplay getDisplay() {
+                return OwnershipRuleDisplay.get("Stand-in rule",
+                        "<html>Names one ontology as the owner of everything."
+                                + "<br><br>Used by tests only.</html>");
+            }
+
+            @Override
+            public Resolver compile(Collection<OWLOntologyID> ontologies) {
+                return entity -> Optional.of(owner);
+            }
+        };
     }
 
     private static List<String> names(MisplacedDeclarationReport report) {

@@ -38,9 +38,9 @@ final class DocumentFamily {
         if (one.equals(other)) {
             return true;
         }
-        Optional<String> oneIri = ontologyIriOf(one);
-        Optional<String> otherIri = ontologyIriOf(other);
-        if (!oneIri.isPresent() || !otherIri.isPresent()) {
+        Optional<String> oneIri = OntologyIris.ontologyIriOf(one);
+        Optional<String> otherIri = OntologyIris.ontologyIriOf(other);
+        if (oneIri.isEmpty() || otherIri.isEmpty()) {
             return false;
         }
         // Read in both directions, so the relationship holds whichever document owns the namespace.
@@ -55,9 +55,5 @@ final class DocumentFamily {
         return ontologyIri.endsWith(OWL_SUFFIX)
                 ? ontologyIri.substring(0, ontologyIri.length() - OWL_SUFFIX.length())
                 : ontologyIri;
-    }
-
-    private static Optional<String> ontologyIriOf(OWLOntologyID id) {
-        return id.isAnonymous() ? Optional.empty() : Optional.of(id.getOntologyIRI().get().toString());
     }
 }

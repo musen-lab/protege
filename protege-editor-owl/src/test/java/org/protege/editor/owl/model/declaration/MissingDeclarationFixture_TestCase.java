@@ -117,7 +117,7 @@ public class MissingDeclarationFixture_TestCase {
         MisplacedDeclarationFinding finding = report.getFindings().get(0);
         assertEquals(BASE_NS + "MisplacedTerm", finding.getEntity().getIRI().toString());
         assertEquals(DeclarationSeverity.WARNING, finding.getSeverity());
-        assertEquals(OwnershipRule.NAMESPACE, finding.getOwnershipRule());
+        assertEquals(NamespaceRule.ID, finding.getOwnershipRuleId());
         assertEquals(IRI.create("http://example.invalid/declarations/base"),
                 finding.getOwningOntology().getOntologyIRI().get());
     }

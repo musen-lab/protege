@@ -8,6 +8,7 @@ import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import javax.annotation.Nonnull;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -31,7 +32,7 @@ public class MisplacedDeclarationChecker {
                     .thenComparing(finding -> finding.getEntityType().getName());
 
     @Nonnull
-    private final Supplier<Set<OwnershipRule>> enabledRules;
+    private final Supplier<ImmutableList<OwnershipRule>> enabledRules;
 
     /**
      * Creates a checker that uses the ownership rules enabled in the preferences.
@@ -43,9 +44,9 @@ public class MisplacedDeclarationChecker {
     /**
      * Creates a checker that uses the supplied ownership rules.
      *
-     * @param enabledRules supplies the rules for each check
+     * @param enabledRules supplies the rules for each check, in the order they are consulted
      */
-    MisplacedDeclarationChecker(@Nonnull Supplier<Set<OwnershipRule>> enabledRules) {
+    MisplacedDeclarationChecker(@Nonnull Supplier<ImmutableList<OwnershipRule>> enabledRules) {
         this.enabledRules = checkNotNull(enabledRules);
     }
 
@@ -71,15 +72,15 @@ public class MisplacedDeclarationChecker {
     MisplacedDeclarationReport check(@Nonnull DeclarationIndex index) {
         checkNotNull(index);
         // Read the settings once, so a value changed mid-run cannot split the result between rules.
-        Set<OwnershipRule> rules = enabledRules.get();
+        ImmutableList<OwnershipRule> rules = enabledRules.get();
         if (rules.isEmpty()) {
             return MisplacedDeclarationReport.get(ImmutableList.of());
         }
-        OwnerIndex owners = OwnerIndex.over(index.getOntologies(), rules);
+        OwnershipPolicy policy = OwnershipPolicy.over(rules, index.getOntologies());
         return MisplacedDeclarationReport.get(index.getEntities()
                 .stream()
                 .filter(entity -> !StandardVocabulary.contains(entity))
-                .map(entity -> findingFor(entity, owners, index))
+                .map(entity -> findingFor(entity, policy, index))
                 .flatMap(Optional::stream)
                 .sorted(BY_NAME_THEN_KIND)
                 .collect(Collectors.toList()));
@@ -90,10 +91,10 @@ public class MisplacedDeclarationChecker {
      */
     @Nonnull
     private static Optional<MisplacedDeclarationFinding> findingFor(@Nonnull OWLEntity entity,
-                                                                    @Nonnull OwnerIndex owners,
+                                                                    @Nonnull OwnershipPolicy policy,
                                                                     @Nonnull DeclarationIndex index) {
         // Step one: identify the ontology that owns the entity.
-        Optional<DeclarationOwner> owner = owners.resolve(entity);
+        Optional<DeclarationOwner> owner = policy.resolve(entity);
         if (owner.isEmpty()) {
             return Optional.empty();
         }
@@ -115,7 +116,7 @@ public class MisplacedDeclarationChecker {
         return Optional.of(MisplacedDeclarationFinding.get(entity,
                 owningOntology,
                 foreignDeclarers,
-                owner.get().getRule()));
+                owner.get().getRuleId()));
     }
 
     private static ImmutableSet<OWLOntologyID> foreignDeclarersOf(OWLOntologyID owningOntology,

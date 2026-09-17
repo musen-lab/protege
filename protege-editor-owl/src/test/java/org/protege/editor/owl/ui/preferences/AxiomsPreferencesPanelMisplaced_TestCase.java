@@ -1,5 +1,6 @@
 package org.protege.editor.owl.ui.preferences;
 
+import com.google.common.collect.ImmutableList;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -7,14 +8,19 @@ import org.protege.editor.core.prefs.Preferences;
 import org.protege.editor.core.prefs.PreferencesManager;
 import org.protege.editor.owl.model.declaration.MisplacedDeclarationPreferences;
 import org.protege.editor.owl.model.declaration.OwnershipRule;
+import org.protege.editor.owl.model.declaration.OwnershipRuleDisplay;
+import org.protege.editor.owl.model.declaration.OwnershipRules;
+import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import javax.swing.JCheckBox;
 import java.awt.Component;
 import java.awt.Container;
 import java.util.ArrayList;
-import java.util.EnumMap;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -23,18 +29,33 @@ import static org.junit.Assert.assertTrue;
 /**
  * Tests the entity ownership rule options in Preferences &gt; Axioms.
  *
- * <p>Both rules are enabled by default and can be changed independently.
+ * <p>Every registered rule is offered, every rule is enabled by default, and each can be changed
+ * independently.
  */
 public class AxiomsPreferencesPanelMisplaced_TestCase {
 
     private static final String PREFERENCES_KEY = "org.protege.editor.owl.declaration";
 
+    private static final String STAND_IN_RULE_KEY = "misplaced.rule.use.stand.in";
+
+    private static final String OBO_RULE_TOOLTIP =
+            "<html>Matches the ID space in an OBO ID to an ontology's short name. "
+                    + "For example, <b>GO_0006915</b> matches <b>go.owl</b>."
+                    + "<br><br>This rule is needed for OBO terms because they share the same "
+                    + "IRI namespace.</html>";
+
+    private static final String NAMESPACE_RULE_TOOLTIP =
+            "<html>Matches an entity's IRI namespace to an ontology IRI. "
+                    + "For example, <b>http://example.org/base#Term</b> matches "
+                    + "<b>http://example.org/base</b>."
+                    + "<br><br>Use this rule when entity IRIs are based on the ontology IRI.</html>";
+
     private Map<OwnershipRule, Boolean> storedRules;
 
     @Before
     public void setUp() {
-        storedRules = new EnumMap<>(OwnershipRule.class);
-        for (OwnershipRule rule : OwnershipRule.values()) {
+        storedRules = new LinkedHashMap<>();
+        for (OwnershipRule rule : OwnershipRules.registered()) {
             storedRules.put(rule, preferences().isRuleEnabled(rule));
         }
         raw().clear();
@@ -46,9 +67,9 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
         storedRules.forEach((rule, enabled) -> preferences().setRuleEnabled(rule, enabled));
     }
 
-    /** Both rules run by default, so both boxes open ticked. */
+    /** Every rule runs by default, so every box opens ticked. */
     @Test
-    public void shouldShowBothBoxesTickedWhenNothingIsStored() {
+    public void shouldShowEveryBoxTickedWhenNothingIsStored() {
         AxiomsPreferencesPanel panel = buildPanel();
 
         assertTrue(oboRuleBoxOf(panel).isSelected());
@@ -57,7 +78,7 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
 
     @Test
     public void shouldShowAnUntickedBoxForASwitchedOffRule() {
-        preferences().setRuleEnabled(OwnershipRule.OBO_IDENTIFIER, false);
+        preferences().setRuleEnabled(oboRule(), false);
         AxiomsPreferencesPanel panel = buildPanel();
 
         assertFalse(oboRuleBoxOf(panel).isSelected());
@@ -71,8 +92,8 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
         oboRuleBoxOf(panel).setSelected(false);
         panel.applyChanges();
 
-        assertFalse(preferences().isRuleEnabled(OwnershipRule.OBO_IDENTIFIER));
-        assertTrue(preferences().isRuleEnabled(OwnershipRule.NAMESPACE));
+        assertFalse(preferences().isRuleEnabled(oboRule()));
+        assertTrue(preferences().isRuleEnabled(namespaceRule()));
     }
 
     @Test
@@ -82,19 +103,19 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
         namespaceRuleBoxOf(panel).setSelected(false);
         panel.applyChanges();
 
-        assertFalse(preferences().isRuleEnabled(OwnershipRule.NAMESPACE));
-        assertTrue(preferences().isRuleEnabled(OwnershipRule.OBO_IDENTIFIER));
+        assertFalse(preferences().isRuleEnabled(namespaceRule()));
+        assertTrue(preferences().isRuleEnabled(oboRule()));
     }
 
     @Test
     public void shouldSwitchARuleBackOn() {
-        preferences().setRuleEnabled(OwnershipRule.NAMESPACE, false);
+        preferences().setRuleEnabled(namespaceRule(), false);
         AxiomsPreferencesPanel panel = buildPanel();
 
         namespaceRuleBoxOf(panel).setSelected(true);
         panel.applyChanges();
 
-        assertTrue(preferences().isRuleEnabled(OwnershipRule.NAMESPACE));
+        assertTrue(preferences().isRuleEnabled(namespaceRule()));
     }
 
     @Test
@@ -106,17 +127,47 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
             }
         }
         assertEquals("expected one control for each ownership rule",
-                OwnershipRule.values().length, ownershipBoxes.size());
+                OwnershipRules.registered().size(), ownershipBoxes.size());
+    }
+
+    @Test
+    public void shouldOfferAControlForARuleItWasNotWrittenAgainst() {
+        OwnershipRule standIn = standInRule();
+        AxiomsPreferencesPanel panel = buildPanel(ImmutableList.of(standIn));
+
+        JCheckBox box = boxMentioning(panel, "Stand-in rule");
+        assertTrue("a rule is enabled until something turns it off", box.isSelected());
+        assertEquals("<html>Owns nothing.<br><br>Used by tests only.</html>", box.getToolTipText());
+
+        box.setSelected(false);
+        panel.applyChanges();
+
+        assertFalse(preferences().isRuleEnabled(standIn));
     }
 
     @Test
     public void shouldExplainEachRuleInATooltip() {
         AxiomsPreferencesPanel panel = buildPanel();
 
-        assertTrue("the OBO rule needs an example in its tooltip",
-                oboRuleBoxOf(panel).getToolTipText().contains("GO_0006915"));
-        assertTrue("the namespace rule needs an example in its tooltip",
-                namespaceRuleBoxOf(panel).getToolTipText().contains("http://example.org/base"));
+        assertEquals(OBO_RULE_TOOLTIP, oboRuleBoxOf(panel).getToolTipText());
+        assertEquals(NAMESPACE_RULE_TOOLTIP, namespaceRuleBoxOf(panel).getToolTipText());
+    }
+
+    private OwnershipRule oboRule() {
+        return ruleLabelled("OBO ID space");
+    }
+
+    private OwnershipRule namespaceRule() {
+        return ruleLabelled("IRI namespace");
+    }
+
+    private OwnershipRule ruleLabelled(String wanted) {
+        for (OwnershipRule rule : OwnershipRules.registered()) {
+            if (rule.getDisplay().getLabel().contains(wanted)) {
+                return rule;
+            }
+        }
+        throw new AssertionError("No registered rule labelled " + wanted);
     }
 
     private JCheckBox oboRuleBoxOf(AxiomsPreferencesPanel panel) {
@@ -141,13 +192,41 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
     }
 
     private AxiomsPreferencesPanel buildPanel() {
-        AxiomsPreferencesPanel panel = new AxiomsPreferencesPanel();
+        return initialised(new AxiomsPreferencesPanel());
+    }
+
+    private AxiomsPreferencesPanel buildPanel(List<OwnershipRule> rules) {
+        return initialised(new AxiomsPreferencesPanel(rules));
+    }
+
+    private AxiomsPreferencesPanel initialised(AxiomsPreferencesPanel panel) {
         try {
             panel.initialise();
         } catch (Exception e) {
             throw new AssertionError("The Axioms preferences panel failed to build", e);
         }
         return panel;
+    }
+
+    /** An ownership rule the panel was not written against, standing in for a newly added one. */
+    private static OwnershipRule standInRule() {
+        return new OwnershipRule() {
+            @Override
+            public String getId() {
+                return STAND_IN_RULE_KEY;
+            }
+
+            @Override
+            public OwnershipRuleDisplay getDisplay() {
+                return OwnershipRuleDisplay.get("Stand-in rule",
+                        "<html>Owns nothing.<br><br>Used by tests only.</html>");
+            }
+
+            @Override
+            public Resolver compile(Collection<OWLOntologyID> ontologies) {
+                return entity -> Optional.empty();
+            }
+        };
     }
 
     private List<JCheckBox> checkBoxesOf(Container container) {

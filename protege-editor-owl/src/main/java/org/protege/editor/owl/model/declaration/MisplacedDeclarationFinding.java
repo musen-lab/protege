@@ -31,23 +31,23 @@ public abstract class MisplacedDeclarationFinding {
      * @param owningOntology the identifier of the ontology that owns the entity's identifier
      * @param declaringOntologies the identifiers of the ontologies outside the owner's family that
      *                            declare the entity
-     * @param ownershipRule the rule that resolved the owning ontology
+     * @param ownershipRuleId the identifier of the rule that made the finding
      * @return a finding at warning severity
      */
     @Nonnull
     public static MisplacedDeclarationFinding get(@Nonnull OWLEntity entity,
                                                   @Nonnull OWLOntologyID owningOntology,
                                                   @Nonnull Collection<OWLOntologyID> declaringOntologies,
-                                                  @Nonnull OwnershipRule ownershipRule) {
+                                                  @Nonnull String ownershipRuleId) {
         checkNotNull(entity);
         checkNotNull(owningOntology);
         checkNotNull(declaringOntologies);
-        checkNotNull(ownershipRule);
+        checkNotNull(ownershipRuleId);
         return new AutoValue_MisplacedDeclarationFinding(entity,
                 DeclarationSeverity.WARNING,
                 owningOntology,
                 ImmutableSet.copyOf(declaringOntologies),
-                ownershipRule);
+                ownershipRuleId);
     }
 
     /**
@@ -83,12 +83,12 @@ public abstract class MisplacedDeclarationFinding {
     public abstract ImmutableSet<OWLOntologyID> getDeclaringOntologies();
 
     /**
-     * Gets the rule that resolved the owning ontology.
+     * Gets the identifier of the rule that made the finding.
      *
-     * @return the ownership rule
+     * @return the ownership rule identifier
      */
     @Nonnull
-    public abstract OwnershipRule getOwnershipRule();
+    public abstract String getOwnershipRuleId();
 
     /**
      * Gets the type of the entity.
