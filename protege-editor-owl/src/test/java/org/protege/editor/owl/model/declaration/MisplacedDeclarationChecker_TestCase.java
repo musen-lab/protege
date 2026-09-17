@@ -81,6 +81,21 @@ public class MisplacedDeclarationChecker_TestCase {
                 .anyMatch(finding -> finding.getEntity().equals(ghost)));
     }
 
+    @Test
+    public void shouldNotFlagAnEntityAForeignDocumentOnlyReferences() throws Exception {
+        OWLOntology root = twoRuleClosure();
+        OWLDataFactory df = root.getOWLOntologyManager().getOWLDataFactory();
+        OWLClass referencedOnly = df.getOWLClass(IRI.create("http://example.org/base#Absent"));
+
+        // base owns the identifier and stays silent, and other uses the term as a superclass, but
+        // no document holds a declaration axiom for it. The check reads declaration axioms rather
+        // than signatures, so there is no declaration to be in the wrong place.
+        assertFalse(entitiesIn(checker.check(root)).contains(referencedOnly));
+        assertTrue("a term nothing declares belongs to the missing-declaration check",
+                new MissingDeclarationChecker().check(root).getFindings().stream()
+                        .anyMatch(finding -> finding.getEntity().equals(referencedOnly)));
+    }
+
     // The real defect.
 
     @Test
