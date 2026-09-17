@@ -33,10 +33,15 @@ class DeclarationIndex {
     @Nonnull
     private final ImmutableMap<OWLEntity, ImmutableSet<OWLOntologyID>> usedBy;
 
+    @Nonnull
+    private final ImmutableSet<OWLOntologyID> ontologies;
+
     private DeclarationIndex(@Nonnull ImmutableMap<OWLEntity, ImmutableSet<OWLOntologyID>> declaredBy,
-                             @Nonnull ImmutableMap<OWLEntity, ImmutableSet<OWLOntologyID>> usedBy) {
+                             @Nonnull ImmutableMap<OWLEntity, ImmutableSet<OWLOntologyID>> usedBy,
+                             @Nonnull ImmutableSet<OWLOntologyID> ontologies) {
         this.declaredBy = checkNotNull(declaredBy);
         this.usedBy = checkNotNull(usedBy);
+        this.ontologies = checkNotNull(ontologies);
     }
 
     /**
@@ -51,10 +56,12 @@ class DeclarationIndex {
         checkNotNull(ontology);
         Map<OWLEntity, ImmutableSet.Builder<OWLOntologyID>> declaredBy = new LinkedHashMap<>();
         Map<OWLEntity, ImmutableSet.Builder<OWLOntologyID>> usedBy = new LinkedHashMap<>();
+        ImmutableSet.Builder<OWLOntologyID> ontologies = ImmutableSet.builder();
         // getImportsClosure() includes the ontology itself and visits each import once, so a
         // cycle between two ontologies ends rather than repeating.
         for (OWLOntology importOntology : ontology.getImportsClosure()) {
             OWLOntologyID importOntologyId = importOntology.getOntologyID();
+            ontologies.add(importOntologyId);
             for (OWLDeclarationAxiom declaration : importOntology.getAxioms(AxiomType.DECLARATION)) {
                 record(declaredBy, declaration.getEntity(), importOntologyId);
             }
@@ -62,7 +69,7 @@ class DeclarationIndex {
                 record(usedBy, entity, importOntologyId);
             }
         }
-        return new DeclarationIndex(build(declaredBy), build(usedBy));
+        return new DeclarationIndex(build(declaredBy), build(usedBy), ontologies.build());
     }
 
     private static void record(Map<OWLEntity, ImmutableSet.Builder<OWLOntologyID>> collector,
@@ -76,6 +83,20 @@ class DeclarationIndex {
         ImmutableMap.Builder<OWLEntity, ImmutableSet<OWLOntologyID>> built = ImmutableMap.builder();
         collector.forEach((entity, ontologyIds) -> built.put(entity, ontologyIds.build()));
         return built.build();
+    }
+
+    /**
+     * Gets the ontology identifiers of the indexed import closure.
+     *
+     * <p>An identifier is retained for every ontology in the closure, including one that declares
+     * nothing, because a check may need to know that an ontology was loaded and stayed silent.
+     *
+     * @return the ontology identifiers of the import closure, including that of the ontology the
+     *         index was built over
+     */
+    @Nonnull
+    ImmutableSet<OWLOntologyID> getOntologies() {
+        return ontologies;
     }
 
     /**

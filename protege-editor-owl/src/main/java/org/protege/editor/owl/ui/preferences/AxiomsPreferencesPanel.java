@@ -2,9 +2,16 @@ package org.protege.editor.owl.ui.preferences;
 
 import org.protege.editor.core.ui.preferences.PreferencesLayoutPanel;
 import org.protege.editor.owl.model.declaration.EntityDeclarationPreferences;
+import org.protege.editor.owl.model.declaration.MisplacedDeclarationPreferences;
+import org.protege.editor.owl.model.declaration.OwnershipRule;
+import org.protege.editor.owl.model.declaration.OwnershipRuleDisplay;
+import org.protege.editor.owl.model.declaration.OwnershipRules;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Displays axiom-related settings in Preferences.
@@ -27,7 +34,30 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
                     + "You can disable this behavior to prevent declaration axioms from "
                     + "being added automatically.";
 
+    private static final String MISPLACED_GROUP_LABEL = "Misplaced declarations";
+
+    private static final String MISPLACED_HELP_TEXT =
+            "Reports when an entity is declared outside the ontology that appears to own its identifier.";
+
+    private final List<OwnershipRule> ownershipRules;
+
+    private final Map<OwnershipRule, JCheckBox> ownershipRuleCheckBoxes = new LinkedHashMap<>();
+
     private JCheckBox suppressAutomaticEntityDeclarationsCheckBox;
+
+    /** Builds the panel over the registered ownership rules. */
+    public AxiomsPreferencesPanel() {
+        this(OwnershipRules.registered());
+    }
+
+    /**
+     * Builds the panel over the given ownership rules.
+     *
+     * @param ownershipRules the rules to offer, in the order they are consulted
+     */
+    AxiomsPreferencesPanel(List<OwnershipRule> ownershipRules) {
+        this.ownershipRules = ownershipRules;
+    }
 
     /** Builds the panel controls from their stored preferences. */
     public void initialise() throws Exception {
@@ -41,12 +71,29 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
 
         panel.addGroup("Declarations");
         panel.addGroupComponent(suppressAutomaticEntityDeclarationsCheckBox);
+
+        panel.addVerticalPadding();
+        panel.addGroup(MISPLACED_GROUP_LABEL);
+        MisplacedDeclarationPreferences misplacedPreferences =
+                MisplacedDeclarationPreferences.getInstance();
+        for (OwnershipRule rule : ownershipRules) {
+            OwnershipRuleDisplay display = rule.getDisplay();
+            JCheckBox checkBox = new JCheckBox(display.getLabel(), misplacedPreferences.isRuleEnabled(rule));
+            checkBox.setToolTipText(display.getTooltipHtmlText());
+            ownershipRuleCheckBoxes.put(rule, checkBox);
+            panel.addGroupComponent(checkBox);
+        }
+        panel.addHelpText(MISPLACED_HELP_TEXT);
     }
 
     /** Stores the values currently shown by the panel. */
     public void applyChanges() {
         EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(
                 suppressAutomaticEntityDeclarationsCheckBox.isSelected());
+        MisplacedDeclarationPreferences misplacedPreferences =
+                MisplacedDeclarationPreferences.getInstance();
+        ownershipRuleCheckBoxes.forEach(
+                (rule, checkBox) -> misplacedPreferences.setRuleEnabled(rule, checkBox.isSelected()));
     }
 
     /** This panel does not hold any resources that need to be released. */

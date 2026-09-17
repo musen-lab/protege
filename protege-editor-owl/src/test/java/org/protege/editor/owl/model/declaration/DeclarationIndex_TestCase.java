@@ -31,6 +31,17 @@ public class DeclarationIndex_TestCase {
     }
 
     @Test
+    public void shouldHoldTheOntologyIdsOfTheImportClosure() throws Exception {
+        OWLOntology leaf = ClosureFixtures.threeLevelClosure();
+
+        DeclarationIndex index = DeclarationIndex.over(leaf);
+
+        Set<OWLOntologyID> expected = new HashSet<>();
+        leaf.getImportsClosure().forEach(ontology -> expected.add(ontology.getOntologyID()));
+        assertEquals(expected, index.getOntologies());
+    }
+
+    @Test
     public void shouldAgreeWithTheOwlApiDeclarationStatusForEveryEntity() throws Exception {
         OWLOntology leaf = ClosureFixtures.threeLevelClosure();
         DeclarationIndex index = DeclarationIndex.over(leaf);

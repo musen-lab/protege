@@ -50,7 +50,21 @@ public class MissingDeclarationChecker {
     @Nonnull
     public MissingDeclarationReport check(@Nonnull OWLOntology ontology) {
         checkNotNull(ontology);
-        DeclarationIndex index = DeclarationIndex.over(ontology);
+        return check(DeclarationIndex.over(ontology));
+    }
+
+    /**
+     * Finds missing declarations using an index that has already been built.
+     *
+     * <p>Sharing an index lets this check and the misplaced-declaration check run over one
+     * traversal of the import closure.
+     *
+     * @param index the index of the import closure to check
+     * @return a report containing the missing declarations in deterministic order
+     */
+    @Nonnull
+    MissingDeclarationReport check(@Nonnull DeclarationIndex index) {
+        checkNotNull(index);
         return MissingDeclarationReport.get(index.getEntities().stream()
                 .filter(entity -> !StandardVocabulary.contains(entity))
                 .filter(entity -> !index.isDeclared(entity))
