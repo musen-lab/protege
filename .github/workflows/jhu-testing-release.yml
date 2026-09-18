@@ -14,12 +14,15 @@ name: JHU testing release
 # already names. Central does not require signatures on snapshots, so no GPG key is needed.
 
 on:
-  # Deliberately manual to begin with. Add the push trigger below once a dispatch run has
-  # published successfully:
-  #
-  #   push:
-  #     branches: [ "master" ]
-  #
+  push:
+    branches: [ "master" ]
+    # Documentation and workflow edits do not change what we publish, so they do not need a
+    # republish. Anything affecting the build does.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/**'
+      - 'LICENSE'
   workflow_dispatch:
 
 # One publish at a time. Two runs deploying the same coordinate concurrently would race, and
