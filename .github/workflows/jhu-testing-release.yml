@@ -1,0 +1,102 @@
+name: JHU testing release
+
+# Publishes a -jhu-testing-SNAPSHOT build of Protégé to Maven Central snapshots for our
+# project partners.
+#
+# This workflow belongs to musen-lab/protege only and must not be contributed upstream to
+# protegeproject/protege. The repository guard below makes it inert if it ever arrives there,
+# but the guard is a safety net rather than the mechanism: keep the file on the fork.
+#
+# Snapshots are deployed with the plain maven-deploy-plugin, not the `release` profile. That
+# profile binds central-publishing-maven-plugin to the deploy phase with autoPublish and
+# waitUntil=published, which is the Central Portal release flow. Snapshots do not use the
+# Portal; they are an ordinary deploy to the snapshot repository that distributionManagement
+# already names. Central does not require signatures on snapshots, so no GPG key is needed.
+
+on:
+  # Deliberately manual to begin with. Add the push trigger below once a dispatch run has
+  # published successfully:
+  #
+  #   push:
+  #     branches: [ "master" ]
+  #
+  workflow_dispatch:
+
+jobs:
+  publish-testing:
+    # Never run anywhere but the fork, whatever branch this file reaches.
+    if: github.repository == 'musen-lab/protege'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the required secrets are set
+        env:
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
+        run: |
+          missing=""
+          [ -n "$OSSRH_USERNAME" ] || missing="$missing OSSRH_USERNAME"
+          [ -n "$OSSRH_TOKEN" ]    || missing="$missing OSSRH_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            echo "Set them at https://github.com/${{ github.repository }}/settings/secrets/actions"
+            exit 1
+          fi
+          echo "Both credentials are present."
+
+      - name: Set up JDK/Maven
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          # Writes a settings.xml server entry named `ossrh`, which is the id used by
+          # distributionManagement in the parent pom.
+          server-id: ossrh
+          server-username: OSSRH_USERNAME
+          server-password: OSSRH_TOKEN
+
+      - name: Derive the testing version
+        id: version
+        run: |
+          base=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
+          testing="${base%-SNAPSHOT}-jhu-testing-SNAPSHOT"
+          case "$testing" in
+            *-SNAPSHOT) ;;
+            *) echo "::error::Derived version $testing is not a snapshot"; exit 1 ;;
+          esac
+          echo "testing=$testing" >> "$GITHUB_OUTPUT"
+          echo "Base version:    $base"
+          echo "Testing version: $testing"
+
+      - name: Set the version across all modules
+        # Applies to the runner's working copy only. Nothing is committed, so master keeps
+        # its own version and the suffix appears solely in the published artifacts.
+        run: >
+          mvn --batch-mode versions:set
+          --define newVersion=${{ steps.version.outputs.testing }}
+          --define generateBackupPoms=false
+
+      - name: Build and test
+        run: mvn --batch-mode --define release.signing.disabled=true clean verify
+
+      - name: Deploy to Maven Central snapshots
+        env:
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
+        # No -Prelease: see the note at the top of this file.
+        run: mvn --batch-mode --define maven.test.skip=true deploy
+
+      - name: Summarise
+        run: |
+          {
+            echo "### Published"
+            echo
+            echo '`edu.stanford.protege:protege-desktop:${{ steps.version.outputs.testing }}`'
+            echo
+            echo "Repository: https://central.sonatype.com/repository/maven-snapshots/"
+            echo
+            echo "Partners consuming this need that repository in their settings.xml or pom,"
+            echo "with snapshots enabled."
+          } >> "$GITHUB_STEP_SUMMARY"
