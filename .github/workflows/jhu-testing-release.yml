@@ -22,6 +22,17 @@ on:
   #
   workflow_dispatch:
 
+# One publish at a time. Two runs deploying the same coordinate concurrently would race, and
+# the loser's artifacts could be partially overwritten. Cancelling the older run is safe here
+# because a superseded testing build has no value: whatever triggered it is already included
+# in the newer one.
+#
+# If branch builds are added later, put the ref in the group so branches do not cancel each
+# other:  group: jhu-testing-${{ github.ref }}
+concurrency:
+  group: jhu-testing
+  cancel-in-progress: true
+
 jobs:
   publish-testing:
     # Never run anywhere but the fork, whatever branch this file reaches.
