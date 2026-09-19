@@ -1,0 +1,9 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+<http://import-test.invalid/formats/subject-own-line>
+	a	owl:Ontology ;
+	dc:title "Subject on its own line, as Jena and TopBraid write it" ;
+	owl:versionIRI <http://import-test.invalid/formats/subject-own-line/2.0> .
+
+<http://import-test.invalid/formats/subject-own-line#C> a owl:Class .

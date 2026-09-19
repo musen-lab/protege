@@ -1,0 +1,9 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix terms: <http://purl.org/dc/terms/> .
+@base <http://import-test.invalid/formats/> .
+
+<type-after-properties>
+    terms:license <https://creativecommons.org/licenses/by/4.0/> ;
+    terms:title "The type comes after other properties" ;
+    a owl:Ontology ;
+    owl:versionIRI <type-after-properties/1.0.0> .
