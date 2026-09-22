@@ -39,13 +39,13 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
     private static final String STAND_IN_RULE_KEY = "misplaced.rule.use.stand.in";
 
     private static final String OBO_RULE_TOOLTIP =
-            "<html>Matches the ID space in an OBO ID to an ontology's short name. "
+            "<html>Matches the ID prefix in an OBO ID to an ontology's short name. "
                     + "For example, <b>GO_0006915</b> matches <b>go.owl</b>."
                     + "<br><br>This rule is needed for OBO terms because they share the same "
-                    + "IRI namespace.</html>";
+                    + "IRI prefix.</html>";
 
     private static final String NAMESPACE_RULE_TOOLTIP =
-            "<html>Matches an entity's IRI namespace to an ontology IRI. "
+            "<html>Matches an entity's IRI prefix to an ontology IRI. "
                     + "For example, <b>http://example.org/base#Term</b> matches "
                     + "<b>http://example.org/base</b>."
                     + "<br><br>Use this rule when entity IRIs are based on the ontology IRI.</html>";
@@ -206,11 +206,11 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
     }
 
     private OwnershipRule oboRule() {
-        return ruleLabelled("OBO ID space");
+        return ruleLabelled("OBO ID");
     }
 
     private OwnershipRule namespaceRule() {
-        return ruleLabelled("IRI namespace");
+        return ruleLabelled("IRI prefix");
     }
 
     private OwnershipRule ruleLabelled(String wanted) {
@@ -223,11 +223,11 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
     }
 
     private JCheckBox oboRuleBoxOf(AxiomsPreferencesPanel panel) {
-        return boxMentioning(panel, "OBO ID space");
+        return boxMentioning(panel, "OBO ID");
     }
 
     private JCheckBox namespaceRuleBoxOf(AxiomsPreferencesPanel panel) {
-        return boxMentioning(panel, "IRI namespace");
+        return boxMentioning(panel, "IRI prefix");
     }
 
     private JCheckBox boxMentioning(AxiomsPreferencesPanel panel, String wanted) {

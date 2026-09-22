@@ -36,11 +36,11 @@ final class OboIdentifierRule implements OwnershipRule {
 
     @Nonnull
     private static final OwnershipRuleDisplay DISPLAY = OwnershipRuleDisplay.get(
-            "Decide ownership from the OBO ID spaces",
-            "<html>Matches the ID space in an OBO ID to an ontology's short name. "
+            "Decide ownership from the OBO ID",
+            "<html>Matches the ID prefix in an OBO ID to an ontology's short name. "
                     + "For example, <b>GO_0006915</b> matches <b>go.owl</b>."
                     + "<br><br>This rule is needed for OBO terms because they share the same "
-                    + "IRI namespace.</html>");
+                    + "IRI prefix.</html>");
 
     @Override
     @Nonnull
