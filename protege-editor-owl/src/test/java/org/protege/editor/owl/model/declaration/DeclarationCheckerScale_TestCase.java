@@ -29,7 +29,11 @@ public class DeclarationCheckerScale_TestCase {
      */
     private static final int EXPECTED_MISPLACED = EXPECTED_MISSING - (ENTITIES / ONTOLOGIES / 10);
 
-    private final DeclarationChecker checker = new DeclarationChecker();
+    // Suppression is what turns the checks on; this test is about their cost, not that gate.
+    private final DeclarationChecker checker = new DeclarationChecker(
+            new MissingDeclarationChecker(),
+            new MisplacedDeclarationChecker(OwnershipRules::registered),
+            () -> true);
 
     @Test
     public void shouldRunBothChecksOverOneHundredThousandEntities() throws Exception {

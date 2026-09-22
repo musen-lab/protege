@@ -68,6 +68,11 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
         suppressAutomaticEntityDeclarationsCheckBox = new JCheckBox(SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_LABEL,
                 EntityDeclarationPreferences.getInstance().isSuppressingAutomaticDeclarations());
         suppressAutomaticEntityDeclarationsCheckBox.setToolTipText(SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_TOOLTIP);
+        // The ownership rules govern what the check reports, and nothing is reported while saving
+        // writes the declarations itself. They follow this box rather than the stored setting, so
+        // ticking it makes them usable at once.
+        suppressAutomaticEntityDeclarationsCheckBox.addItemListener(
+                event -> refreshOwnershipRuleAvailability());
 
         panel.addGroup("Declarations");
         panel.addGroupComponent(suppressAutomaticEntityDeclarationsCheckBox);
@@ -84,6 +89,7 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
             panel.addGroupComponent(checkBox);
         }
         panel.addHelpText(MISPLACED_HELP_TEXT);
+        refreshOwnershipRuleAvailability();
     }
 
     /** Stores the values currently shown by the panel. */
@@ -94,6 +100,12 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
                 MisplacedDeclarationPreferences.getInstance();
         ownershipRuleCheckBoxes.forEach(
                 (rule, checkBox) -> misplacedPreferences.setRuleEnabled(rule, checkBox.isSelected()));
+    }
+
+    /** Ownership rule controls are usable only while automatic declarations are suppressed. */
+    private void refreshOwnershipRuleAvailability() {
+        boolean checksRun = suppressAutomaticEntityDeclarationsCheckBox.isSelected();
+        ownershipRuleCheckBoxes.values().forEach(checkBox -> checkBox.setEnabled(checksRun));
     }
 
     /** This panel does not hold any resources that need to be released. */

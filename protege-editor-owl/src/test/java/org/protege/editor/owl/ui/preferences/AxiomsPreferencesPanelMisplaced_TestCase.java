@@ -6,6 +6,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.protege.editor.core.prefs.Preferences;
 import org.protege.editor.core.prefs.PreferencesManager;
+import org.protege.editor.owl.model.declaration.EntityDeclarationPreferences;
 import org.protege.editor.owl.model.declaration.ImportClosureView;
 import org.protege.editor.owl.model.declaration.MisplacedDeclarationPreferences;
 import org.protege.editor.owl.model.declaration.OwnershipRule;
@@ -51,8 +52,11 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
 
     private Map<OwnershipRule, Boolean> storedRules;
 
+    private boolean storedSuppression;
+
     @Before
     public void setUp() {
+        storedSuppression = EntityDeclarationPreferences.getInstance().isSuppressingAutomaticDeclarations();
         storedRules = new LinkedHashMap<>();
         for (OwnershipRule rule : OwnershipRules.registered()) {
             storedRules.put(rule, preferences().isRuleEnabled(rule));
@@ -64,6 +68,55 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
     public void tearDown() {
         raw().clear();
         storedRules.forEach((rule, enabled) -> preferences().setRuleEnabled(rule, enabled));
+        EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(storedSuppression);
+    }
+
+    @Test
+    public void shouldDisableTheOwnershipControlsWhileSavingWritesDeclarations() {
+        EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(false);
+        AxiomsPreferencesPanel panel = buildPanel();
+
+        assertFalse(oboRuleBoxOf(panel).isEnabled());
+        assertFalse(namespaceRuleBoxOf(panel).isEnabled());
+        assertTrue("the value it holds is still shown", oboRuleBoxOf(panel).isSelected());
+    }
+
+    @Test
+    public void shouldEnableTheOwnershipControlsWhenDeclarationsAreSuppressed() {
+        EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(true);
+        AxiomsPreferencesPanel panel = buildPanel();
+
+        assertTrue(oboRuleBoxOf(panel).isEnabled());
+        assertTrue(namespaceRuleBoxOf(panel).isEnabled());
+    }
+
+    @Test
+    public void shouldEnableTheOwnershipControlsAsSoonAsSuppressionIsTicked() {
+        EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(false);
+        AxiomsPreferencesPanel panel = buildPanel();
+        assertFalse(oboRuleBoxOf(panel).isEnabled());
+
+        suppressionBoxOf(panel).setSelected(true);
+
+        assertTrue("the controls follow the box rather than the stored setting",
+                oboRuleBoxOf(panel).isEnabled());
+    }
+
+    @Test
+    public void shouldKeepOwnershipValuesWhileTheirControlsAreUnavailable() {
+        preferences().setRuleEnabled(oboRule(), false);
+        EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(false);
+        AxiomsPreferencesPanel panel = buildPanel();
+
+        suppressionBoxOf(panel).setSelected(true);
+        panel.applyChanges();
+
+        assertFalse("the rule switched off before is still switched off",
+                preferences().isRuleEnabled(oboRule()));
+    }
+
+    private JCheckBox suppressionBoxOf(AxiomsPreferencesPanel panel) {
+        return boxMentioning(panel, "Suppress automatic entity declarations");
     }
 
     /** Every rule runs by default, so every box opens ticked. */

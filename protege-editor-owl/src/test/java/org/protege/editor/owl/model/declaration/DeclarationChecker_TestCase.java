@@ -4,6 +4,7 @@ import org.junit.Test;
 import org.semanticweb.owlapi.model.OWLOntology;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
@@ -18,7 +19,7 @@ public class DeclarationChecker_TestCase {
     public void shouldGiveTheSameFindingsAsEachCheckRunAlone() throws Exception {
         OWLOntology leaf = ClosureFixtures.threeLevelClosure();
 
-        DeclarationReport report = new DeclarationChecker().check(leaf);
+        DeclarationReport report = checkerThatRuns().check(leaf);
 
         assertEquals(new MissingDeclarationChecker().check(leaf).getFindings(),
                 report.getMissing().getFindings());
@@ -33,7 +34,8 @@ public class DeclarationChecker_TestCase {
         RecordingMissingChecker missing = new RecordingMissingChecker();
         RecordingMisplacedChecker misplaced = new RecordingMisplacedChecker();
 
-        new DeclarationChecker(missing, misplaced).check(ClosureFixtures.threeLevelClosure());
+        new DeclarationChecker(missing, misplaced, () -> true)
+                .check(ClosureFixtures.threeLevelClosure());
 
         assertNotNull(missing.index);
         assertSame("both checks must share one walk of the closure", missing.index, misplaced.index);
@@ -41,11 +43,66 @@ public class DeclarationChecker_TestCase {
 
     @Test
     public void shouldReportNothingForAClosureWithNoDefects() throws Exception {
-        DeclarationReport report = new DeclarationChecker().check(ClosureFixtures.componentLayoutClosure());
+        DeclarationReport report = checkerThatRuns().check(ClosureFixtures.componentLayoutClosure());
 
         assertTrue(report.isEmpty());
         assertTrue(report.getMissing().isEmpty());
         assertTrue(report.getMisplaced().isEmpty());
+    }
+
+    @Test
+    public void shouldReportNothingWhileAutomaticDeclarationsAreWritten() throws Exception {
+        OWLOntology leaf = ClosureFixtures.threeLevelClosure();
+
+        // Saving would write a declaration for everything the closure leaves undeclared, so a
+        // missing finding would be papered over and the declaration written reported as misplaced.
+        DeclarationReport report = checkerSuppressing(false).check(leaf);
+
+        assertTrue(report.isEmpty());
+        assertTrue(report.getMissing().isEmpty());
+        assertTrue(report.getMisplaced().isEmpty());
+    }
+
+    @Test
+    public void shouldReportTheSameClosureOnceSuppressionIsOn() throws Exception {
+        OWLOntology leaf = ClosureFixtures.threeLevelClosure();
+
+        DeclarationReport report = checkerSuppressing(true).check(leaf);
+
+        assertFalse(report.getMissing().isEmpty());
+        assertEquals(singletonList(ClosureFixtures.BASE + "#Misplaced"),
+                entityNames(report.getMisplaced()));
+    }
+
+    @Test
+    public void shouldLeaveEachCheckAnsweringWhenCalledOnItsOwn() throws Exception {
+        OWLOntology leaf = ClosureFixtures.threeLevelClosure();
+
+        // The setting governs the feature, not what counts as a finding.
+        assertFalse(new MissingDeclarationChecker().check(leaf).isEmpty());
+        assertFalse(new MisplacedDeclarationChecker(OwnershipRules::registered).check(leaf).isEmpty());
+    }
+
+    @Test
+    public void shouldReadTheSettingAfreshOnEveryRun() throws Exception {
+        OWLOntology leaf = ClosureFixtures.threeLevelClosure();
+        AtomicBoolean suppressing = new AtomicBoolean(false);
+        DeclarationChecker checker = new DeclarationChecker(new MissingDeclarationChecker(),
+                new MisplacedDeclarationChecker(OwnershipRules::registered), suppressing::get);
+
+        assertTrue(checker.check(leaf).isEmpty());
+        suppressing.set(true);
+        assertFalse("a cached value would need a restart to take effect",
+                checker.check(leaf).isEmpty());
+    }
+
+    private static DeclarationChecker checkerThatRuns() {
+        return checkerSuppressing(true);
+    }
+
+    private static DeclarationChecker checkerSuppressing(boolean suppressing) {
+        return new DeclarationChecker(new MissingDeclarationChecker(),
+                new MisplacedDeclarationChecker(OwnershipRules::registered), () -> suppressing);
     }
 
     private static List<String> entityNames(MisplacedDeclarationReport report) {
