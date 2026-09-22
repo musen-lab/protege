@@ -76,7 +76,7 @@ public class MisplacedDeclarationChecker {
         if (rules.isEmpty()) {
             return MisplacedDeclarationReport.get(ImmutableList.of());
         }
-        OwnershipPolicy policy = OwnershipPolicy.over(rules, index.getOntologies());
+        OwnershipPolicy policy = OwnershipPolicy.over(rules, index);
         return MisplacedDeclarationReport.get(index.getEntities()
                 .stream()
                 .filter(entity -> !StandardVocabulary.contains(entity))
@@ -109,7 +109,7 @@ public class MisplacedDeclarationChecker {
         // Step three: identify the declarers outside the owner's family. Note: A project may spread
         // its terms across documents, so obo/go/components/terms.owl is in the family of obo/go.owl,
         // and a GO entity declared there is not misplaced.
-        ImmutableSet<OWLOntologyID> foreignDeclarers = foreignDeclarersOf(owningOntology, declaringOntologies);
+        ImmutableSet<OWLOntologyID> foreignDeclarers = foreignDeclarersOf(owner.get(), declaringOntologies);
         if (foreignDeclarers.isEmpty()) {
             return Optional.empty();    // nothing is misplaced, the owner's family declared it or nothing did
         }
@@ -119,11 +119,12 @@ public class MisplacedDeclarationChecker {
                 owner.get().getRuleId()));
     }
 
-    private static ImmutableSet<OWLOntologyID> foreignDeclarersOf(OWLOntologyID owningOntology,
+    private static ImmutableSet<OWLOntologyID> foreignDeclarersOf(DeclarationOwner owner,
                                                                   Set<OWLOntologyID> declaringOntologies) {
+        // The rule that chose the owner decides what stands in for it.
         return ImmutableSet.copyOf(
                 declaringOntologies.stream()
-                        .filter(declaringOntology -> !DocumentFamily.sameFamily(declaringOntology, owningOntology))
+                        .filter(declaringOntology -> !owner.isStoodInForBy(declaringOntology))
                         .collect(Collectors.toList()));
     }
 }

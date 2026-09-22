@@ -10,10 +10,7 @@ import org.semanticweb.owlapi.model.OWLOntology;
 import org.semanticweb.owlapi.model.OWLOntologyID;
 import org.semanticweb.owlapi.model.OWLOntologyManager;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -109,22 +106,16 @@ public class OboIdentifierRule_TestCase {
     }
 
     private void assertOwner(OWLOntology closure, OWLClass entity, OWLOntology expected) {
-        Optional<OWLOntologyID> owner = rule.compile(idsOf(closure)).resolve(entity);
+        Optional<OWLOntologyID> owner = rule.compile(TestClosureView.over(closure)).resolve(entity);
         assertEquals(Optional.of(expected.getOntologyID()), owner);
     }
 
     private void assertNoOwnerIn(OWLClass entity, OWLOntology... closure) {
-        assertFalse(rule.compile(idsOf(closure)).resolve(entity).isPresent());
+        assertFalse(rule.compile(TestClosureView.over(closure)).resolve(entity).isPresent());
     }
 
     private void assertNoOwner(OWLOntology closure, OWLClass entity) {
         assertNoOwnerIn(entity, closure);
-    }
-
-    private static List<OWLOntologyID> idsOf(OWLOntology... ontologies) {
-        return Arrays.stream(ontologies)
-                .map(OWLOntology::getOntologyID)
-                .collect(Collectors.toList());
     }
 
     private OWLOntology ontology(String iri) throws Exception {

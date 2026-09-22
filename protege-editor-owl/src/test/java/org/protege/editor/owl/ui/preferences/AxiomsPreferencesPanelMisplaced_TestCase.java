@@ -6,17 +6,16 @@ import org.junit.Before;
 import org.junit.Test;
 import org.protege.editor.core.prefs.Preferences;
 import org.protege.editor.core.prefs.PreferencesManager;
+import org.protege.editor.owl.model.declaration.ImportClosureView;
 import org.protege.editor.owl.model.declaration.MisplacedDeclarationPreferences;
 import org.protege.editor.owl.model.declaration.OwnershipRule;
 import org.protege.editor.owl.model.declaration.OwnershipRuleDisplay;
 import org.protege.editor.owl.model.declaration.OwnershipRules;
-import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import javax.swing.JCheckBox;
 import java.awt.Component;
 import java.awt.Container;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -223,7 +222,7 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
             }
 
             @Override
-            public Resolver compile(Collection<OWLOntologyID> ontologies) {
+            public Resolver compile(ImportClosureView closure) {
                 return entity -> Optional.empty();
             }
         };

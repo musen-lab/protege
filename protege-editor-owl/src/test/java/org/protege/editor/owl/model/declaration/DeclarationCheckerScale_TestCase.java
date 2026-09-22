@@ -39,10 +39,18 @@ public class DeclarationCheckerScale_TestCase {
         DeclarationReport report = checker.check(root);
         long elapsedMillis = (System.nanoTime() - start) / 1_000_000;
 
+        // Timed after the check so it is measured warm, making the closure walk, including
+        // deriving reachability for the view an ownership rule resolves against, comparable with
+        // the figure above rather than carrying this test's cold start.
+        long indexStart = System.nanoTime();
+        DeclarationIndex.over(root);
+        long indexMillis = (System.nanoTime() - indexStart) / 1_000_000;
+
         System.out.println("[scale] " + root.getImportsClosure().size() + " ontologies, "
                 + ENTITIES + " terms, " + report.getMissing().size() + " missing and "
                 + report.getMisplaced().size() + " misplaced in " + elapsedMillis
-                + " ms (informational)");
+                + " ms, of which the closure walk and reachability took " + indexMillis
+                + " ms, including one term mentioned by every document (informational)");
 
         // One finding per defect, so nothing was missed and nothing was double-counted.
         assertEquals(EXPECTED_MISSING, report.getMissing().size());
@@ -86,7 +94,24 @@ public class DeclarationCheckerScale_TestCase {
             previous = member;
         }
         addTerms(m, df, root, rootIri, perOntology, previous);
+        addTermMentionedEverywhere(m, df, root);
         return root;
+    }
+
+    /**
+     * Declares one term in every document of the closure.
+     *
+     * <p>That is the worst case for deciding which document mentions a term first, because the
+     * candidates have to be compared with each other. It adds no finding: the term is declared
+     * everywhere so it is not missing, and the documents mentioning it sit side by side so no
+     * rule resolves an owner for it.
+     */
+    private static void addTermMentionedEverywhere(OWLOntologyManager m, OWLDataFactory df,
+                                                   OWLOntology root) {
+        OWLClass shared = df.getOWLClass(IRI.create("http://example.org/scale/shared#Everywhere"));
+        for (OWLOntology each : root.getImportsClosure()) {
+            m.addAxiom(each, df.getOWLDeclarationAxiom(shared));
+        }
     }
 
     private static void addTerms(OWLOntologyManager m, OWLDataFactory df, OWLOntology o,

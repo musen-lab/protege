@@ -3,7 +3,6 @@ package org.protege.editor.owl.model.declaration;
 import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import javax.annotation.Nonnull;
-import java.util.Collection;
 
 /**
  * Decides an entity's owner by matching the entity IRI namespace to an ontology IRI.
@@ -47,8 +46,8 @@ final class NamespaceRule implements OwnershipRule {
 
     @Override
     @Nonnull
-    public Resolver compile(@Nonnull Collection<OWLOntologyID> ontologies) {
-        OntologyKeyIndex byOntologyIri = OntologyKeyIndex.over(ontologies,
+    public Resolver compile(@Nonnull ImportClosureView closure) {
+        OntologyKeyIndex byOntologyIri = OntologyKeyIndex.over(closure.getOntologies(),
                 ontology ->
                         OntologyIris.ontologyIriOf(ontology)
                                     .map(OntologyIris::stripTrailingSeparator));

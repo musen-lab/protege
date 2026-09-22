@@ -4,7 +4,6 @@ import org.protege.editor.owl.model.util.OboUtilities;
 import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import javax.annotation.Nonnull;
-import java.util.Collection;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -57,8 +56,8 @@ final class OboIdentifierRule implements OwnershipRule {
 
     @Override
     @Nonnull
-    public Resolver compile(@Nonnull Collection<OWLOntologyID> ontologies) {
-        OntologyKeyIndex byShortName = OntologyKeyIndex.over(ontologies, OboIdentifierRule::shortNameOf);
+    public Resolver compile(@Nonnull ImportClosureView closure) {
+        OntologyKeyIndex byShortName = OntologyKeyIndex.over(closure.getOntologies(), OboIdentifierRule::shortNameOf);
         // OboUtilities reads an ID space that contains an underscore, such as APOLLO_SV, correctly.
         return entity -> OboUtilities.getOboIdSpaceFromIri(entity.getIRI())
                 .map(idSpace -> idSpace.toLowerCase(Locale.ROOT))

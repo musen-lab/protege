@@ -68,7 +68,7 @@ public class MissingDeclarationChecker {
         return MissingDeclarationReport.get(index.getEntities().stream()
                 .filter(entity -> !StandardVocabulary.contains(entity))
                 .filter(entity -> !index.isDeclared(entity))
-                .map(entity -> MissingDeclarationFinding.get(entity, index.getUsingOntologies(entity)))
+                .map(entity -> MissingDeclarationFinding.get(entity, index.getMentioningOntologies(entity)))
                 .sorted(BY_NAME_THEN_KIND)
                 .collect(Collectors.toList()));
     }

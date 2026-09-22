@@ -6,7 +6,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.protege.editor.core.prefs.Preferences;
 import org.protege.editor.core.prefs.PreferencesManager;
-import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -28,16 +27,20 @@ public class MisplacedDeclarationPreferences_TestCase {
 
     private static final String NAMESPACE_RULE_KEY = NamespaceRule.ID;
 
+    private static final String FIRST_MENTION_RULE_KEY = FirstMentionRule.ID;
+
     private static final String STAND_IN_RULE_KEY = "misplaced.rule.use.stand.in";
 
     private static final String SUPPRESS_KEY = "suppress.automatic.entity.declarations";
 
     private static final String[] KEYS =
-            {OBO_RULE_KEY, NAMESPACE_RULE_KEY, STAND_IN_RULE_KEY, SUPPRESS_KEY};
+            {OBO_RULE_KEY, NAMESPACE_RULE_KEY, FIRST_MENTION_RULE_KEY, STAND_IN_RULE_KEY, SUPPRESS_KEY};
 
     private static final OwnershipRule OBO_RULE = new OboIdentifierRule();
 
     private static final OwnershipRule NAMESPACE_RULE = new NamespaceRule();
+
+    private static final OwnershipRule FIRST_MENTION_RULE = new FirstMentionRule();
 
     private MisplacedDeclarationPreferences preferences;
 
@@ -81,7 +84,8 @@ public class MisplacedDeclarationPreferences_TestCase {
 
         assertFalse(preferences.isRuleEnabled(OBO_RULE));
         assertTrue("the other rule is untouched", preferences.isRuleEnabled(NAMESPACE_RULE));
-        assertEquals(ImmutableList.of(NAMESPACE_RULE_KEY), idsOf(preferences.getEnabledRules()));
+        assertEquals(ImmutableList.of(NAMESPACE_RULE_KEY, FIRST_MENTION_RULE_KEY),
+                idsOf(preferences.getEnabledRules()));
     }
 
     @Test
@@ -96,14 +100,15 @@ public class MisplacedDeclarationPreferences_TestCase {
     public void shouldGiveNoRulesWhenEveryRuleIsSwitchedOff() {
         preferences.setRuleEnabled(OBO_RULE, false);
         preferences.setRuleEnabled(NAMESPACE_RULE, false);
+        preferences.setRuleEnabled(FIRST_MENTION_RULE, false);
 
         assertTrue(preferences.getEnabledRules().isEmpty());
     }
 
     @Test
     public void shouldKeepTheRegisteredOrder() {
-        assertEquals("the OBO rule is consulted before the namespace rule",
-                ImmutableList.of(OBO_RULE_KEY, NAMESPACE_RULE_KEY),
+        assertEquals("the identifier rules are consulted before the closure rule",
+                ImmutableList.of(OBO_RULE_KEY, NAMESPACE_RULE_KEY, FIRST_MENTION_RULE_KEY),
                 idsOf(OwnershipRules.registered()));
     }
 
@@ -159,7 +164,7 @@ public class MisplacedDeclarationPreferences_TestCase {
             }
 
             @Override
-            public Resolver compile(Collection<OWLOntologyID> ontologies) {
+            public Resolver compile(ImportClosureView closure) {
                 return entity -> Optional.empty();
             }
         };

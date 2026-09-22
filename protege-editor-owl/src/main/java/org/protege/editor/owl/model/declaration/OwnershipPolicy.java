@@ -9,6 +9,7 @@ import javax.annotation.Nonnull;
 import java.util.Collection;
 import java.util.Optional;
 
+
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -45,18 +46,18 @@ final class OwnershipPolicy {
      * owner.
      *
      * @param rules the enabled rules, in decreasing precedence order
-     * @param ontologies the ontology identifiers that each rule may select as an owner
+     * @param closure the import closure each rule resolves against
      * @return a policy whose compiled resolvers can be reused for multiple entities
-     * @throws NullPointerException if {@code rules} or {@code ontologies} is {@code null}
+     * @throws NullPointerException if {@code rules} or {@code closure} is {@code null}
      */
     @Nonnull
     static OwnershipPolicy over(@Nonnull Collection<OwnershipRule> rules,
-                                @Nonnull Collection<OWLOntologyID> ontologies) {
+                                @Nonnull ImportClosureView closure) {
         checkNotNull(rules);
-        checkNotNull(ontologies);
+        checkNotNull(closure);
         ImmutableList.Builder<CompiledRule> compiled = ImmutableList.builder();
         for (OwnershipRule rule : rules) {
-            compiled.add(new CompiledRule(rule.getId(), rule.compile(ontologies)));
+            compiled.add(new CompiledRule(rule, rule.compile(closure)));
         }
         return new OwnershipPolicy(compiled.build());
     }
@@ -79,21 +80,21 @@ final class OwnershipPolicy {
         for (CompiledRule compiledRule : compiledRules) {
             Optional<OWLOntologyID> owner = compiledRule.resolver.resolve(entity);
             if (owner.isPresent()) {
-                return Optional.of(DeclarationOwner.get(owner.get(), compiledRule.ruleId));
+                return Optional.of(DeclarationOwner.get(owner.get(), compiledRule.rule));
             }
         }
         return Optional.empty();
     }
 
-    /** Associates a compiled resolver with the identifier of the rule that produced it. */
+    /** Associates a compiled resolver with the rule that produced it. */
     private static final class CompiledRule {
 
-        private final String ruleId;
+        private final OwnershipRule rule;
 
         private final OwnershipRule.Resolver resolver;
 
-        private CompiledRule(String ruleId, OwnershipRule.Resolver resolver) {
-            this.ruleId = checkNotNull(ruleId);
+        private CompiledRule(OwnershipRule rule, OwnershipRule.Resolver resolver) {
+            this.rule = checkNotNull(rule);
             this.resolver = checkNotNull(resolver);
         }
     }

@@ -11,10 +11,8 @@ import org.semanticweb.owlapi.model.OWLOntology;
 import org.semanticweb.owlapi.model.OWLOntologyID;
 import org.semanticweb.owlapi.model.OWLOntologyManager;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -105,13 +103,7 @@ public class OwnershipPolicy_TestCase {
     }
 
     private static OwnershipPolicy policyOf(List<OwnershipRule> rules, OWLOntology... ontologies) {
-        return OwnershipPolicy.over(rules, idsOf(ontologies));
-    }
-
-    private static List<OWLOntologyID> idsOf(OWLOntology... ontologies) {
-        return Arrays.stream(ontologies)
-                .map(OWLOntology::getOntologyID)
-                .collect(Collectors.toList());
+        return OwnershipPolicy.over(rules, TestClosureView.over(ontologies));
     }
 
     private OWLOntology ontology(String iri) throws Exception {

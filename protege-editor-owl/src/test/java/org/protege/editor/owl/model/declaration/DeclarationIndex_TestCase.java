@@ -75,7 +75,7 @@ public class DeclarationIndex_TestCase {
 
         assertFalse(index.isDeclared(ghost));
         assertTrue(index.getDeclaringOntologies(ghost).isEmpty());
-        assertEquals(iris(index.getUsingOntologies(ghost)), setOf(ClosureFixtures.MID));
+        assertEquals(iris(index.getMentioningOntologies(ghost)), setOf(ClosureFixtures.MID));
     }
 
     @Test
@@ -115,7 +115,7 @@ public class DeclarationIndex_TestCase {
         assertFalse(index.isDeclared(undeclared));
         // An anonymous ontology still has an identifier of its own, so it needs no special case.
         assertEquals(Collections.singleton(anonymous.getOntologyID()),
-                index.getUsingOntologies(undeclared));
+                index.getMentioningOntologies(undeclared));
     }
 
     @Test

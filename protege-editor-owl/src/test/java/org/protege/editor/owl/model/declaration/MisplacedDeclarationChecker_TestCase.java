@@ -6,7 +6,6 @@ import org.junit.Test;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.*;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -273,6 +272,26 @@ public class MisplacedDeclarationChecker_TestCase {
     }
 
     @Test
+    public void shouldLetTheDecidingRuleSayWhatStandsInForTheOwner() throws Exception {
+        OWLOntologyManager m = OWLManager.createOWLOntologyManager();
+        OWLDataFactory df = m.getOWLDataFactory();
+        OWLOntology project = m.createOntology(IRI.create("http://example.org/proj"));
+        m.createOntology(IRI.create("http://example.org/proj/part"));
+        m.applyChange(new AddImport(project,
+                df.getOWLImportsDeclaration(IRI.create("http://example.org/proj/part"))));
+        OWLClass term = df.getOWLClass(IRI.create("http://example.org/vocab#Term"));
+        m.addAxiom(m.getOntology(IRI.create("http://example.org/proj/part")),
+                df.getOWLDeclarationAxiom(term));
+
+        // The component sits beneath the project's IRI, so the default family test stands in for it.
+        assertTrue(checkerWith(standInRuleOwning(project.getOntologyID(), true))
+                .check(project).isEmpty());
+        // A rule for which nothing stands in reports the same declaration.
+        assertEquals(ImmutableList.of("http://example.org/vocab#Term"),
+                names(checkerWith(standInRuleOwning(project.getOntologyID(), false)).check(project)));
+    }
+
+    @Test
     public void shouldReadTheRulesAfreshOnEveryRun() throws Exception {
         OWLOntology root = twoRuleClosure();
         AtomicReference<ImmutableList<OwnershipRule>> rules =
@@ -323,7 +342,22 @@ public class MisplacedDeclarationChecker_TestCase {
 
     /** An ownership rule that names one ontology as the owner of every entity. */
     private static OwnershipRule standInRuleOwning(OWLOntologyID owner) {
+        return standInRuleOwning(owner, true);
+    }
+
+    /**
+     * An ownership rule that names one ontology as the owner of every entity, and either applies
+     * the default family test or treats nothing at all as standing in for that owner.
+     */
+    private static OwnershipRule standInRuleOwning(OWLOntologyID owner, boolean applyFamilyTest) {
         return new OwnershipRule() {
+            @Override
+            public boolean standsInForOwner(OWLOntologyID theOwner, OWLOntologyID candidate) {
+                return applyFamilyTest
+                        ? OwnershipRule.super.standsInForOwner(theOwner, candidate)
+                        : false;
+            }
+
             @Override
             public String getId() {
                 return "misplaced.rule.use.stand.in";
@@ -337,7 +371,7 @@ public class MisplacedDeclarationChecker_TestCase {
             }
 
             @Override
-            public Resolver compile(Collection<OWLOntologyID> ontologies) {
+            public Resolver compile(ImportClosureView closure) {
                 return entity -> Optional.of(owner);
             }
         };
