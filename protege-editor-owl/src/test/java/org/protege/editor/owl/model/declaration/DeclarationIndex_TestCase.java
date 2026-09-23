@@ -31,6 +31,17 @@ public class DeclarationIndex_TestCase {
     }
 
     @Test
+    public void shouldHoldTheOntologyIdsOfTheImportClosure() throws Exception {
+        OWLOntology leaf = ClosureFixtures.threeLevelClosure();
+
+        DeclarationIndex index = DeclarationIndex.over(leaf);
+
+        Set<OWLOntologyID> expected = new HashSet<>();
+        leaf.getImportsClosure().forEach(ontology -> expected.add(ontology.getOntologyID()));
+        assertEquals(expected, index.getOntologies());
+    }
+
+    @Test
     public void shouldAgreeWithTheOwlApiDeclarationStatusForEveryEntity() throws Exception {
         OWLOntology leaf = ClosureFixtures.threeLevelClosure();
         DeclarationIndex index = DeclarationIndex.over(leaf);
@@ -64,7 +75,7 @@ public class DeclarationIndex_TestCase {
 
         assertFalse(index.isDeclared(ghost));
         assertTrue(index.getDeclaringOntologies(ghost).isEmpty());
-        assertEquals(iris(index.getUsingOntologies(ghost)), setOf(ClosureFixtures.MID));
+        assertEquals(iris(index.getMentioningOntologies(ghost)), setOf(ClosureFixtures.MID));
     }
 
     @Test
@@ -104,7 +115,7 @@ public class DeclarationIndex_TestCase {
         assertFalse(index.isDeclared(undeclared));
         // An anonymous ontology still has an identifier of its own, so it needs no special case.
         assertEquals(Collections.singleton(anonymous.getOntologyID()),
-                index.getUsingOntologies(undeclared));
+                index.getMentioningOntologies(undeclared));
     }
 
     @Test

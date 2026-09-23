@@ -8,6 +8,7 @@ import org.protege.editor.core.prefs.PreferencesManager;
 import org.protege.editor.owl.model.declaration.EntityDeclarationPreferences;
 
 import javax.swing.JCheckBox;
+import javax.swing.JLabel;
 import java.awt.Component;
 import java.awt.Container;
 import java.util.ArrayList;
@@ -15,6 +16,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -31,6 +33,10 @@ public class AxiomsPreferencesPanelDeclarations_TestCase {
     private static final String PREFERENCES_KEY = "org.protege.editor.owl.declaration";
 
     private static final String SUPPRESS_KEY = "suppress.automatic.entity.declarations";
+
+    // A fragment rather than the whole sentence: the wording is escaped before it is shown.
+    private static final String SUPPRESS_HELP_TEXT_FRAGMENT =
+            "Prevents Prot\u00e9g\u00e9 from automatically adding missing entity declarations.";
 
     private boolean hadStoredValue;
 
@@ -97,6 +103,28 @@ public class AxiomsPreferencesPanelDeclarations_TestCase {
     }
 
     @Test
+    public void shouldExplainTheControlBeneathIt() {
+        AxiomsPreferencesPanel panel = buildPanel();
+        JCheckBox box = declarationCheckBoxOf(panel);
+        List<Component> order = componentsOf(panel);
+
+        int next = order.indexOf(box) + 1;
+        assertTrue("the declaration control has nothing after it", next < order.size());
+        Component explanation = order.get(next);
+        assertTrue("the declaration control is not explained beneath it",
+                explanation instanceof JLabel);
+        assertTrue("expected to read the explanation but read "
+                        + ((JLabel) explanation).getText(),
+                ((JLabel) explanation).getText().contains(SUPPRESS_HELP_TEXT_FRAGMENT));
+    }
+
+    @Test
+    public void shouldNotExplainTheControlOnHover() {
+        assertNull("the declaration control still explains itself on hover",
+                declarationCheckBoxOf(buildPanel()).getToolTipText());
+    }
+
+    @Test
     public void shouldOfferExactlyOneDeclarationControl() {
         List<JCheckBox> matches = new ArrayList<>();
         for (JCheckBox checkBox : checkBoxesOf(buildPanel())) {
@@ -129,6 +157,22 @@ public class AxiomsPreferencesPanelDeclarations_TestCase {
             throw new AssertionError("The Axioms preferences panel failed to build", e);
         }
         return panel;
+    }
+
+    /** Every component of the panel, in the order the panel added them. */
+    private List<Component> componentsOf(Container container) {
+        List<Component> found = new ArrayList<>();
+        collectComponents(container, found);
+        return found;
+    }
+
+    private void collectComponents(Container container, List<Component> found) {
+        for (Component child : container.getComponents()) {
+            found.add(child);
+            if (child instanceof Container) {
+                collectComponents((Container) child, found);
+            }
+        }
     }
 
     private List<JCheckBox> checkBoxesOf(Container container) {
