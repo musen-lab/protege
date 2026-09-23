@@ -160,7 +160,7 @@ public class MisplacedDeclarationPreferences_TestCase {
             @Override
             public OwnershipRuleDisplay getDisplay() {
                 return OwnershipRuleDisplay.get("Stand-in rule",
-                        "<html>Owns nothing.<br><br>Used by tests only.</html>");
+                        "Owns nothing. Used by tests only.");
             }
 
             @Override

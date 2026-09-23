@@ -366,8 +366,7 @@ public class MisplacedDeclarationChecker_TestCase {
             @Override
             public OwnershipRuleDisplay getDisplay() {
                 return OwnershipRuleDisplay.get("Stand-in rule",
-                        "<html>Names one ontology as the owner of everything."
-                                + "<br><br>Used by tests only.</html>");
+                        "Names one ontology as the owner of everything. Used by tests only.");
             }
 
             @Override

@@ -1,5 +1,6 @@
 package org.protege.editor.owl.ui.preferences;
 
+import com.google.common.html.HtmlEscapers;
 import org.protege.editor.core.ui.preferences.PreferencesLayoutPanel;
 import org.protege.editor.owl.model.declaration.EntityDeclarationPreferences;
 import org.protege.editor.owl.model.declaration.MisplacedDeclarationPreferences;
@@ -16,7 +17,8 @@ import java.util.Map;
 /**
  * Displays axiom-related settings in Preferences.
  *
- * <p>The panel keeps these settings in one place. Each setting controls a separate behavior.
+ * <p>The panel keeps these settings in one place. Each setting controls a separate behavior, and
+ * each carries its explanation as help text beneath it rather than on hover.
  *
  * @author Josef Hardi
  */
@@ -25,23 +27,22 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
     private static final String SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_LABEL =
             "Suppress automatic entity declarations when saving";
 
-    private static final String SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_TOOLTIP =
-            "<html>By default, Protégé adds a declaration axiom for an entity to each "
-                    + "ontology in which the entity is not already declared. We strongly "
-                    + "recommend keeping this behavior enabled, because declaration axioms "
-                    + "make ontology parsing much more robust, particularly when imported "
-                    + "ontologies cannot be resolved or loaded.<br><br>"
-                    + "You can disable this behavior to prevent declaration axioms from "
-                    + "being added automatically.";
+    private static final String SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_HELP_TEXT =
+            "Prevents Protégé from automatically adding missing entity declarations. "
+                    + "Leave this option off unless necessary, because declaration axioms "
+                    + "help ontologies load reliably when imports are unavailable.";
 
-    private static final String MISPLACED_GROUP_LABEL = "Misplaced declarations";
+    private static final String MISPLACED_GROUP_LABEL = "Misplaced declaration rules";
 
-    private static final String MISPLACED_HELP_TEXT =
-            "Reports when an entity is declared outside the ontology that appears to own its identifier.";
+    /** Sized for the narrowest dialog the application builds, not the default one, and left with
+     * enough margin that a longer group heading or a different look and feel cannot overflow it. */
+    private static final int HELP_TEXT_WIDTH = 450;
 
     private final List<OwnershipRule> ownershipRules;
 
     private final Map<OwnershipRule, JCheckBox> ownershipRuleCheckBoxes = new LinkedHashMap<>();
+
+    private final Map<OwnershipRule, JLabel> ownershipRuleHelpLabels = new LinkedHashMap<>();
 
     private JCheckBox suppressAutomaticEntityDeclarationsCheckBox;
 
@@ -67,7 +68,6 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
 
         suppressAutomaticEntityDeclarationsCheckBox = new JCheckBox(SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_LABEL,
                 EntityDeclarationPreferences.getInstance().isSuppressingAutomaticDeclarations());
-        suppressAutomaticEntityDeclarationsCheckBox.setToolTipText(SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_TOOLTIP);
         // The ownership rules govern what the check reports, and nothing is reported while saving
         // writes the declarations itself. They follow this box rather than the stored setting, so
         // ticking it makes them usable at once.
@@ -76,6 +76,7 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
 
         panel.addGroup("Declarations");
         panel.addGroupComponent(suppressAutomaticEntityDeclarationsCheckBox);
+        panel.addHelpText(wrapped(SUPPRESS_AUTOMATIC_ENTITY_DECLARATIONS_HELP_TEXT));
 
         panel.addVerticalPadding();
         panel.addGroup(MISPLACED_GROUP_LABEL);
@@ -84,11 +85,10 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
         for (OwnershipRule rule : ownershipRules) {
             OwnershipRuleDisplay display = rule.getDisplay();
             JCheckBox checkBox = new JCheckBox(display.getLabel(), misplacedPreferences.isRuleEnabled(rule));
-            checkBox.setToolTipText(display.getTooltipHtmlText());
             ownershipRuleCheckBoxes.put(rule, checkBox);
             panel.addGroupComponent(checkBox);
+            ownershipRuleHelpLabels.put(rule, panel.addHelpTextComponent(wrapped(display.getHelpText())));
         }
-        panel.addHelpText(MISPLACED_HELP_TEXT);
         refreshOwnershipRuleAvailability();
     }
 
@@ -102,10 +102,18 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
                 (rule, checkBox) -> misplacedPreferences.setRuleEnabled(rule, checkBox.isSelected()));
     }
 
-    /** Ownership rule controls are usable only while automatic declarations are suppressed. */
+    /** Renders prose as a label that wraps, so that no wording can widen the dialog. The width is
+     * deliberately unitless: Swing scales a CSS {@code px} value by 96/72. */
+    private static String wrapped(String helpText) {
+        return "<html><body style='width:" + HELP_TEXT_WIDTH + "'>"
+                + HtmlEscapers.htmlEscaper().escape(helpText)
+                + "</body></html>";
+    }
+
     private void refreshOwnershipRuleAvailability() {
         boolean checksRun = suppressAutomaticEntityDeclarationsCheckBox.isSelected();
         ownershipRuleCheckBoxes.values().forEach(checkBox -> checkBox.setEnabled(checksRun));
+        ownershipRuleHelpLabels.values().forEach(label -> label.setEnabled(checksRun));
     }
 
     /** This panel does not hold any resources that need to be released. */

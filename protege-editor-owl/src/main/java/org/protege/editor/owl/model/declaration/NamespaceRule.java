@@ -27,10 +27,8 @@ final class NamespaceRule implements OwnershipRule {
     @Nonnull
     private static final OwnershipRuleDisplay DISPLAY = OwnershipRuleDisplay.get(
             "Decide ownership from the IRI prefix",
-            "<html>Matches an entity's IRI prefix to an ontology IRI. "
-                    + "For example, <b>http://example.org/base#Term</b> matches "
-                    + "<b>http://example.org/base</b>."
-                    + "<br><br>Use this rule when entity IRIs are based on the ontology IRI.</html>");
+            "Matches an entity's IRI prefix to an ontology IRI: "
+                    + "http://example.org/base#Term matches http://example.org/base.");
 
     @Override
     @Nonnull

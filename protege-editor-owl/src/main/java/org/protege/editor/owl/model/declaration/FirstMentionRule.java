@@ -36,12 +36,8 @@ final class FirstMentionRule implements OwnershipRule {
     @Nonnull
     private static final OwnershipRuleDisplay DISPLAY = OwnershipRuleDisplay.get(
             "Decide ownership from the import closure",
-            "<html>Matches an entity to the first document in the import closure that mentions it. "
-                    + "For example, a term used in <b>core.owl</b> and declared in <b>sales.owl</b> "
-                    + "belongs to <b>core.owl</b>."
-                    + "<br><br>Use this rule when entity IRIs are not built from the ontology IRI, "
-                    + "so neither of the other rules can decide ownership. It reports nothing when "
-                    + "two documents mention a term side by side.</html>");
+            "Matches an entity to the first document in the closure that mentions it: a term used "
+                    + "in core.owl but declared in sales.owl belongs to core.owl.");
 
     @Override
     @Nonnull
