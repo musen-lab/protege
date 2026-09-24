@@ -1600,6 +1600,12 @@
         <class value="org.protege.editor.owl.ui.annotation.EntityCreationMetadataPreferencesPanel"/>
     </extension>
 
+    <extension id="ui.jsonld.prefs"
+               point="org.protege.editor.core.application.preferencespanel">
+        <label value="JSON-LD"/>
+        <class value="org.protege.editor.owl.ui.preferences.JsonLdPreferencesPanel"/>
+    </extension>
+
     <extension id="ui.preferences.explanation.general"
                point="org.protege.editor.core.application.explanationpreferencespanel">
         <label value="General"/>
