@@ -211,6 +211,7 @@ public class MisplacedDeclarationChecker_TestCase {
         assertNotNull(report);
         assertTrue(report.isEmpty());
         assertEquals(0, report.size());
+        assertEquals(DeclarationCheckStatus.EXECUTED, report.getStatus());
     }
 
     @Test
@@ -246,7 +247,11 @@ public class MisplacedDeclarationChecker_TestCase {
     public void shouldReportNothingWhenBothRulesAreSwitchedOff() throws Exception {
         OWLOntology root = twoRuleClosure();
 
-        assertTrue(checkerWith().check(root).isEmpty());
+        MisplacedDeclarationReport report = checkerWith().check(root);
+
+        assertTrue(report.isEmpty());
+        // Not having run is not the same as having found nothing.
+        assertEquals(DeclarationCheckStatus.MISPLACED_SKIPPED, report.getStatus());
         // The missing-declaration findings are unaffected by the misplaced rules.
         assertFalse(new MissingDeclarationChecker().check(root).isEmpty());
     }

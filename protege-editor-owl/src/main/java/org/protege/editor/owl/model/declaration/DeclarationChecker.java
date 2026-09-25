@@ -1,6 +1,5 @@
 package org.protege.editor.owl.model.declaration;
 
-import com.google.common.collect.ImmutableList;
 import org.semanticweb.owlapi.model.OWLOntology;
 
 import javax.annotation.Nonnull;
@@ -58,16 +57,17 @@ public class DeclarationChecker {
      * Checks an ontology and its imports for declaration problems.
      *
      * @param ontology the ontology to check
-     * @return the missing and misplaced declaration findings, or an empty report while automatic
-     *         entity declarations are not suppressed
+     * @return the missing and misplaced declaration findings, or both kinds reported as not run
+     *         while automatic entity declarations are not suppressed
      */
     @Nonnull
     public DeclarationReport check(@Nonnull OWLOntology ontology) {
         checkNotNull(ontology);
         // Read once per run, so turning the setting on or off takes effect on the next run.
         if (!suppressingAutomaticDeclarations.getAsBoolean()) {
-            return DeclarationReport.get(MissingDeclarationReport.get(ImmutableList.of()),
-                    MisplacedDeclarationReport.get(ImmutableList.of()));
+            return DeclarationReport.get(
+                    MissingDeclarationReport.skipped(DeclarationCheckStatus.SKIPPED),
+                    MisplacedDeclarationReport.skipped(DeclarationCheckStatus.SKIPPED));
         }
         DeclarationIndex index = DeclarationIndex.over(ontology);
         return DeclarationReport.get(missingChecker.check(index), misplacedChecker.check(index));

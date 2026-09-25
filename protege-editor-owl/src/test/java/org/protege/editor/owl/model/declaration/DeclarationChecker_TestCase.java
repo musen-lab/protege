@@ -1,5 +1,6 @@
 package org.protege.editor.owl.model.declaration;
 
+import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.semanticweb.owlapi.model.OWLOntology;
 
@@ -23,7 +24,7 @@ public class DeclarationChecker_TestCase {
 
         assertEquals(new MissingDeclarationChecker().check(leaf).getFindings(),
                 report.getMissing().getFindings());
-        assertEquals(entityNames(new MisplacedDeclarationChecker().check(leaf)),
+        assertEquals(entityNames(new MisplacedDeclarationChecker(OwnershipRules::registered).check(leaf)),
                 entityNames(report.getMisplaced()));
         assertEquals(singletonList(ClosureFixtures.BASE + "#Misplaced"),
                 entityNames(report.getMisplaced()));
@@ -48,6 +49,8 @@ public class DeclarationChecker_TestCase {
         assertTrue(report.isEmpty());
         assertTrue(report.getMissing().isEmpty());
         assertTrue(report.getMisplaced().isEmpty());
+        assertEquals(DeclarationCheckStatus.EXECUTED, report.getMissing().getStatus());
+        assertEquals(DeclarationCheckStatus.EXECUTED, report.getMisplaced().getStatus());
     }
 
     @Test
@@ -60,6 +63,39 @@ public class DeclarationChecker_TestCase {
 
         assertTrue(report.isEmpty());
         assertTrue(report.getMissing().isEmpty());
+        assertTrue(report.getMisplaced().isEmpty());
+        assertEquals(DeclarationCheckStatus.SKIPPED,
+                report.getMissing().getStatus());
+        assertEquals(DeclarationCheckStatus.SKIPPED,
+                report.getMisplaced().getStatus());
+    }
+
+    @Test
+    public void shouldNotWalkTheClosureWhileAutomaticDeclarationsAreWritten() throws Exception {
+        RecordingMissingChecker missing = new RecordingMissingChecker();
+        RecordingMisplacedChecker misplaced = new RecordingMisplacedChecker();
+
+        new DeclarationChecker(missing, misplaced, () -> false)
+                .check(ClosureFixtures.threeLevelClosure());
+
+        assertNull(missing.index);
+        assertNull(misplaced.index);
+    }
+
+    @Test
+    public void shouldRunTheMissingCheckAloneWhenEveryOwnershipRuleIsDisabled() throws Exception {
+        OWLOntology leaf = ClosureFixtures.threeLevelClosure();
+        DeclarationChecker checker = new DeclarationChecker(new MissingDeclarationChecker(),
+                new MisplacedDeclarationChecker(ImmutableList::of), () -> true);
+
+        DeclarationReport report = checker.check(leaf);
+
+        assertEquals(DeclarationCheckStatus.EXECUTED, report.getMissing().getStatus());
+        assertEquals(new MissingDeclarationChecker().check(leaf).getFindings(),
+                report.getMissing().getFindings());
+        assertFalse(report.getMissing().isEmpty());
+        assertEquals(DeclarationCheckStatus.MISPLACED_SKIPPED,
+                report.getMisplaced().getStatus());
         assertTrue(report.getMisplaced().isEmpty());
     }
 

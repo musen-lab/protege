@@ -41,7 +41,7 @@ public class MissingDeclarationFixture_TestCase {
                 IRI.create(new File(FIXTURES, "base.ttl"))));
         module = manager.loadOntologyFromOntologyDocument(new File(FIXTURES, "module.ttl"));
         checker = new MissingDeclarationChecker();
-        misplacedChecker = new MisplacedDeclarationChecker();
+        misplacedChecker = new MisplacedDeclarationChecker(OwnershipRules::registered);
     }
 
     @Test

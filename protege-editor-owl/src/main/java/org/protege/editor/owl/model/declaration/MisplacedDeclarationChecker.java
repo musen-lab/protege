@@ -74,7 +74,7 @@ public class MisplacedDeclarationChecker {
         // Read the settings once, so a value changed mid-run cannot split the result between rules.
         ImmutableList<OwnershipRule> rules = enabledRules.get();
         if (rules.isEmpty()) {
-            return MisplacedDeclarationReport.get(ImmutableList.of());
+            return MisplacedDeclarationReport.skipped(DeclarationCheckStatus.MISPLACED_SKIPPED);
         }
         OwnershipPolicy policy = OwnershipPolicy.over(rules, index);
         return MisplacedDeclarationReport.get(index.getEntities()
