@@ -19,6 +19,7 @@ import org.protege.editor.owl.model.search.SearchManagerSelector;
 import org.protege.editor.owl.ui.OntologyFormatPanel;
 import org.protege.editor.owl.ui.Extensions;
 import org.protege.editor.owl.ui.UIHelper;
+import org.protege.editor.owl.ui.declaration.DeclarationIssuesReporter;
 import org.protege.editor.owl.ui.error.OntologyLoadErrorHandlerUI;
 import org.protege.editor.owl.ui.explanation.ExplanationManager;
 import org.protege.editor.owl.ui.ontology.OntologyPreferences;
@@ -266,12 +267,14 @@ public class OWLEditorKit extends AbstractEditorKit<OWLEditorKitFactory> {
                 }
             }
             Map<OWLOntology, OWLOntologyStorageException> saveErrors = new LinkedHashMap<>();
+            boolean anyOntologyWritten = false;
             for (OWLOntology ontology : ontologiesToSaveAs) {
                 try {
                     if (!handleSaveAs(ontology)) {
                         // SaveAs aborted.  Abort all?
                         return;
                     }
+                    anyOntologyWritten = true;
                 } catch (OWLOntologyStorageException e) {
                     //noinspection ThrowableResultOfMethodCallIgnored
                     saveErrors.put(ontology, e);
@@ -280,6 +283,7 @@ public class OWLEditorKit extends AbstractEditorKit<OWLEditorKitFactory> {
             for (OWLOntology ontology : ontologiesToSave) {
                 try {
                     getOWLModelManager().save(ontology);
+                    anyOntologyWritten = true;
                 } catch (OWLOntologyStorageException e) {
                     //noinspection ThrowableResultOfMethodCallIgnored
                     saveErrors.put(ontology, e);
@@ -289,7 +293,9 @@ public class OWLEditorKit extends AbstractEditorKit<OWLEditorKitFactory> {
             newPhysicalURIs.forEach(this::addRecent);
             newPhysicalURIs.clear();
             handleSaveErrors(saveErrors);
-
+            if (anyOntologyWritten) {
+                reportDeclarationIssues(activeOntology);
+            }
         } finally {
             logger.info(LogBanner.end());
         }
@@ -324,7 +330,9 @@ public class OWLEditorKit extends AbstractEditorKit<OWLEditorKitFactory> {
     public void handleSaveAs() {
         final OWLOntology ont = getModelManager().getActiveOntology();
         try {
-            handleSaveAs(ont);
+            if (handleSaveAs(ont)) {
+                reportDeclarationIssues(ont);
+            }
         } catch (OWLOntologyStorageException e) {
             Map<OWLOntology, OWLOntologyStorageException> saveErrorMap = new HashMap<>();
             //noinspection ThrowableResultOfMethodCallIgnored
@@ -333,6 +341,13 @@ public class OWLEditorKit extends AbstractEditorKit<OWLEditorKitFactory> {
         }
     }
 
+
+    /**
+     * Reports any issues found when checking entity declarations.
+     */
+    private void reportDeclarationIssues(@Nonnull OWLOntology ontology) {
+        new DeclarationIssuesReporter(getWorkspace()).report(ontology);
+    }
 
     /**
      * Saves the specified ontology to a location that is specified by the user before the save operation.
