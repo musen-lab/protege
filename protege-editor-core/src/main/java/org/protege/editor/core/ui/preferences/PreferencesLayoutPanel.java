@@ -163,12 +163,16 @@ public class PreferencesLayoutPanel extends JComponent {
     }
 
     public void addHelpText(String helpText) {
+        addHelpTextComponent(helpText);
+    }
+    
+    public JLabel addHelpTextComponent(String helpText) {
         JLabel label = new JLabel(helpText);
         label.setFont(label.getFont().deriveFont(Font.PLAIN, 10f));
         label.setForeground(Color.GRAY);
         label.setBorder(BorderFactory.createEmptyBorder(3, 20, 7, 0));
         addGroupComponent(label);
-
+        return label;
     }
 
     public void addLabelledGroupComponent(String label, JComponent component) {

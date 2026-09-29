@@ -83,6 +83,28 @@ public class MissingDeclarationReport_TestCase {
     }
 
     @Test
+    public void shouldRecordThatACheckWhichFoundNothingRan() {
+        assertEquals(DeclarationCheckStatus.EXECUTED,
+                MissingDeclarationReport.get(Collections.emptyList()).getStatus());
+        assertEquals(DeclarationCheckStatus.EXECUTED, report.getStatus());
+    }
+
+    @Test
+    public void shouldRecordWhyACheckDidNotRunAndHoldNoFindings() {
+        MissingDeclarationReport skipped = MissingDeclarationReport.skipped(
+                DeclarationCheckStatus.SKIPPED);
+
+        assertEquals(DeclarationCheckStatus.SKIPPED, skipped.getStatus());
+        assertTrue(skipped.isEmpty());
+        assertTrue(skipped.getFindings().isEmpty());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void shouldRefuseANotCheckedReportWithoutAReason() {
+        MissingDeclarationReport.skipped(DeclarationCheckStatus.EXECUTED);
+    }
+
+    @Test
     public void shouldExposeEntityTypeSeverityAndReferringOntologiesOnAFinding() throws Exception {
         OWLOntology ontology = OWLManager.createOWLOntologyManager()
                 .createOntology(IRI.create("http://example.org/one"));
