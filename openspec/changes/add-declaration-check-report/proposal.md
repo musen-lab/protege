@@ -14,7 +14,9 @@ problems cannot do so on demand without first changing those preferences. There 
 - Present the findings in a report dialog modeled on the existing "Loaded ontology sources" dialog:
   a resizable plain dialog containing a scrollable list, with the findings grouped into the two
   existing sections - missing entity declarations and misplaced entity declarations - each showing
-  a count and readable per-entity rows. Misplaced rows name the ownership rule that identified them.
+  a count and readable per-entity rows. Every row shows the finding's severity; missing rows name
+  the ontologies that use the entity, and misplaced rows name the ownership rule that identified
+  them, the owning ontology, and the declaring ontologies.
 - Show an explicit no-issues result when both sections are empty, and present a check failure as an
   error rather than a clean report.
 - The action is read-only: it changes no preference and modifies no ontology axioms. The existing
