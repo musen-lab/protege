@@ -8,11 +8,11 @@ import org.protege.editor.owl.OWLEditorKit;
 import org.protege.editor.owl.model.declaration.DeclarationReportOutline;
 import org.protege.editor.owl.model.declaration.MisplacedDeclarationFinding;
 import org.protege.editor.owl.model.declaration.MissingDeclarationFinding;
+import org.protege.editor.owl.model.declaration.OntologyIdFormat;
 import org.protege.editor.owl.ui.renderer.OWLCellRenderer;
 import org.semanticweb.owlapi.model.OWLEntity;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
@@ -43,7 +43,7 @@ public final class DeclarationCheckReportPanel extends JPanel {
 
     static final String NO_MISPLACED_DECLARATIONS = "No misplaced entity declarations.";
 
-    private static final String RULE_LABEL_PREFIX = "Ownership rule: ";
+    private static final String DETAIL_SEPARATOR = " | ";
 
     private final OWLEditorKit owlEditorKit;
 
@@ -99,7 +99,7 @@ public final class DeclarationCheckReportPanel extends JPanel {
             rows.add(new MessageRow(NO_MISSING_DECLARATIONS));
         } else {
             for (MissingDeclarationFinding finding : outline.getMissing()) {
-                rows.add(new FindingRow(finding.getEntity(), null));
+                rows.add(new FindingRow(finding.getEntity(), missingDetail(finding)));
             }
         }
         rows.add(new SectionHeader(outline.getMisplacedSection().getHeading()));
@@ -107,11 +107,24 @@ public final class DeclarationCheckReportPanel extends JPanel {
             rows.add(new MessageRow(NO_MISPLACED_DECLARATIONS));
         } else {
             for (MisplacedDeclarationFinding finding : outline.getMisplaced()) {
-                rows.add(new FindingRow(finding.getEntity(),
-                        RULE_LABEL_PREFIX + DeclarationReportOutline.ruleLabelOf(finding)));
+                rows.add(new FindingRow(finding.getEntity(), misplacedDetail(finding)));
             }
         }
         return rows;
+    }
+
+    @Nonnull
+    private static String missingDetail(@Nonnull MissingDeclarationFinding finding) {
+        return "Severity: " + finding.getSeverity()
+                + DETAIL_SEPARATOR + "Used in: " + OntologyIdFormat.formatAll(finding.getReferringOntologies());
+    }
+
+    @Nonnull
+    private static String misplacedDetail(@Nonnull MisplacedDeclarationFinding finding) {
+        return "Severity: " + finding.getSeverity()
+                + DETAIL_SEPARATOR + "Ownership rule: " + DeclarationReportOutline.ruleLabelOf(finding)
+                + DETAIL_SEPARATOR + "Owned by: " + OntologyIdFormat.format(finding.getOwningOntology())
+                + DETAIL_SEPARATOR + "Declared in: " + OntologyIdFormat.formatAll(finding.getDeclaringOntologies());
     }
 
     /**
@@ -149,10 +162,8 @@ public final class DeclarationCheckReportPanel extends JPanel {
             findingPanel.setOpaque(true);
             findingPanel.setBackground(isSelected ? list.getSelectionBackground() : list.getBackground());
             findingPanel.add(entityComponent, BorderLayout.CENTER);
-            if (row.getDetail() != null) {
-                detailLabel.setText(row.getDetail());
-                findingPanel.add(detailLabel, BorderLayout.SOUTH);
-            }
+            detailLabel.setText(row.getDetail());
+            findingPanel.add(detailLabel, BorderLayout.SOUTH);
             return findingPanel;
         }
     }
@@ -183,12 +194,12 @@ public final class DeclarationCheckReportPanel extends JPanel {
         @Nonnull
         private final OWLEntity entity;
 
-        @Nullable
+        @Nonnull
         private final String detail;
 
-        FindingRow(@Nonnull OWLEntity entity, @Nullable String detail) {
+        FindingRow(@Nonnull OWLEntity entity, @Nonnull String detail) {
             this.entity = checkNotNull(entity);
-            this.detail = detail;
+            this.detail = checkNotNull(detail);
         }
 
         @Nonnull
@@ -196,7 +207,7 @@ public final class DeclarationCheckReportPanel extends JPanel {
             return entity;
         }
 
-        @Nullable
+        @Nonnull
         String getDetail() {
             return detail;
         }

@@ -36,7 +36,7 @@ public class DeclarationCheckReportPanel_TestCase {
     }
 
     @Test
-    public void shouldLabelMisplacedRowsWithTheOwnershipRule() {
+    public void shouldDescribeMisplacedRowsWithSeverityRuleOwnerAndDeclaringOntologies() {
         DeclarationReportOutline outline = DeclarationReportOutline.of(report(0, 0, 1));
         MisplacedDeclarationFinding finding = outline.getMisplaced().get(0);
 
@@ -46,19 +46,25 @@ public class DeclarationCheckReportPanel_TestCase {
         DeclarationCheckReportPanel.FindingRow misplacedRow =
                 (DeclarationCheckReportPanel.FindingRow) rows.get(3);
         assertEquals(finding.getEntity(), misplacedRow.getEntity());
-        assertEquals("Ownership rule: " + DeclarationReportOutline.ruleLabelOf(finding),
+        assertEquals("Severity: " + finding.getSeverity()
+                        + " | Ownership rule: " + DeclarationReportOutline.ruleLabelOf(finding)
+                        + " | Owned by: http://purl.obolibrary.org/obo/go.owl"
+                        + " | Declared in: http://example.org/pizza",
                 misplacedRow.getDetail());
     }
 
     @Test
-    public void shouldLeaveMissingRowsWithoutADetailLine() {
-        DeclarationReportOutline outline = DeclarationReportOutline.of(report(1, 0, 0));
+    public void shouldDescribeMissingRowsWithSeverityAndReferringOntologies() {
+        DeclarationReportOutline outline = DeclarationReportOutline.of(report(1, 1, 0));
 
         List<Object> rows = DeclarationCheckReportPanel.rows(outline);
 
-        DeclarationCheckReportPanel.FindingRow missingRow =
+        DeclarationCheckReportPanel.FindingRow errorRow =
                 (DeclarationCheckReportPanel.FindingRow) rows.get(1);
-        assertNull(missingRow.getDetail());
+        DeclarationCheckReportPanel.FindingRow warningRow =
+                (DeclarationCheckReportPanel.FindingRow) rows.get(2);
+        assertEquals("Severity: ERROR | Used in: http://example.org/pizza", errorRow.getDetail());
+        assertEquals("Severity: WARNING | Used in: http://example.org/pizza", warningRow.getDetail());
     }
 
     @Test

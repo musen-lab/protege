@@ -11,11 +11,12 @@
 - [x] 2.1 Add `DeclarationCheckReportPanel` modeled on `PhysicalLocationPanel`: a resizable
       `JOptionPane(PLAIN_MESSAGE)` host with an `MList` in a scroll pane.
 - [x] 2.2 Build rows from `DeclarationReportOutline`: a counted section header per section, entity
-      rows rendered with `OWLCellRenderer`, and the ownership-rule label on misplaced rows via
-      `DeclarationReportOutline.ruleLabelOf`.
+      rows rendered with `OWLCellRenderer`, and a detail line per row with the severity plus the
+      referring ontologies (missing) or the `DeclarationReportOutline.ruleLabelOf` label, owning
+      ontology, and declaring ontologies (misplaced).
 - [x] 2.3 Show an explicit placeholder row when a section is empty so an all-empty report is an
       unmistakable no-issues result.
-- [x] 2.4 Add tests for row grouping, misplaced rule labels, and the empty-section placeholders.
+- [x] 2.4 Add tests for row grouping, per-row detail lines, and the empty-section placeholders.
 
 ## 3. Tools menu action
 

@@ -55,8 +55,10 @@ SHALL NOT alter the behavior of the save-time declaration warning.
 
 The report SHALL present findings in a resizable dialog containing a scrollable list, grouping them
 into a missing-entity-declarations section and a misplaced-entity-declarations section. Each section
-SHALL show its finding count, and each finding SHALL appear as a readable per-entity row. A
-misplaced finding's row SHALL identify the ownership rule that selected it.
+SHALL show its finding count, and each finding SHALL appear as a readable per-entity row that shows
+the finding's severity. A missing finding's row SHALL name the ontologies that use the entity. A
+misplaced finding's row SHALL identify the ownership rule that selected it, the owning ontology, and
+the ontologies that declare the entity.
 
 #### Scenario: Findings grouped into two counted sections
 
@@ -64,10 +66,16 @@ misplaced finding's row SHALL identify the ownership rule that selected it.
 - **THEN** the report shows a missing-entity-declarations section and a misplaced-entity-declarations
   section, each headed by its count, with one row per finding
 
-#### Scenario: Misplaced row names its ownership rule
+#### Scenario: Missing row names its severity and referring ontologies
+
+- **WHEN** the report shows a missing-declaration finding
+- **THEN** that finding's row shows its severity and the ontologies in which the entity is used
+
+#### Scenario: Misplaced row names its ownership rule and ontologies
 
 - **WHEN** the report shows a misplaced-declaration finding
-- **THEN** that finding's row shows the label of the ownership rule that identified it
+- **THEN** that finding's row shows its severity, the label of the ownership rule that identified
+  it, the owning ontology, and the ontologies that declare the entity
 
 ### Requirement: Explicit no-issues and failure results
 

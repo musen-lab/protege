@@ -27,8 +27,10 @@ additionally skips when no ownership rule is enabled.
   same shape as the "Loaded ontology sources" dialog the captain referenced.
 - **Reuse `DeclarationReportOutline` as the data source.** The panel builds its rows from the
   outline's sections and findings rather than recomputing anything. Section headers use each
-  section's heading (title plus count); entity rows render with the shared `OWLCellRenderer`; a
-  misplaced row's detail line uses `DeclarationReportOutline.ruleLabelOf`.
+  section's heading (title plus count); entity rows render with the shared `OWLCellRenderer`; every
+  row's detail line shows the finding's severity, a missing row adds the referring ontologies, and
+  a misplaced row adds the `DeclarationReportOutline.ruleLabelOf` label, the owning ontology, and
+  the declaring ontologies, all formatted with `OntologyIdFormat` like the log writer.
 - **Explicit empty and failure results.** When a section has no findings the panel shows a
   placeholder row, so an all-empty report is an unmistakable no-issues result. The action catches a
   check failure and shows an error dialog instead of an empty report.
