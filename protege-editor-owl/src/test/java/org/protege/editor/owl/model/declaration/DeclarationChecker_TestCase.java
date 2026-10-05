@@ -132,6 +132,21 @@ public class DeclarationChecker_TestCase {
                 checker.check(leaf).isEmpty());
     }
 
+    @Test
+    public void shouldForceBothChecksToRunRegardlessOfPreferences() throws Exception {
+        OWLOntology leaf = ClosureFixtures.threeLevelClosure();
+
+        // forcingAllChecks ignores the suppression setting and uses every registered ownership
+        // rule, so both checks run even though the save-time path would skip them here.
+        DeclarationReport report = DeclarationChecker.forcingAllChecks().check(leaf);
+
+        assertEquals(DeclarationCheckStatus.EXECUTED, report.getMissing().getStatus());
+        assertEquals(DeclarationCheckStatus.EXECUTED, report.getMisplaced().getStatus());
+        assertFalse(report.getMissing().isEmpty());
+        assertEquals(singletonList(ClosureFixtures.BASE + "#Misplaced"),
+                entityNames(report.getMisplaced()));
+    }
+
     private static DeclarationChecker checkerThatRuns() {
         return checkerSuppressing(true);
     }
