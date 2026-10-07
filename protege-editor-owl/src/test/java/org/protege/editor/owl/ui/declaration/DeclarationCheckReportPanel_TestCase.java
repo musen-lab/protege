@@ -3,191 +3,157 @@ package org.protege.editor.owl.ui.declaration;
 import org.junit.Test;
 import org.protege.editor.core.ui.list.MList;
 import org.protege.editor.core.ui.list.MListSectionHeader;
-import org.protege.editor.owl.model.declaration.DeclarationReportOutline;
-import org.protege.editor.owl.model.declaration.MisplacedDeclarationFinding;
+import org.protege.editor.owl.model.declaration.*;
+import org.semanticweb.owlapi.apibinding.OWLManager;
+import org.semanticweb.owlapi.model.*;
 
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.*;
 import static org.protege.editor.owl.model.declaration.DeclarationReportFixtures.report;
 
-/**
- * Tests how the manual declaration report groups findings into list rows.
- */
+/** Tests the two-line dialog presentation independently of checking and log diagnostics. */
 public class DeclarationCheckReportPanel_TestCase {
 
     @Test
-    public void shouldGroupFindingsUnderTheTwoSectionHeaders() {
+    public void shouldGroupFindingsAndKeepEmptySectionPlaceholders() {
         DeclarationReportOutline outline = DeclarationReportOutline.of(report(2, 1, 3));
-
-        List<Object> rows = DeclarationCheckReportPanel.rows(outline);
-
-        // header, 3 missing rows, header, 3 misplaced rows
+        List<Object> rows = DeclarationCheckReportPanel.rows(outline, Collections.emptyList());
         assertEquals(8, rows.size());
-        assertEquals(outline.getMissingSection().getHeading(), ((MListSectionHeader) rows.get(0)).getName());
         assertEquals("Missing entity declarations: 3", ((MListSectionHeader) rows.get(0)).getName());
-        for (int i = 1; i <= 3; i++) {
-            assertTrue(rows.get(i) instanceof DeclarationCheckReportPanel.FindingRow);
-        }
-        assertEquals(outline.getMisplacedSection().getHeading(), ((MListSectionHeader) rows.get(4)).getName());
         assertEquals("Misplaced entity declarations: 3", ((MListSectionHeader) rows.get(4)).getName());
-        for (int i = 5; i <= 7; i++) {
-            assertTrue(rows.get(i) instanceof DeclarationCheckReportPanel.FindingRow);
+        rows = DeclarationCheckReportPanel.rows(DeclarationReportOutline.of(report(0, 0, 0)), Collections.emptyList());
+        assertEquals(4, rows.size());
+        assertEquals(DeclarationCheckReportPanel.NO_MISSING_DECLARATIONS,
+                ((DeclarationCheckReportPanel.MessageRow) rows.get(1)).getText());
+        assertEquals(DeclarationCheckReportPanel.NO_MISPLACED_DECLARATIONS,
+                ((DeclarationCheckReportPanel.MessageRow) rows.get(3)).getText());
+    }
+
+    @Test
+    public void shouldUseOnlyActualLocalMentionsIncludingMultipleOntologies() throws Exception {
+        OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
+        OWLOntology root = manager.createOntology(IRI.create("http://example.org/root"));
+        OWLOntology module = manager.createOntology(IRI.create("http://example.org/module"));
+        OWLDataFactory df = manager.getOWLDataFactory();
+        manager.applyChange(new AddImport(root, df.getOWLImportsDeclaration(module.getOntologyID().getOntologyIRI().get())));
+        OWLClass entity = df.getOWLClass(IRI.create("http://example.org/Undeclared"));
+        manager.addAxiom(module, df.getOWLSubClassOfAxiom(entity, df.getOWLThing()));
+        // Deliberately supply ancestor-inclusive metadata: the dialog must inspect own signatures.
+        MissingDeclarationFinding finding = MissingDeclarationFinding.get(entity,
+                Arrays.asList(root.getOntologyID(), module.getOntologyID()));
+        DeclarationReportOutline outline = DeclarationReportOutline.of(DeclarationReport.get(
+                MissingDeclarationReport.get(Collections.singletonList(finding)),
+                MisplacedDeclarationReport.get(Collections.emptyList())));
+        assertEquals(Collections.singletonList("Used in: http://example.org/module"),
+                findingRow(outline, root.getImportsClosure(), 1).getDetail());
+        manager.addAxiom(root, df.getOWLSubClassOfAxiom(entity, df.getOWLThing()));
+        assertEquals(Collections.singletonList("Used in: http://example.org/module, http://example.org/root"),
+                findingRow(outline, root.getImportsClosure(), 1).getDetail());
+        assertEquals(1, new MissingDeclarationChecker().check(root).size());
+    }
+
+    @Test
+    public void shouldRenderExactlyTwoLabelsWithoutSeverityOrStandaloneRuleForBothMissingSeveritiesAndMisplaced() throws Exception {
+        DeclarationReportOutline outline = DeclarationReportOutline.of(report(1, 1, 1));
+        OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
+        OWLOntology pizza = manager.createOntology(IRI.create("http://example.org/pizza"));
+        for (MissingDeclarationFinding finding : outline.getMissing()) {
+            manager.addAxiom(pizza, manager.getOWLDataFactory().getOWLDeclarationAxiom(finding.getEntity()));
         }
-    }
-
-    @Test
-    public void shouldDescribeMisplacedRowsWithRuleOwnerAndDeclaringOntologiesWithoutSeverity() {
-        DeclarationReportOutline outline = DeclarationReportOutline.of(report(0, 0, 1));
-        MisplacedDeclarationFinding finding = outline.getMisplaced().get(0);
-
-        List<Object> rows = DeclarationCheckReportPanel.rows(outline);
-
-        // header(missing), placeholder(missing), header(misplaced), misplaced row
-        DeclarationCheckReportPanel.FindingRow misplacedRow =
-                (DeclarationCheckReportPanel.FindingRow) rows.get(3);
-        assertEquals(finding.getEntity(), misplacedRow.getEntity());
-        assertEquals(Arrays.asList(
-                        "Ownership rule: " + DeclarationReportOutline.ruleLabelOf(finding),
-                        "Owned by: http://purl.obolibrary.org/obo/go.owl",
-                        "Declared in: http://example.org/pizza"),
-                misplacedRow.getDetail());
-    }
-
-    @Test
-    public void shouldDescribeMissingRowsWithLocationWithoutSeverity() {
-        DeclarationReportOutline outline = DeclarationReportOutline.of(report(1, 1, 0));
-
-        List<Object> rows = DeclarationCheckReportPanel.rows(outline);
-
-        DeclarationCheckReportPanel.FindingRow errorRow =
-                (DeclarationCheckReportPanel.FindingRow) rows.get(1);
-        DeclarationCheckReportPanel.FindingRow warningRow =
-                (DeclarationCheckReportPanel.FindingRow) rows.get(2);
-        assertEquals(Arrays.asList("Location: http://example.org/pizza"), errorRow.getDetail());
-        assertEquals(Arrays.asList("Location: http://example.org/pizza"), warningRow.getDetail());
-    }
-
-    @Test
-    public void shouldRenderLocationOnlyForMissingRowsAndNeverRenderSeverity() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(
-                    new DefaultListCellRenderer(), DeclarationReportOutline.of(report(1, 1, 1)));
+                    new DefaultListCellRenderer(), outline, Collections.singletonList(pizza));
             MList list = findAll(panel, MList.class).get(0);
             for (int index : Arrays.asList(1, 2, 4)) {
                 Component rendered = list.getCellRenderer().getListCellRendererComponent(
                         list, list.getModel().getElementAt(index), index, false, false);
-                List<String> texts = new ArrayList<>();
-                for (JLabel label : findAll(rendered, JLabel.class)) {
-                    texts.add(label.getText());
+                List<JLabel> labels = findAll(rendered, JLabel.class);
+                assertEquals(2, labels.size());
+                String detail = labels.get(1).getText();
+                assertEquals(index == 4
+                        ? "Suggested placement: http://example.org/pizza → http://purl.obolibrary.org/obo/go.owl"
+                        : "Used in: http://example.org/pizza", detail);
+                for (JLabel label : labels) {
                     assertFalse(label.getText().contains("Severity:"));
-                    assertFalse(label.getText().contains("Used in:"));
+                    assertFalse(label.getText().contains("Ownership rule:"));
+                    assertFalse(label.getText().contains("Owned by:"));
                     assertFalse(label.getText().contains("ERROR"));
                     assertFalse(label.getText().contains("WARNING"));
-                }
-                assertEquals(index != 4, texts.contains("Location: http://example.org/pizza"));
-                if (index == 4) {
-                    assertTrue(texts.contains("Ownership rule: " + DeclarationReportOutline.ruleLabelOf(
-                            DeclarationReportOutline.of(report(1, 1, 1)).getMisplaced().get(0))));
-                    assertTrue(texts.contains("Owned by: http://purl.obolibrary.org/obo/go.owl"));
-                    assertTrue(texts.contains("Declared in: http://example.org/pizza"));
                 }
             }
         });
     }
 
     @Test
-    public void shouldShowExplicitPlaceholdersWhenBothSectionsAreEmpty() {
-        DeclarationReportOutline outline = DeclarationReportOutline.of(report(0, 0, 0));
-
-        List<Object> rows = DeclarationCheckReportPanel.rows(outline);
-
-        assertEquals(4, rows.size());
-        assertEquals("Missing entity declarations: 0", ((MListSectionHeader) rows.get(0)).getName());
-        assertEquals(DeclarationCheckReportPanel.NO_MISSING_DECLARATIONS,
-                ((DeclarationCheckReportPanel.MessageRow) rows.get(1)).getText());
-        assertEquals("Misplaced entity declarations: 0", ((MListSectionHeader) rows.get(2)).getName());
-        assertEquals(DeclarationCheckReportPanel.NO_MISPLACED_DECLARATIONS,
-                ((DeclarationCheckReportPanel.MessageRow) rows.get(3)).getText());
-    }
-
-    @Test
-    public void shouldShowEveryMisplacedDetailLineWithinTheDefaultDialogWidth() throws Exception {
-        // MList resets its cell height cache from resize events, so lay out on the event thread.
-        SwingUtilities.invokeAndWait(this::shouldShowEveryMisplacedDetailLineWithinTheDefaultDialogWidthOnEdt);
-    }
-
-    private void shouldShowEveryMisplacedDetailLineWithinTheDefaultDialogWidthOnEdt() {
-        DeclarationReportOutline outline = DeclarationReportOutline.of(report(1, 1, 1));
-        DeclarationCheckReportPanel panel =
-                new DeclarationCheckReportPanel(new DefaultListCellRenderer(), outline);
-        panel.setSize(panel.getPreferredSize());
-        layOut(panel);
-
-        JViewport viewport = findAll(panel, JViewport.class).get(0);
-        MList list = findAll(panel, MList.class).get(0);
-        int misplacedRowIndex = 4; // header, 2 missing rows, header, misplaced row
-        Rectangle rowBounds = list.getCellBounds(misplacedRowIndex, misplacedRowIndex);
-        Component row = list.getCellRenderer().getListCellRendererComponent(
-                list, list.getModel().getElementAt(misplacedRowIndex), misplacedRowIndex, false, false);
-        row.setSize(rowBounds.getSize());
-        layOut(row);
-
-        List<String> detailTexts = new ArrayList<>();
-        for (JLabel label : findAll(row, JLabel.class)) {
-            detailTexts.add(label.getText());
-            Rectangle labelBounds = SwingUtilities.convertRectangle(label.getParent(), label.getBounds(), row);
-            assertTrue("'" + label.getText() + "' is clipped by its row",
-                    labelBounds.height >= label.getPreferredSize().height
-                            && labelBounds.y + labelBounds.height <= rowBounds.height);
-        }
-        assertTrue("the report needs horizontal scrolling at the default size",
-                list.getPreferredSize().width <= viewport.getExtentSize().width);
-        assertTrue(detailTexts.contains("Declared in: http://example.org/pizza"));
-    }
-
-    @Test
-    public void shouldKeepTheListWithinTheViewportAcrossRepeatedLayouts() throws Exception {
-        DeclarationReportOutline outline = DeclarationReportOutline.of(report(1, 1, 1));
-        // Like OWLCellRenderer, size the entity to the width of the list's parent.
-        ListCellRenderer parentWidthRenderer = new DefaultListCellRenderer() {
-            @Override
-            public Component getListCellRendererComponent(JList list, Object value, int index,
-                                                          boolean isSelected, boolean cellHasFocus) {
-                JLabel label = (JLabel) super.getListCellRendererComponent(
-                        list, value, index, isSelected, cellHasFocus);
-                label.setPreferredSize(null);
-                Dimension size = label.getPreferredSize();
-                label.setPreferredSize(new Dimension(list.getParent().getWidth(), size.height));
-                return label;
-            }
-        };
-        DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(parentWidthRenderer, outline);
-        JScrollPane scrollPane = findAll(panel, JScrollPane.class).get(0);
-        MList list = findAll(panel, MList.class).get(0);
-
-        for (Dimension size : Arrays.asList(new Dimension(800, 500), new Dimension(1000, 600),
-                new Dimension(700, 500), new Dimension(800, 500))) {
-            // Each pass runs on the event thread and then lets the resize events queued by the
-            // layout run, as they would in the dialog: MList resets its cell cache on resize.
-            for (int pass = 0; pass < 3; pass++) {
-                SwingUtilities.invokeAndWait(() -> {
-                    panel.setSize(size);
+    public void shouldRetainAllDeclaringIrisBeforeExpectedOwnerOnOneScrollableLine() throws Exception {
+        String longIri = "http://example.org/" + String.join("", Collections.nCopies(100, "long-module-name"));
+        MisplacedDeclarationFinding finding = MisplacedDeclarationFinding.get(
+                OWLManager.getOWLDataFactory().getOWLClass(IRI.create("http://example.org/QuickBaking")),
+                new OWLOntologyID(IRI.create("http://example.org/pizza-fixture/baking")),
+                Arrays.asList(new OWLOntologyID(IRI.create("http://example.org/pizza-fixture/menu")),
+                        new OWLOntologyID(IRI.create(longIri))), "test-rule");
+        DeclarationReportOutline outline = DeclarationReportOutline.of(DeclarationReport.get(
+                MissingDeclarationReport.get(Collections.emptyList()),
+                MisplacedDeclarationReport.get(Collections.singletonList(finding))));
+        String expected = "Suggested placement: http://example.org/pizza-fixture/menu, " + longIri
+                + " → http://example.org/pizza-fixture/baking";
+        assertEquals(Collections.singletonList(expected), findingRow(outline, Collections.emptyList(), 3).getDetail());
+        SwingUtilities.invokeAndWait(() -> {
+            DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(
+                    new DefaultListCellRenderer(), outline, Collections.emptyList());
+            MList list = findAll(panel, MList.class).get(0);
+            for (int width : Arrays.asList(800, 1000, 700, 800)) {
+                panel.setSize(width, 500);
+                for (int pass = 0; pass < 3; pass++) {
                     layOut(panel);
-                });
+                }
+                JScrollPane scrollPane = findAll(panel, JScrollPane.class).get(0);
+                assertTrue(scrollPane.getHorizontalScrollBar().isVisible());
+                assertTrue(list.getPreferredSize().width > scrollPane.getViewport().getExtentSize().width);
+                Component rendered = list.getCellRenderer().getListCellRendererComponent(
+                        list, list.getModel().getElementAt(3), 3, false, false);
+                List<JLabel> labels = findAll(rendered, JLabel.class);
+                assertEquals(2, labels.size());
+                assertEquals(expected, labels.get(1).getText());
+                assertFalse(labels.get(1).getText().startsWith("<html>"));
+                Rectangle bounds = list.getCellBounds(3, 3);
+                rendered.setSize(bounds.getSize());
+                layOut(rendered);
+                for (JLabel label : labels) {
+                    Rectangle labelBounds = SwingUtilities.convertRectangle(label.getParent(), label.getBounds(), rendered);
+                    assertTrue(labelBounds.height >= label.getPreferredSize().height);
+                    assertTrue(labelBounds.y + labelBounds.height <= bounds.height);
+                }
             }
-            SwingUtilities.invokeAndWait(() -> {
-                int viewportWidth = scrollPane.getViewport().getExtentSize().width;
-                assertTrue("list width " + list.getWidth() + " exceeds viewport width " + viewportWidth,
-                        list.getWidth() <= viewportWidth);
-                assertFalse("the report shows a horizontal scrollbar at " + size,
-                        scrollPane.getHorizontalScrollBar().isVisible());
-            });
-        }
+        });
+    }
+
+    @Test
+    public void shouldFillViewportWithoutHorizontalScrollingWhenDetailsFit() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(new DefaultListCellRenderer(),
+                    DeclarationReportOutline.of(report(1, 1, 1)), Collections.emptyList());
+            for (int width : Arrays.asList(800, 1000, 800)) {
+                panel.setSize(width, 500);
+                for (int pass = 0; pass < 3; pass++) {
+                    layOut(panel);
+                }
+                JScrollPane scrollPane = findAll(panel, JScrollPane.class).get(0);
+                assertFalse(scrollPane.getHorizontalScrollBar().isVisible());
+                assertEquals(scrollPane.getViewport().getExtentSize().width, findAll(panel, MList.class).get(0).getWidth());
+            }
+        });
+    }
+
+    private static DeclarationCheckReportPanel.FindingRow findingRow(DeclarationReportOutline outline,
+            java.util.Collection<OWLOntology> ontologies, int index) {
+        return (DeclarationCheckReportPanel.FindingRow) DeclarationCheckReportPanel.rows(outline, ontologies).get(index);
     }
 
     private static void layOut(Component component) {

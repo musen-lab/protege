@@ -87,7 +87,7 @@ public final class DeclarationReportLogWriter {
             logger.info("  {}  {}", finding.getEntityType().getPrintName(), finding.getEntity().toStringID());
             logger.info("    owned by:    {}  (rule: {})", OntologyIdFormat.format(finding.getOwningOntology()),
                     DeclarationReportOutline.ruleLabelOf(finding));
-            logger.info("    declared in: {}", OntologyIdFormat.formatAll(finding.getDeclaringOntologies()));
+            logger.info("    {}", DeclarationReportOutline.suggestedPlacementOf(finding));
         }
         writeOmitted(logger, findings.size());
     }

@@ -72,6 +72,19 @@ public final class DeclarationReportOutline {
     }
 
     /**
+     * Formats the actual declaration locations followed by the expected owner, retaining all IRIs.
+     *
+     * @param finding the misplaced finding to present
+     * @return the placement detail shared by the dialog and log
+     */
+    @Nonnull
+    public static String suggestedPlacementOf(@Nonnull MisplacedDeclarationFinding finding) {
+        checkNotNull(finding);
+        return "Suggested placement: " + OntologyIdFormat.formatAll(finding.getDeclaringOntologies())
+                + " → " + OntologyIdFormat.format(finding.getOwningOntology());
+    }
+
+    /**
      * Formats a count for display in a report using English thousands separators.
      *
      * @param count the count to format

@@ -12,6 +12,10 @@ import org.protege.editor.owl.model.declaration.MissingDeclarationFinding;
 import org.protege.editor.owl.model.declaration.OntologyIdFormat;
 import org.protege.editor.owl.ui.renderer.OWLCellRenderer;
 import org.semanticweb.owlapi.model.OWLEntity;
+import org.semanticweb.owlapi.model.OWLOntology;
+import org.semanticweb.owlapi.model.parameters.Imports;
+import java.util.Collection;
+import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
 import javax.swing.*;
@@ -46,7 +50,8 @@ public final class DeclarationCheckReportPanel extends JPanel {
 
     DeclarationCheckReportPanel(@Nonnull OWLEditorKit owlEditorKit,
                                 @Nonnull DeclarationReportOutline outline) {
-        this(new OWLCellRenderer(checkNotNull(owlEditorKit)), outline);
+        this(new OWLCellRenderer(checkNotNull(owlEditorKit)), outline,
+                owlEditorKit.getOWLModelManager().getActiveOntology().getImportsClosure());
     }
 
     /**
@@ -56,13 +61,17 @@ public final class DeclarationCheckReportPanel extends JPanel {
      * @param outline the declaration report outline to present
      */
     DeclarationCheckReportPanel(@Nonnull ListCellRenderer entityRenderer,
-                                @Nonnull DeclarationReportOutline outline) {
+                                @Nonnull DeclarationReportOutline outline,
+                                @Nonnull Collection<OWLOntology> ontologies) {
         checkNotNull(entityRenderer);
+        if (entityRenderer instanceof OWLCellRenderer) {
+            ((OWLCellRenderer) entityRenderer).setWrap(false);
+        }
         checkNotNull(outline);
         setLayout(new BorderLayout(3, 3));
         MList list = new MList();
         list.setCellRenderer(new FindingCellRenderer(entityRenderer));
-        list.setListData(rows(outline).toArray());
+        list.setListData(rows(outline, ontologies).toArray());
         JPanel boxHolder = new ViewportWidthPanel();
         boxHolder.setOpaque(false);
         boxHolder.add(list, BorderLayout.NORTH);
@@ -99,7 +108,8 @@ public final class DeclarationCheckReportPanel extends JPanel {
      * @throws NullPointerException if {@code outline} is {@code null}
      */
     @Nonnull
-    static List<Object> rows(@Nonnull DeclarationReportOutline outline) {
+    static List<Object> rows(@Nonnull DeclarationReportOutline outline,
+                             @Nonnull Collection<OWLOntology> ontologies) {
         checkNotNull(outline);
         List<Object> rows = new ArrayList<>();
         rows.add(new SectionHeader(outline.getMissingSection().getHeading()));
@@ -107,7 +117,7 @@ public final class DeclarationCheckReportPanel extends JPanel {
             rows.add(new MessageRow(NO_MISSING_DECLARATIONS));
         } else {
             for (MissingDeclarationFinding finding : outline.getMissing()) {
-                rows.add(new FindingRow(finding.getEntity(), missingDetail(finding)));
+                rows.add(new FindingRow(finding.getEntity(), missingDetail(finding, ontologies)));
             }
         }
         rows.add(new SectionHeader(outline.getMisplacedSection().getHeading()));
@@ -122,23 +132,22 @@ public final class DeclarationCheckReportPanel extends JPanel {
     }
 
     @Nonnull
-    private static List<String> missingDetail(@Nonnull MissingDeclarationFinding finding) {
-        return ImmutableList.of(
-                "Location: " + OntologyIdFormat.formatAll(finding.getReferringOntologies()));
+    private static List<String> missingDetail(@Nonnull MissingDeclarationFinding finding,
+                                              @Nonnull Collection<OWLOntology> ontologies) {
+        return ImmutableList.of("Used in: " + OntologyIdFormat.formatAll(ontologies.stream()
+                .filter(ontology -> ontology.containsEntityInSignature(finding.getEntity(), Imports.EXCLUDED))
+                .map(OWLOntology::getOntologyID)
+                .sorted(java.util.Comparator.comparing(OntologyIdFormat::format))
+                .collect(Collectors.toList())));
     }
 
     @Nonnull
     private static List<String> misplacedDetail(@Nonnull MisplacedDeclarationFinding finding) {
-        return ImmutableList.of(
-                "Ownership rule: " + DeclarationReportOutline.ruleLabelOf(finding),
-                "Owned by: " + OntologyIdFormat.format(finding.getOwningOntology()),
-                "Declared in: " + OntologyIdFormat.formatAll(finding.getDeclaringOntologies()));
+        return ImmutableList.of(DeclarationReportOutline.suggestedPlacementOf(finding));
     }
 
     /**
-     * Holds the list at the width of the scroll pane's viewport. The entity renderer sizes itself to
-     * the width of the list's parent, and the finding row adds its own border on top, so without
-     * this cap the list would grow wider on every layout pass.
+     * Fills the viewport when content fits and allows horizontal scrolling for full detail IRIs.
      */
     private static final class ViewportWidthPanel extends JPanel implements Scrollable {
 
@@ -163,7 +172,9 @@ public final class DeclarationCheckReportPanel extends JPanel {
 
         @Override
         public boolean getScrollableTracksViewportWidth() {
-            return true;
+            // Grow only to the content's natural width; long details use horizontal scrolling.
+            return getParent() instanceof JViewport
+                    && getPreferredSize().width <= ((JViewport) getParent()).getExtentSize().width;
         }
 
         @Override
@@ -204,6 +215,14 @@ public final class DeclarationCheckReportPanel extends JPanel {
             FindingRow row = (FindingRow) value;
             Component entityComponent = entityRenderer.getListCellRendererComponent(
                     list, row.getEntity(), index, isSelected, cellHasFocus);
+            if (entityRenderer instanceof OWLCellRenderer) {
+                JViewport viewport = (JViewport) SwingUtilities.getAncestorOfClass(JViewport.class, list);
+                if (viewport != null && viewport.getExtentSize().width > 0) {
+                    Dimension size = entityComponent.getPreferredSize();
+                    entityComponent.setPreferredSize(new Dimension(
+                            Math.max(1, viewport.getExtentSize().width - 40), size.height));
+                }
+            }
             findingPanel.removeAll();
             findingPanel.setOpaque(true);
             findingPanel.setBackground(isSelected ? list.getSelectionBackground() : list.getBackground());
