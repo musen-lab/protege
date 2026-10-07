@@ -38,6 +38,26 @@ public class DeclarationChecker {
     }
 
     /**
+     * Creates a checker that runs both the missing- and misplaced-declaration checks regardless of
+     * the user's Axioms preferences.
+     *
+     * <p>The returned checker ignores the "Suppress automatic entity declarations" setting that
+     * normally turns declaration checking on, and it consults every registered ownership rule
+     * rather than only the enabled ones. It reads no preference and changes none, and like every
+     * other checker it never modifies the ontology. This supports a manually invoked, read-only
+     * declaration report that must run both checks even when the preferences would skip them.
+     *
+     * @return a checker that always runs both declaration checks
+     */
+    @Nonnull
+    public static DeclarationChecker forcingAllChecks() {
+        return new DeclarationChecker(
+                new MissingDeclarationChecker(),
+                new MisplacedDeclarationChecker(OwnershipRules::registered),
+                () -> true);
+    }
+
+    /**
      * Creates a checker that uses the given declaration checkers.
      *
      * @param missingChecker checks for missing declarations

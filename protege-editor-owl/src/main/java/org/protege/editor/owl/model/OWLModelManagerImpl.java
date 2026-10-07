@@ -594,7 +594,7 @@ public class OWLModelManagerImpl extends AbstractModelManager implements OWLMode
             format = previousFormat;
         }
         /*
-         * Resolve the document format based on the entity declaration setting for this save 
+         * Resolve the document format based on the entity declaration setting for this save
          * without changing the format stored by the ontology manager.
          *
          * See http://protegewiki.stanford.edu/wiki/OWL2RDFParserDeclarationRequirement

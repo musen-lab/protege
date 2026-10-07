@@ -6,8 +6,6 @@ import org.semanticweb.owlapi.model.OWLOntologyID;
 import org.slf4j.Logger;
 
 import javax.annotation.Nonnull;
-import java.util.Collection;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -76,7 +74,7 @@ public final class DeclarationReportLogWriter {
         logger.info(section.getHeading());
         for (MissingDeclarationFinding finding : shown(findings)) {
             logger.info("  {}  {}", finding.getEntityType().getPrintName(), finding.getEntity().toStringID());
-            logger.info("              used in: {}", ontologies(finding.getReferringOntologies()));
+            logger.info("              used in: {}", OntologyIdFormat.formatAll(finding.getReferringOntologies()));
         }
         writeOmitted(logger, findings.size());
     }
@@ -89,7 +87,7 @@ public final class DeclarationReportLogWriter {
             logger.info("  {}  {}", finding.getEntityType().getPrintName(), finding.getEntity().toStringID());
             logger.info("    owned by:    {}  (rule: {})", OntologyIdFormat.format(finding.getOwningOntology()),
                     DeclarationReportOutline.ruleLabelOf(finding));
-            logger.info("    declared in: {}", ontologies(finding.getDeclaringOntologies()));
+            logger.info("    declared in: {}", OntologyIdFormat.formatAll(finding.getDeclaringOntologies()));
         }
         writeOmitted(logger, findings.size());
     }
@@ -104,12 +102,5 @@ public final class DeclarationReportLogWriter {
             logger.info("  ...and {} more",
                     DeclarationReportOutline.formatCount(findingCount - MAX_ROWS_PER_SECTION));
         }
-    }
-
-    @Nonnull
-    private static String ontologies(@Nonnull Collection<OWLOntologyID> ontologyIds) {
-        return ontologyIds.stream()
-                .map(OntologyIdFormat::format)
-                .collect(Collectors.joining(", "));
     }
 }

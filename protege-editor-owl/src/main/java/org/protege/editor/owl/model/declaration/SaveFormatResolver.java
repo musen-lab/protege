@@ -69,7 +69,7 @@ public class SaveFormatResolver {
         copyFormat.setAddMissingTypes(false);
         return copyFormat;
     }
-    
+
     @Nonnull
     private Optional<OWLDocumentFormat> copyOf(@Nonnull OWLDocumentFormat format) {
         if (format.getClass().equals(RDFXMLDocumentFormat.class)) {
@@ -84,7 +84,7 @@ public class SaveFormatResolver {
             return Optional.empty();
         }
     }
-    
+
     private void copySettings(@Nonnull OWLDocumentFormat source, @Nonnull OWLDocumentFormat target) {
         if (source.isPrefixOWLOntologyFormat() && target.isPrefixOWLOntologyFormat()) {
             PrefixDocumentFormat sourcePrefixes = source.asPrefixOWLOntologyFormat();
