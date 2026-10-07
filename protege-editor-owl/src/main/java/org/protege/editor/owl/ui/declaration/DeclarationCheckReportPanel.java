@@ -13,7 +13,6 @@ import org.protege.editor.owl.model.declaration.OntologyIdFormat;
 import org.protege.editor.owl.ui.renderer.OWLCellRenderer;
 import org.semanticweb.owlapi.model.OWLEntity;
 import org.semanticweb.owlapi.model.OWLOntology;
-import org.semanticweb.owlapi.model.parameters.Imports;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
@@ -135,7 +134,9 @@ public final class DeclarationCheckReportPanel extends JPanel {
     private static List<String> missingDetail(@Nonnull MissingDeclarationFinding finding,
                                               @Nonnull Collection<OWLOntology> ontologies) {
         return ImmutableList.of("Used in: " + OntologyIdFormat.formatAll(ontologies.stream()
-                .filter(ontology -> ontology.containsEntityInSignature(finding.getEntity(), Imports.EXCLUDED))
+                // Inspect own axioms rather than OWLAPI's cached signature, which can retain imports.
+                .filter(ontology -> ontology.getAxioms().stream()
+                        .anyMatch(axiom -> axiom.getSignature().contains(finding.getEntity())))
                 .map(OWLOntology::getOntologyID)
                 .sorted(java.util.Comparator.comparing(OntologyIdFormat::format))
                 .collect(Collectors.toList())));

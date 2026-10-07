@@ -44,7 +44,9 @@ public class DeclarationCheckReportPanel_TestCase {
         manager.applyChange(new AddImport(root, df.getOWLImportsDeclaration(module.getOntologyID().getOntologyIRI().get())));
         OWLClass entity = df.getOWLClass(IRI.create("http://example.org/Undeclared"));
         manager.addAxiom(module, df.getOWLSubClassOfAxiom(entity, df.getOWLThing()));
-        // Deliberately supply ancestor-inclusive metadata: the dialog must inspect own signatures.
+        // Populate the closure signature cache, as the desktop renderer/checker may already have done.
+        root.getSignature(org.semanticweb.owlapi.model.parameters.Imports.INCLUDED);
+        // Deliberately supply ancestor-inclusive metadata: the dialog must inspect own axioms.
         MissingDeclarationFinding finding = MissingDeclarationFinding.get(entity,
                 Arrays.asList(root.getOntologyID(), module.getOntologyID()));
         DeclarationReportOutline outline = DeclarationReportOutline.of(DeclarationReport.get(
