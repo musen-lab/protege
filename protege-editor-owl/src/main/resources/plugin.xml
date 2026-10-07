@@ -1468,6 +1468,15 @@
         <editorKitId value="OWLEditorKit"/>
     </extension>
 
+    <extension id="tools.checkdeclarations"
+               point="org.protege.editor.core.application.EditorKitMenuAction">
+        <name value="Check entity declarations..."/>
+        <class value="org.protege.editor.owl.ui.declaration.CheckDeclarationsAction"/>
+        <toolTip value="Checks the active ontology and its imports for missing and misplaced entity declarations, regardless of the Axioms preferences"/>
+        <path value="org.protege.editor.owl.menu.tools/SlotT-A"/>
+        <editorKitId value="OWLEditorKit"/>
+    </extension>
+
 	<!-- Repositories -->
 
     <extension id="TONESRepository" point="org.protege.editor.core.application.OntologyRepositoryFactory">
