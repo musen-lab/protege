@@ -41,7 +41,7 @@ public class DeclarationCheckReportPanel_TestCase {
     }
 
     @Test
-    public void shouldDescribeMisplacedRowsWithSeverityRuleOwnerAndDeclaringOntologies() {
+    public void shouldDescribeMisplacedRowsWithRuleOwnerAndDeclaringOntologiesWithoutSeverity() {
         DeclarationReportOutline outline = DeclarationReportOutline.of(report(0, 0, 1));
         MisplacedDeclarationFinding finding = outline.getMisplaced().get(0);
 
@@ -52,7 +52,6 @@ public class DeclarationCheckReportPanel_TestCase {
                 (DeclarationCheckReportPanel.FindingRow) rows.get(3);
         assertEquals(finding.getEntity(), misplacedRow.getEntity());
         assertEquals(Arrays.asList(
-                        "Severity: " + finding.getSeverity(),
                         "Ownership rule: " + DeclarationReportOutline.ruleLabelOf(finding),
                         "Owned by: http://purl.obolibrary.org/obo/go.owl",
                         "Declared in: http://example.org/pizza"),
@@ -60,7 +59,7 @@ public class DeclarationCheckReportPanel_TestCase {
     }
 
     @Test
-    public void shouldDescribeMissingRowsWithSeverityAndReferringOntologies() {
+    public void shouldDescribeMissingRowsWithLocationWithoutSeverity() {
         DeclarationReportOutline outline = DeclarationReportOutline.of(report(1, 1, 0));
 
         List<Object> rows = DeclarationCheckReportPanel.rows(outline);
@@ -69,8 +68,36 @@ public class DeclarationCheckReportPanel_TestCase {
                 (DeclarationCheckReportPanel.FindingRow) rows.get(1);
         DeclarationCheckReportPanel.FindingRow warningRow =
                 (DeclarationCheckReportPanel.FindingRow) rows.get(2);
-        assertEquals(Arrays.asList("Severity: ERROR", "Used in: http://example.org/pizza"), errorRow.getDetail());
-        assertEquals(Arrays.asList("Severity: WARNING", "Used in: http://example.org/pizza"), warningRow.getDetail());
+        assertEquals(Arrays.asList("Location: http://example.org/pizza"), errorRow.getDetail());
+        assertEquals(Arrays.asList("Location: http://example.org/pizza"), warningRow.getDetail());
+    }
+
+    @Test
+    public void shouldRenderLocationOnlyForMissingRowsAndNeverRenderSeverity() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(
+                    new DefaultListCellRenderer(), DeclarationReportOutline.of(report(1, 1, 1)));
+            MList list = findAll(panel, MList.class).get(0);
+            for (int index : Arrays.asList(1, 2, 4)) {
+                Component rendered = list.getCellRenderer().getListCellRendererComponent(
+                        list, list.getModel().getElementAt(index), index, false, false);
+                List<String> texts = new ArrayList<>();
+                for (JLabel label : findAll(rendered, JLabel.class)) {
+                    texts.add(label.getText());
+                    assertFalse(label.getText().contains("Severity:"));
+                    assertFalse(label.getText().contains("Used in:"));
+                    assertFalse(label.getText().contains("ERROR"));
+                    assertFalse(label.getText().contains("WARNING"));
+                }
+                assertEquals(index != 4, texts.contains("Location: http://example.org/pizza"));
+                if (index == 4) {
+                    assertTrue(texts.contains("Ownership rule: " + DeclarationReportOutline.ruleLabelOf(
+                            DeclarationReportOutline.of(report(1, 1, 1)).getMisplaced().get(0))));
+                    assertTrue(texts.contains("Owned by: http://purl.obolibrary.org/obo/go.owl"));
+                    assertTrue(texts.contains("Declared in: http://example.org/pizza"));
+                }
+            }
+        });
     }
 
     @Test

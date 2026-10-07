@@ -124,14 +124,12 @@ public final class DeclarationCheckReportPanel extends JPanel {
     @Nonnull
     private static List<String> missingDetail(@Nonnull MissingDeclarationFinding finding) {
         return ImmutableList.of(
-                "Severity: " + finding.getSeverity(),
-                "Used in: " + OntologyIdFormat.formatAll(finding.getReferringOntologies()));
+                "Location: " + OntologyIdFormat.formatAll(finding.getReferringOntologies()));
     }
 
     @Nonnull
     private static List<String> misplacedDetail(@Nonnull MisplacedDeclarationFinding finding) {
         return ImmutableList.of(
-                "Severity: " + finding.getSeverity(),
                 "Ownership rule: " + DeclarationReportOutline.ruleLabelOf(finding),
                 "Owned by: " + OntologyIdFormat.format(finding.getOwningOntology()),
                 "Declared in: " + OntologyIdFormat.formatAll(finding.getDeclaringOntologies()));
