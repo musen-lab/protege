@@ -165,7 +165,7 @@ public class PreferencesLayoutPanel extends JComponent {
     public void addHelpText(String helpText) {
         addHelpTextComponent(helpText);
     }
-    
+
     public JLabel addHelpTextComponent(String helpText) {
         JLabel label = new JLabel(helpText);
         label.setFont(label.getFont().deriveFont(Font.PLAIN, 10f));
