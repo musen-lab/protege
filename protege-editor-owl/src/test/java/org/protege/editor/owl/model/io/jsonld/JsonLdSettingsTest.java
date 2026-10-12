@@ -170,6 +170,42 @@ public class JsonLdSettingsTest {
     }
 
     @Test
+    public void prefixesUsedOnlyThroughShortNamesAreLeftOut() throws Exception {
+        // rdfs: is only used by rdfs:label, which the body writes as the short name "label"
+        String text = saveText();
+        JsonNode root = mapper.readTree(text);
+        assertFalse("rdfs: is not used in the finished file", root.get("@context").has("rdfs"));
+        assertFalse(root.get("@graph").toString().contains("rdfs:"));
+        assertTrue("label still points to rdfs:label",
+                root.get("@context").get("label").get("@id").asText().equals("http://www.w3.org/2000/01/rdf-schema#label"));
+        assertNothingLost(text);
+
+        prefs.setPruneUnusedPrefixes(false);
+        assertTrue(save().get("@context").has("rdfs"));
+    }
+
+    @Test
+    public void textThatLooksLikeAPrefixedNameDoesNotKeepThePrefix() throws Exception {
+        // An ordinary literal "rdfs:foo"; rdfs: is otherwise only used through the short name "label"
+        annotate(IRI.create(NS + "tom"), df.getOWLAnnotationProperty(IRI.create(NS + "note")), df.getOWLLiteral("rdfs:foo"));
+        String text = saveText();
+        assertTrue(text.contains("\"rdfs:foo\""));
+        assertFalse(mapper.readTree(text).get("@context").has("rdfs"));
+        assertNothingLost(text);
+    }
+
+    @Test
+    public void prefixesUsedByKeysInTheContextAreKept() throws Exception {
+        // Without short names the language map is defined as "rdfs:label", which needs the rdfs prefix
+        prefs.setGenerateTermsFor(GenerateTermsFor.NONE);
+        String text = saveText();
+        JsonNode context = mapper.readTree(text).get("@context");
+        assertTrue(context.has("rdfs:label"));
+        assertEquals("http://www.w3.org/2000/01/rdf-schema#", context.get("rdfs").asText());
+        assertNothingLost(text);
+    }
+
+    @Test
     public void noShortNamesWhenTermsAreOff() throws Exception {
         prefs.setGenerateTermsFor(GenerateTermsFor.NONE);
         JsonNode root = save();

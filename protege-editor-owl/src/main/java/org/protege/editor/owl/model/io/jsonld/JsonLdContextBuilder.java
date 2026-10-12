@@ -37,6 +37,9 @@ public class JsonLdContextBuilder {
 
     private final JsonLdPreferences prefs;
 
+    // The prefix names put into the context by the last call to build()
+    private final Set<String> prefixNames = new HashSet<>();
+
     public JsonLdContextBuilder(@Nonnull JsonLdPreferences prefs) {
         this.prefs = Objects.requireNonNull(prefs);
     }
@@ -53,6 +56,8 @@ public class JsonLdContextBuilder {
                                      @Nonnull Set<String> usedIris) throws OWLOntologyStorageException {
         Map<String, Object> context = new LinkedHashMap<>();
         Map<String, String> prefixes = prefixes(format, usedIris);
+        prefixNames.clear();
+        prefixNames.addAll(prefixes.keySet());
         context.putAll(prefixes);
 
         if (prefs.isUseVocab()) {
@@ -109,6 +114,15 @@ public class JsonLdContextBuilder {
             }
         }
         return context;
+    }
+
+    /**
+     * The names of the prefixes in the context made by the last call to {@link #build}, as opposed to short names
+     * and other entries.
+     */
+    @Nonnull
+    public Set<String> getPrefixNames() {
+        return Collections.unmodifiableSet(new HashSet<>(prefixNames));
     }
 
     private Map<String, String> prefixes(@Nonnull OWLDocumentFormat format, @Nonnull Set<String> usedIris) {

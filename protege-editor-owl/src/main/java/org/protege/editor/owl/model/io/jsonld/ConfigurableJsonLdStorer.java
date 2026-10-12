@@ -69,10 +69,11 @@ public class ConfigurableJsonLdStorer extends AbstractOWLStorer {
         try {
             Object expanded = JsonLdPostProcessor.rebuild(draft, prefs);
             // Expanded files have no @context, so none is built (and a name clash can't stop the save)
+            JsonLdContextBuilder contextBuilder = new JsonLdContextBuilder(prefs);
             Map<String, Object> context = prefs.getDocumentForm() == DocumentForm.EXPANDED
                     ? Collections.emptyMap()
-                    : new JsonLdContextBuilder(prefs).build(ontology, format, JsonLdPostProcessor.usedIris(expanded));
-            return JsonLdPostProcessor.shapeAndFinish(expanded, context, prefs);
+                    : contextBuilder.build(ontology, format, JsonLdPostProcessor.usedIris(expanded));
+            return JsonLdPostProcessor.shapeAndFinish(expanded, context, contextBuilder.getPrefixNames(), prefs);
         } catch (IOException e) {
             throw new OWLOntologyStorageException("Error processing JSON-LD", e);
         }

@@ -64,10 +64,14 @@ public final class JsonLdPostProcessor {
     /**
      * Shapes the expanded document (compacted, flattened or expanded) with the given @context,
      * and applies the finishing options. Returns the document as a JSON tree.
+     *
+     * @param prefixNames the names of the entries in {@code context} that are prefixes; with pruneUnusedPrefixes
+     *                    on, those the finished document doesn't use are removed
      */
     @Nonnull
     public static JsonNode shapeAndFinish(@Nonnull Object expanded,
                                           @Nonnull Map<String, Object> context,
+                                          @Nonnull Set<String> prefixNames,
                                           @Nonnull JsonLdPreferences prefs) throws IOException {
         try {
             Object document = expanded;
@@ -75,7 +79,7 @@ public final class JsonLdPostProcessor {
                     && prefs.getDocumentForm() != DocumentForm.FLATTENED) {
                 document = nestBlankNodes(expanded);
             }
-            return finish(MAPPER.valueToTree(shape(document, context, prefs)), prefs);
+            return finish(MAPPER.valueToTree(shape(document, context, prefs)), prefixNames, prefs);
         } catch (JsonLdError e) {
             throw new IOException("JSON-LD processing failed: " + e.getMessage(), e);
         }
@@ -297,9 +301,12 @@ public final class JsonLdPostProcessor {
         }
     }
 
-    private static JsonNode finish(@Nonnull JsonNode node, @Nonnull JsonLdPreferences prefs) {
+    private static JsonNode finish(@Nonnull JsonNode node, @Nonnull Set<String> prefixNames, @Nonnull JsonLdPreferences prefs) {
         if (node.isObject()) {
             ObjectNode root = (ObjectNode) node;
+            if (prefs.isPruneUnusedPrefixes()) {
+                removeUnusedPrefixes(root, prefixNames);
+            }
             JsonNode context = root.get("@context");
             if (context != null && context.isObject() && context.size() == 0) {
                 root.remove("@context");
@@ -310,6 +317,144 @@ public final class JsonLdPostProcessor {
             }
         }
         return orderKeys(node, prefs.getKeyOrdering(), true);
+    }
+
+    /**
+     * Removes prefixes from @context that the finished document doesn't use as part of an IRI. Before compaction a
+     * namespace can look used (rdfs: for rdfs:label), while the finished document writes that IRI as a short name
+     * ("label").
+     * <p>
+     * Only places where JSON-LD reads an IRI count: property keys, @id and @type values, plain-string values of
+     * properties defined with "@type": "@id" (or "@vocab"), and in @context the keys and the @id and @type values
+     * of the entries. Text, such as an @value, a plain string of another property, or a language map value, is
+     * never an IRI, so a literal "rdfs:foo" doesn't keep the rdfs prefix.
+     */
+    static void removeUnusedPrefixes(@Nonnull ObjectNode root, @Nonnull Set<String> prefixNames) {
+        JsonNode context = root.get("@context");
+        if (context == null || !context.isObject() || prefixNames.isEmpty()) {
+            return;
+        }
+        // What the context says about each term: its values are IRIs, or it is a language map
+        Set<String> iriValued = new HashSet<>();
+        Set<String> languageMaps = new HashSet<>();
+        Set<String> used = new HashSet<>();
+        for (Iterator<Map.Entry<String, JsonNode>> it = context.fields(); it.hasNext(); ) {
+            Map.Entry<String, JsonNode> e = it.next();
+            String term = e.getKey();
+            JsonNode definition = e.getValue();
+            if (prefixNames.contains(term)) {
+                continue;
+            }
+            notePrefixUse(term, prefixNames, used);
+            if (definition.isTextual()) {
+                notePrefixUse(definition.asText(), prefixNames, used);
+            } else if (definition.isObject()) {
+                noteIri(definition.get("@id"), prefixNames, used);
+                String type = definition.path("@type").asText("");
+                if ("@id".equals(type) || "@vocab".equals(type)) {
+                    iriValued.add(term);
+                } else {
+                    notePrefixUse(type, prefixNames, used);
+                }
+                if ("@language".equals(definition.path("@container").asText(""))) {
+                    languageMaps.add(term);
+                }
+            }
+        }
+        for (Iterator<Map.Entry<String, JsonNode>> it = root.fields(); it.hasNext(); ) {
+            Map.Entry<String, JsonNode> e = it.next();
+            if (!"@context".equals(e.getKey())) {
+                collectIriUses(e.getKey(), e.getValue(), false, iriValued, languageMaps, prefixNames, used);
+            }
+        }
+        for (String name : prefixNames) {
+            if (!used.contains(name)) {
+                ((ObjectNode) context).remove(name);
+            }
+        }
+    }
+
+    /**
+     * Notes the prefixes used by IRIs in the value of {@code key}.
+     *
+     * @param plainStringsAreIris whether plain strings here are IRIs (the property is defined with "@type": "@id")
+     */
+    private static void collectIriUses(String key, JsonNode value, boolean plainStringsAreIris,
+                                       Set<String> iriValued, Set<String> languageMaps,
+                                       Set<String> prefixNames, Set<String> used) {
+        switch (key) {
+            case "@id":
+            case "@type":
+                noteIri(value, prefixNames, used);
+                return;
+            case "@value":
+            case "@language":
+            case "@direction":
+            case "@index":
+                // Text, a language tag or an index: never an IRI
+                return;
+            case "@list":
+            case "@set":
+                collectValues(value, plainStringsAreIris, iriValued, languageMaps, prefixNames, used);
+                return;
+            case "@graph":
+                collectValues(value, false, iriValued, languageMaps, prefixNames, used);
+                return;
+            default:
+                if (key.startsWith("@")) {
+                    return;
+                }
+                // A property: its key is an IRI (or a short name)
+                notePrefixUse(key, prefixNames, used);
+                if (languageMaps.contains(key) && value.isObject() && !value.has("@value")) {
+                    // A language map: the keys are language tags, the values text
+                    return;
+                }
+                collectValues(value, iriValued.contains(key), iriValued, languageMaps, prefixNames, used);
+        }
+    }
+
+    private static void collectValues(JsonNode value, boolean plainStringsAreIris,
+                                      Set<String> iriValued, Set<String> languageMaps,
+                                      Set<String> prefixNames, Set<String> used) {
+        if (value.isTextual()) {
+            if (plainStringsAreIris) {
+                notePrefixUse(value.asText(), prefixNames, used);
+            }
+        } else if (value.isArray()) {
+            for (JsonNode item : value) {
+                collectValues(item, plainStringsAreIris, iriValued, languageMaps, prefixNames, used);
+            }
+        } else if (value.isObject()) {
+            for (Iterator<Map.Entry<String, JsonNode>> it = value.fields(); it.hasNext(); ) {
+                Map.Entry<String, JsonNode> e = it.next();
+                collectIriUses(e.getKey(), e.getValue(), plainStringsAreIris, iriValued, languageMaps, prefixNames, used);
+            }
+        }
+    }
+
+    /** Notes the prefix of an IRI value, or of each IRI in an array of them. */
+    private static void noteIri(JsonNode value, Set<String> prefixNames, Set<String> used) {
+        if (value == null) {
+            return;
+        }
+        if (value.isTextual()) {
+            notePrefixUse(value.asText(), prefixNames, used);
+        } else if (value.isArray()) {
+            for (JsonNode item : value) {
+                noteIri(item, prefixNames, used);
+            }
+        }
+    }
+
+    private static void notePrefixUse(String iri, Set<String> prefixNames, Set<String> used) {
+        int colon = iri.indexOf(':');
+        if (colon > 0) {
+            String name = iri.substring(0, colon);
+            if (prefixNames.contains(name)) {
+                used.add(name);
+            }
+        }
     }
 
     private static void ensureGraphArray(@Nonnull ObjectNode root) {
