@@ -4,9 +4,8 @@ package org.protege.editor.owl.model.io.jsonld;
  * Strategy for inlining anonymous blank nodes (such as OWL class restrictions) under properties.
  */
 public enum BlankNodeEmbedding {
-    EMBED_ONCE("Embed single-reference blank nodes inline"),
-    EMBED_ALWAYS("Always embed (duplicate multi-referenced nodes)"),
-    REFERENCE("Never embed (Emit top-level referenced blank nodes)");
+    EMBED_ONCE("Put inside the thing that uses them"),
+    REFERENCE("Keep as separate nodes");
 
     private final String description;
 

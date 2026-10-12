@@ -1,12 +1,17 @@
 package org.protege.editor.owl.model;
 
+import org.protege.editor.owl.model.io.jsonld.ConfigurableJsonLDDocumentFormat;
+import org.protege.editor.owl.model.io.jsonld.JsonLdPrefixReader;
+import org.semanticweb.owlapi.model.IRI;
 import org.semanticweb.owlapi.model.OWLDocumentFormat;
 import org.semanticweb.owlapi.model.OWLOntology;
 import org.semanticweb.owlapi.model.OWLOntologyManager;
+import org.semanticweb.owlapi.model.parameters.Imports;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import java.util.function.Predicate;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -34,6 +39,20 @@ public class DocumentFormatUpdater {
             return;
         }
         OWLDocumentFormat mappedFormat = formatMapper.mapFormat(format);
+        if(mappedFormat != format && mappedFormat instanceof ConfigurableJsonLDDocumentFormat) {
+            // The JSON-LD parser keeps no prefixes: read them back from the file's @context
+            IRI documentIRI = man.getOntologyDocumentIRI(ontology);
+            // Context entries that map to an entity of the ontology are short names, not prefixes
+            Predicate<String> isEntityIri = iri -> ontology.containsEntityInSignature(IRI.create(iri), Imports.INCLUDED);
+            JsonLdPrefixReader.readPrefixes(documentIRI, isEntityIri).forEach((name, namespace) -> {
+                if(JsonLdPrefixReader.DEFAULT_PREFIX_NAME.equals(name)) {
+                    ((ConfigurableJsonLDDocumentFormat) mappedFormat).setDefaultPrefix(namespace);
+                }
+                else {
+                    ((ConfigurableJsonLDDocumentFormat) mappedFormat).setPrefix(name, namespace);
+                }
+            });
+        }
         man.setOntologyFormat(ontology, mappedFormat);
         if(mappedFormat != format) {
             logger.info("Updated ontology {} document format class from: {} to: {}",

@@ -1,13 +1,11 @@
 package org.protege.editor.owl.model.io.jsonld;
 
 /**
- * Strategy for automatically adding @type coercion to property definitions in @context.
+ * Whether object properties get "@type": "@id" in @context, so their values can be written as plain IRI strings.
  */
 public enum TypeCoercionMode {
-    NONE("No automatic coercion"),
-    ID("Coerce all object properties to @id"),
-    VOCAB("Coerce to @vocab where applicable"),
-    AUTO("Smart auto-coercion (Object properties -> @id)");
+    NONE("Off: links are written as {\"@id\": ...}"),
+    ID("On: object properties and OWL links are plain IRI strings");
 
     private final String description;
 

@@ -5,8 +5,7 @@ package org.protege.editor.owl.model.io.jsonld;
  */
 public enum TermNameSource {
     LOCAL_NAME("IRI Local Name (Deterministic)"),
-    RDFS_LABEL("rdfs:label (Prefers English or default language)"),
-    SKOS_PREFLABEL("skos:prefLabel");
+    RDFS_LABEL("rdfs:label (Prefers English or default language)");
 
     private final String description;
 

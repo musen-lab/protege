@@ -7,7 +7,7 @@ public enum GenerateTermsFor {
     NONE("None (Prefixes only)"),
     ANNOTATION_PROPERTIES("Annotation properties only"),
     ALL_PROPERTIES("All properties (Annotation, Object, Data)"),
-    ALL_ENTITIES("All entities (Properties + Classes + Individuals)");
+    ALL_ENTITIES("All properties and classes");
 
     private final String description;
 

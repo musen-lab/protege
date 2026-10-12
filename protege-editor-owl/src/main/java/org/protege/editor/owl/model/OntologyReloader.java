@@ -96,6 +96,7 @@ public class OntologyReloader {
     private List<OWLOntologyChange> performReloadAndGetPatch() throws OWLOntologyCreationException {
         dlg.setMessage("Reloading ontology");
         OWLOntologyManager reloadingManager = OWLManager.createOWLOntologyManager();
+        OntologyManagerFactory.addJsonLdSupport(reloadingManager);
         PriorityCollection<OWLOntologyIRIMapper> iriMappers = reloadingManager.getIRIMappers();
         iriMappers.clear();
         // Should be able to share these

@@ -1,5 +1,7 @@
 package org.protege.editor.owl.model;
 
+import org.protege.editor.owl.model.io.jsonld.ConfigurableJsonLDDocumentFormat;
+import org.semanticweb.owlapi.formats.RDFJsonLDDocumentFormat;
 import org.semanticweb.owlapi.formats.RioTurtleDocumentFormat;
 import org.semanticweb.owlapi.formats.TurtleDocumentFormat;
 import org.semanticweb.owlapi.model.OWLDocumentFormat;
@@ -23,6 +25,15 @@ public class DocumentFormatMapper {
             TurtleDocumentFormat turtleDocumentFormat = new TurtleDocumentFormat();
             turtleDocumentFormat.copyPrefixesFrom(rioTurtleDocumentFormat);
             return turtleDocumentFormat;
+        }
+        if(format instanceof RDFJsonLDDocumentFormat && !(format instanceof ConfigurableJsonLDDocumentFormat)) {
+            // OWL API's JSON-LD format keeps no prefixes; Protégé's does, so they survive the next save
+            ConfigurableJsonLDDocumentFormat jsonLdFormat = new ConfigurableJsonLDDocumentFormat();
+            jsonLdFormat.setAddMissingTypes(format.isAddMissingTypes());
+            if(format.getOntologyLoaderMetaData() != null) {
+                jsonLdFormat.setOntologyLoaderMetaData(format.getOntologyLoaderMetaData());
+            }
+            return jsonLdFormat;
         }
         return format;
     }

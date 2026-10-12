@@ -1,7 +1,5 @@
 package org.protege.editor.owl.model.io.jsonld;
 
-import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
-import org.eclipse.rdf4j.rio.helpers.JSONLDSettings;
 import org.semanticweb.owlapi.formats.PrefixDocumentFormat;
 import org.semanticweb.owlapi.formats.RDFJsonLDDocumentFormat;
 import org.semanticweb.owlapi.model.IRI;
@@ -15,9 +13,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Prefix-aware, configurable JSON-LD document format.
- * Extends RDFJsonLDDocumentFormat and implements PrefixDocumentFormat so Protégé
- * and OWL API's RioRenderer preserve and forward ontology prefixes into the JSON-LD @context.
+ * JSON-LD document format that keeps the ontology's prefixes, so {@link ConfigurableJsonLdStorer}
+ * can put them into the JSON-LD @context. The JSON-LD settings themselves live in {@link JsonLdPreferences}.
  */
 public class ConfigurableJsonLDDocumentFormat extends RDFJsonLDDocumentFormat implements PrefixDocumentFormat {
 
@@ -28,27 +25,12 @@ public class ConfigurableJsonLDDocumentFormat extends RDFJsonLDDocumentFormat im
     public ConfigurableJsonLDDocumentFormat() {
         super();
         this.prefixManager = new DefaultPrefixManager();
-        applyPreferences(JsonLdPreferences.getInstance());
     }
 
     public ConfigurableJsonLDDocumentFormat(@Nonnull PrefixManager prefixManager) {
         super();
         this.prefixManager = new DefaultPrefixManager();
         this.prefixManager.copyPrefixesFrom(prefixManager);
-        applyPreferences(JsonLdPreferences.getInstance());
-    }
-
-    /**
-     * Applies settings from JsonLdPreferences into the format's parameters for RioStorer.
-     */
-    public void applyPreferences(@Nonnull JsonLdPreferences prefs) {
-        setParameter(JSONLDSettings.JSONLD_MODE, prefs.getDocumentForm().getRioMode());
-        setParameter(JSONLDSettings.COMPACT_ARRAYS, prefs.isCompactArrays());
-        setParameter(JSONLDSettings.USE_NATIVE_TYPES, prefs.isUseNativeTypes());
-        setParameter(BasicWriterSettings.PRETTY_PRINT, prefs.isPrettyPrint());
-        setParameter(BasicWriterSettings.INLINE_BLANK_NODES, prefs.getBlankNodeEmbedding() != BlankNodeEmbedding.REFERENCE);
-        setParameter(BasicWriterSettings.XSD_STRING_TO_PLAIN_LITERAL, prefs.isOmitXsdStringTypes());
-        setParameter(JSONLDSettings.USE_RDF_TYPE, prefs.isUseRdfType());
     }
 
     // --- PrefixDocumentFormat and PrefixManager delegations ---
