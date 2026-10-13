@@ -231,7 +231,7 @@ public final class DeclarationCheckReportPanel extends JPanel {
             detailPanel.removeAll();
             for (String line : row.getDetail()) {
                 JLabel detailLabel = new JLabel(line);
-                detailLabel.setForeground(Color.DARK_GRAY);
+                detailLabel.setForeground(isSelected ? list.getSelectionForeground() : Color.DARK_GRAY);
                 detailLabel.setFont(detailLabel.getFont().deriveFont(12.0f));
                 detailPanel.add(detailLabel);
             }

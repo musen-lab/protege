@@ -153,6 +153,30 @@ public class DeclarationCheckReportPanel_TestCase {
         });
     }
 
+    @Test
+    public void shouldUseSelectionForegroundAndRestoreNormalDetailColorWhenRendererIsReused() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(new DefaultListCellRenderer(),
+                    DeclarationReportOutline.of(report(1, 1, 1)), Collections.emptyList());
+            MList list = findAll(panel, MList.class).get(0);
+            Color selectionForeground = new Color(240, 245, 250);
+            Color selectionBackground = new Color(30, 60, 90);
+            list.setSelectionForeground(selectionForeground);
+            list.setSelectionBackground(selectionBackground);
+            for (int index : Arrays.asList(1, 2, 4, 1)) {
+                for (boolean selected : Arrays.asList(false, true, false, true)) {
+                    Component rendered = list.getCellRenderer().getListCellRendererComponent(
+                            list, list.getModel().getElementAt(index), index, selected, false);
+                    List<JLabel> labels = findAll(rendered, JLabel.class);
+                    assertEquals(2, labels.size());
+                    assertEquals(selected ? selectionForeground : Color.DARK_GRAY, labels.get(1).getForeground());
+                    assertEquals(selected ? selectionBackground : list.getBackground(), rendered.getBackground());
+                    assertTrue(labels.get(1).getText().startsWith(index == 4 ? "Suggested placement: " : "Used in: "));
+                }
+            }
+        });
+    }
+
     private static DeclarationCheckReportPanel.FindingRow findingRow(DeclarationReportOutline outline,
             java.util.Collection<OWLOntology> ontologies, int index) {
         return (DeclarationCheckReportPanel.FindingRow) DeclarationCheckReportPanel.rows(outline, ontologies).get(index);
