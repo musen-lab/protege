@@ -7,6 +7,7 @@ import org.protege.editor.owl.model.event.EventType;
 import org.protege.editor.owl.model.util.MemoryMonitor;
 import org.protege.editor.owl.ui.util.LowMemoryNotificationViewImpl;
 import org.protege.editor.owl.ui.util.ProgressDialog;
+import org.protege.editor.owl.model.OntologyManagerFactory;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.io.IRIDocumentSource;
 import org.semanticweb.owlapi.model.*;
@@ -193,6 +194,7 @@ public class OntologyLoader {
         manager.setOntologyFactories(Collections.singleton(factory));
         manager.getOntologyParsers().add(m.getOntologyParsers());
         manager.getOntologyFactories().set(m.getOntologyFactories());
+        OntologyManagerFactory.addJsonLdSupport(manager);
         return manager;
     }
 }

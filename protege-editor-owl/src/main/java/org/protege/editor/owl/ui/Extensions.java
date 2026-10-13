@@ -39,6 +39,8 @@ public class Extensions {
                             Arrays.asList(".tex"));
         format_extensions.put(new RDFJsonLDDocumentFormat(),
                             Arrays.asList(".jsonld"));
+        format_extensions.put(new org.protege.editor.owl.model.io.jsonld.ConfigurableJsonLDDocumentFormat(),
+                            Arrays.asList(".jsonld"));
         format_extensions.put(new NTriplesDocumentFormat(),
                             Arrays.asList(".nt", ".n3" /** .n3 is not an official N-Triples extension, but easy to confuse **/));
     }
@@ -47,9 +49,12 @@ public class Extensions {
         if (format_extensions.containsKey(fmt)) {
             return format_extensions.get(fmt);
         }
-        else {
-            return Arrays.asList(".owl");
+        for (OWLDocumentFormat knownFormat : format_extensions.keySet()) {
+            if (knownFormat.getClass().isInstance(fmt) || fmt.getClass().isInstance(knownFormat)) {
+                return format_extensions.get(knownFormat);
+            }
         }
+        return Arrays.asList(".owl");
     }
 
     public static List<String> getExtensions() {

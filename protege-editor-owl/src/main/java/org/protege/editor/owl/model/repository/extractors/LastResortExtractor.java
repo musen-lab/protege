@@ -1,6 +1,7 @@
 package org.protege.editor.owl.model.repository.extractors;
 
 import com.google.common.base.Optional;
+import org.protege.editor.owl.model.OntologyManagerFactory;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.IRI;
 import org.semanticweb.owlapi.model.OWLOntology;
@@ -17,6 +18,7 @@ public class LastResortExtractor implements OntologyIdExtractor {
 
     public Optional<OWLOntologyID> getOntologyId(URI location) {
         OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
+        OntologyManagerFactory.addJsonLdSupport(manager);
         try {
             OWLOntology ontology = manager.loadOntologyFromOntologyDocument(IRI.create(location));
             return Optional.of(ontology.getOntologyID());
