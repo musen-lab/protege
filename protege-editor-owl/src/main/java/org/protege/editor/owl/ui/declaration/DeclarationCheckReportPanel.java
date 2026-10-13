@@ -11,6 +11,7 @@ import org.protege.editor.owl.model.declaration.MisplacedDeclarationFinding;
 import org.protege.editor.owl.model.declaration.MissingDeclarationFinding;
 import org.protege.editor.owl.model.declaration.OntologyIdFormat;
 import org.protege.editor.owl.ui.renderer.OWLCellRenderer;
+import org.semanticweb.owlapi.model.OWLAnnotation;
 import org.semanticweb.owlapi.model.OWLAxiom;
 import org.semanticweb.owlapi.model.OWLEntity;
 import org.semanticweb.owlapi.model.OWLOntology;
@@ -140,8 +141,8 @@ public final class DeclarationCheckReportPanel extends JPanel {
     }
 
     /**
-     * Maps each missing entity to the ontologies whose own axioms mention it, scanning each
-     * ontology's axioms once for the whole report.
+     * Maps each missing entity to the ontologies whose own axioms or header annotations mention
+     * it, scanning each ontology once for the whole report.
      */
     @Nonnull
     private static Map<OWLEntity, List<OWLOntologyID>> directMentionsOf(
@@ -152,20 +153,30 @@ public final class DeclarationCheckReportPanel extends JPanel {
                 .collect(Collectors.toSet());
         Map<OWLEntity, List<OWLOntologyID>> mentions = new HashMap<>();
         for (OWLOntology ontology : ontologies) {
-            // Inspect own axioms rather than OWLAPI's cached signature, which can retain imports.
+            // Inspect own axioms and header annotations rather than OWLAPI's cached signature,
+            // which can retain imports.
             Set<OWLEntity> mentioned = new HashSet<>();
             for (OWLAxiom axiom : ontology.getAxioms()) {
-                for (OWLEntity entity : axiom.getSignature()) {
-                    if (missing.contains(entity)) {
-                        mentioned.add(entity);
-                    }
-                }
+                addMissing(axiom.getSignature(), missing, mentioned);
+            }
+            for (OWLAnnotation annotation : ontology.getAnnotations()) {
+                addMissing(annotation.getSignature(), missing, mentioned);
             }
             for (OWLEntity entity : mentioned) {
                 mentions.computeIfAbsent(entity, key -> new ArrayList<>()).add(ontology.getOntologyID());
             }
         }
         return mentions;
+    }
+
+    private static void addMissing(@Nonnull Set<OWLEntity> signature,
+                                   @Nonnull Set<OWLEntity> missing,
+                                   @Nonnull Set<OWLEntity> mentioned) {
+        for (OWLEntity entity : signature) {
+            if (missing.contains(entity)) {
+                mentioned.add(entity);
+            }
+        }
     }
 
     @Nonnull

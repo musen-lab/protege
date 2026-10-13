@@ -60,6 +60,27 @@ public class DeclarationCheckReportPanel_TestCase {
         assertEquals(1, new MissingDeclarationChecker().check(root).size());
     }
 
+    @Test
+    public void shouldLocateHeaderOnlyAnnotationPropertyInItsOwnOntologyButNotItsImporter() throws Exception {
+        OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
+        OWLDataFactory df = manager.getOWLDataFactory();
+        OWLOntology root = manager.createOntology(IRI.create("http://example.org/root"));
+        OWLOntology module = manager.createOntology(IRI.create("http://example.org/module"));
+        manager.applyChange(new AddImport(root, df.getOWLImportsDeclaration(module.getOntologyID().getOntologyIRI().get())));
+        OWLAnnotationProperty note = df.getOWLAnnotationProperty(IRI.create("http://example.org/headerNote"));
+        manager.applyChange(new AddOntologyAnnotation(module, df.getOWLAnnotation(note, df.getOWLLiteral("module"))));
+        MissingDeclarationReport found = new MissingDeclarationChecker().check(root);
+        assertEquals(1, found.size());
+        DeclarationReportOutline outline = DeclarationReportOutline.of(DeclarationReport.get(
+                found,
+                MisplacedDeclarationReport.get(Collections.emptyList())));
+        assertEquals(Collections.singletonList("Used in: http://example.org/module"),
+                findingRow(outline, root.getImportsClosure(), 1).getDetail());
+        manager.applyChange(new AddOntologyAnnotation(root, df.getOWLAnnotation(note, df.getOWLLiteral("root"))));
+        assertEquals(Collections.singletonList("Used in: http://example.org/module, http://example.org/root"),
+                findingRow(outline, root.getImportsClosure(), 1).getDetail());
+    }
+
     @Test(timeout = 30_000)
     public void shouldLocateEveryMissingEntityInALargeClosureWithoutRescanningPerFinding() throws Exception {
         OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
