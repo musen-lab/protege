@@ -77,14 +77,17 @@ public final class DeclarationIssuesDialog {
     static String warningMessageContentOf(@Nonnull DeclarationReportOutline outline) {
         StringBuilder message = new StringBuilder(
                 "<html>The ontology was saved with \"Preferences &gt; Axioms &gt; Suppress automatic entity "
-                        + "declarations\" option enabled,<br>and the following issues remain:<br><br>");
+                        + "declarations\" enabled,<br>which prevents Protégé from automatically adding missing "
+                        + "declarations.<br><br>");
         for (DeclarationReportOutline.Section section : outline.getSections()) {
             // Escaped, or HTML would drop "<detection disabled>" as an unknown tag.
             message.append("&nbsp;• ").append(HtmlEscapers.htmlEscaper().escape(section.getHeading()))
                     .append("<br>");
         }
-        return message.append("<br>See the Protégé log for details.<br><br><b>Warning: Protégé may not load "
-                + "ontologies with missing entity declarations correctly.</b></html>").toString();
+        return message.append(
+                "<br>See the Protégé log for details. To repair these issues, use \"Tools &gt; Check entity declarations...\""
+                + "<br><br><b>Warning: Protégé may not load correctly ontologies with missing entity declarations and"
+                + "<br>we recommend repairing these issues.</b></html>").toString();
     }
 
     interface OptionChooser {
