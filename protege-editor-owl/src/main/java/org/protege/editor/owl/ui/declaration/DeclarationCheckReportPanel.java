@@ -33,17 +33,13 @@ import java.util.stream.Collectors;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Presents the result of a manually invoked entity declaration check.
+ * Presents the entity declaration check result from invoking the Tools menu item.
  *
- * <p>The panel mirrors the "Loaded ontology sources" dialog: a resizable plain
- * {@link JOptionPane} hosting an {@link MList} inside a scroll pane. The findings are grouped into
- * the two sections the {@link DeclarationReportOutline} already defines - missing entity
- * declarations and misplaced entity declarations - each introduced by a section header that
- * carries the section count. When a section has no findings it shows an explicit placeholder row,
- * so a clean ontology produces an unmistakable no-issues result rather than a blank list.
- *
- * <p>This view is read-only. It renders the outline it is given and never recomputes findings,
- * changes a preference, or modifies an ontology.
+ * <p>The findings are grouped into the two sections the {@link DeclarationReportOutline}
+ * already defines - missing entity declarations and misplaced entity declarations -
+ * each introduced by a section header that carries the section count. When a section has
+ * no findings it shows an explicit placeholder row, so a clean ontology produces an
+ * unmistakable no-issues result rather than a blank list.
  *
  * @author Josef Hardi
  */
@@ -66,7 +62,7 @@ public final class DeclarationCheckReportPanel extends JPanel {
      *
      * @param entityRenderer the renderer that draws a finding's entity
      * @param outline the declaration report outline to present
-     * @param ontologies the ontologies scanned for the "Used in" location of each missing finding
+     * @param ontologies the ontologies in the import closure
      */
     DeclarationCheckReportPanel(@Nonnull ListCellRenderer entityRenderer,
                                 @Nonnull DeclarationReportOutline outline,
@@ -112,7 +108,7 @@ public final class DeclarationCheckReportPanel extends JPanel {
      * finding rows or a single placeholder row when the section is empty.
      *
      * @param outline the declaration report outline to lay out
-     * @param ontologies the ontologies scanned for the "Used in" location of each missing finding
+     * @param ontologies the ontologies in the import closure
      * @return the ordered list rows, mixing {@link MListSectionHeader} and {@link MListItem}
      * @throws NullPointerException if {@code outline} is {@code null}
      */
@@ -155,8 +151,6 @@ public final class DeclarationCheckReportPanel extends JPanel {
                 .collect(Collectors.toSet());
         Map<OWLEntity, List<OWLOntologyID>> mentions = new HashMap<>();
         for (OWLOntology ontology : ontologies) {
-            // Inspect own axioms and header annotations rather than OWLAPI's cached signature,
-            // which can retain imports.
             Set<OWLEntity> mentioned = new HashSet<>();
             for (OWLAxiom axiom : ontology.getAxioms()) {
                 addMissing(axiom.getSignature(), missing, mentioned);
