@@ -11,16 +11,23 @@ import org.protege.editor.owl.model.declaration.MisplacedDeclarationFinding;
 import org.protege.editor.owl.model.declaration.MissingDeclarationFinding;
 import org.protege.editor.owl.model.declaration.OntologyIdFormat;
 import org.protege.editor.owl.ui.renderer.OWLCellRenderer;
+import org.semanticweb.owlapi.model.OWLAxiom;
 import org.semanticweb.owlapi.model.OWLEntity;
 import org.semanticweb.owlapi.model.OWLOntology;
-import java.util.Collection;
-import java.util.stream.Collectors;
+import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import javax.annotation.Nonnull;
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -115,8 +122,10 @@ public final class DeclarationCheckReportPanel extends JPanel {
         if (outline.getMissing().isEmpty()) {
             rows.add(new MessageRow(NO_MISSING_DECLARATIONS));
         } else {
+            Map<OWLEntity, List<OWLOntologyID>> mentions = directMentionsOf(outline.getMissing(), ontologies);
             for (MissingDeclarationFinding finding : outline.getMissing()) {
-                rows.add(new FindingRow(finding.getEntity(), missingDetail(finding, ontologies)));
+                rows.add(new FindingRow(finding.getEntity(),
+                        missingDetail(mentions.getOrDefault(finding.getEntity(), ImmutableList.of()))));
             }
         }
         rows.add(new SectionHeader(outline.getMisplacedSection().getHeading()));
@@ -130,15 +139,39 @@ public final class DeclarationCheckReportPanel extends JPanel {
         return rows;
     }
 
+    /**
+     * Maps each missing entity to the ontologies whose own axioms mention it, scanning each
+     * ontology's axioms once for the whole report.
+     */
     @Nonnull
-    private static List<String> missingDetail(@Nonnull MissingDeclarationFinding finding,
-                                              @Nonnull Collection<OWLOntology> ontologies) {
-        return ImmutableList.of("Used in: " + OntologyIdFormat.formatAll(ontologies.stream()
-                // Inspect own axioms rather than OWLAPI's cached signature, which can retain imports.
-                .filter(ontology -> ontology.getAxioms().stream()
-                        .anyMatch(axiom -> axiom.getSignature().contains(finding.getEntity())))
-                .map(OWLOntology::getOntologyID)
-                .sorted(java.util.Comparator.comparing(OntologyIdFormat::format))
+    private static Map<OWLEntity, List<OWLOntologyID>> directMentionsOf(
+            @Nonnull Collection<MissingDeclarationFinding> findings,
+            @Nonnull Collection<OWLOntology> ontologies) {
+        Set<OWLEntity> missing = findings.stream()
+                .map(MissingDeclarationFinding::getEntity)
+                .collect(Collectors.toSet());
+        Map<OWLEntity, List<OWLOntologyID>> mentions = new HashMap<>();
+        for (OWLOntology ontology : ontologies) {
+            // Inspect own axioms rather than OWLAPI's cached signature, which can retain imports.
+            Set<OWLEntity> mentioned = new HashSet<>();
+            for (OWLAxiom axiom : ontology.getAxioms()) {
+                for (OWLEntity entity : axiom.getSignature()) {
+                    if (missing.contains(entity)) {
+                        mentioned.add(entity);
+                    }
+                }
+            }
+            for (OWLEntity entity : mentioned) {
+                mentions.computeIfAbsent(entity, key -> new ArrayList<>()).add(ontology.getOntologyID());
+            }
+        }
+        return mentions;
+    }
+
+    @Nonnull
+    private static List<String> missingDetail(@Nonnull List<OWLOntologyID> mentioningOntologies) {
+        return ImmutableList.of("Used in: " + OntologyIdFormat.formatAll(mentioningOntologies.stream()
+                .sorted(Comparator.comparing(OntologyIdFormat::format))
                 .collect(Collectors.toList())));
     }
 

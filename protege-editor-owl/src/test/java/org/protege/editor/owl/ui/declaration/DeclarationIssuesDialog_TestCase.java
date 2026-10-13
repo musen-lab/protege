@@ -27,7 +27,7 @@ public class DeclarationIssuesDialog_TestCase {
                 + "&nbsp;• Missing entity declarations: 12<br>"
                 + "&nbsp;• Misplaced entity declarations: 3<br>"
                 + "<br>"
-                + "See the Protégé log for details. To repair these issues, use \"Tools &gt; Check entity declarations...\"<br>"
+                + "See the Protégé log for details. To review these issues, use \"Tools &gt; Check entity declarations...\"<br>"
                 + "<br>"
                 + "<b>Warning: Protégé may not load correctly ontologies with "
                 + "missing entity declarations and<br>we recommend repairing these issues.</b></html>", message);

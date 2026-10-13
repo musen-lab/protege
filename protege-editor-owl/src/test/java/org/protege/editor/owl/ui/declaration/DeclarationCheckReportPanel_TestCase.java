@@ -60,6 +60,44 @@ public class DeclarationCheckReportPanel_TestCase {
         assertEquals(1, new MissingDeclarationChecker().check(root).size());
     }
 
+    @Test(timeout = 30_000)
+    public void shouldLocateEveryMissingEntityInALargeClosureWithoutRescanningPerFinding() throws Exception {
+        OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
+        OWLDataFactory df = manager.getOWLDataFactory();
+        OWLOntology root = manager.createOntology(IRI.create("http://example.org/scale/root"));
+        List<OWLOntology> members = new ArrayList<>();
+        for (int o = 0; o < 20; o++) {
+            IRI memberIri = IRI.create("http://example.org/scale/o" + o);
+            members.add(manager.createOntology(memberIri));
+            manager.applyChange(new AddImport(root, df.getOWLImportsDeclaration(memberIri)));
+        }
+        List<MissingDeclarationFinding> findings = new ArrayList<>();
+        for (int i = 0; i < 100_000; i++) {
+            OWLClass term = df.getOWLClass(IRI.create("http://example.org/scale#C" + i));
+            OWLOntology member = members.get(i % members.size());
+            if (i % 10 == 0) {
+                manager.addAxiom(member, df.getOWLSubClassOfAxiom(term, df.getOWLThing()));
+                findings.add(MissingDeclarationFinding.get(term, Collections.singletonList(root.getOntologyID())));
+            } else {
+                manager.addAxiom(member, df.getOWLDeclarationAxiom(term));
+            }
+        }
+        DeclarationReportOutline outline = DeclarationReportOutline.of(DeclarationReport.get(
+                MissingDeclarationReport.get(findings),
+                MisplacedDeclarationReport.get(Collections.emptyList())));
+
+        List<Object> rows = DeclarationCheckReportPanel.rows(outline, root.getImportsClosure());
+
+        assertEquals(findings.size() + 3, rows.size());
+        for (int index = 1; index <= findings.size(); index++) {
+            DeclarationCheckReportPanel.FindingRow row = (DeclarationCheckReportPanel.FindingRow) rows.get(index);
+            String iri = row.getEntity().getIRI().toString();
+            int term = Integer.parseInt(iri.substring(iri.lastIndexOf("#C") + 2));
+            assertEquals(Collections.singletonList("Used in: http://example.org/scale/o" + term % members.size()),
+                    row.getDetail());
+        }
+    }
+
     @Test
     public void shouldRenderExactlyTwoLabelsWithoutSeverityOrStandaloneRuleForBothMissingSeveritiesAndMisplaced() throws Exception {
         DeclarationReportOutline outline = DeclarationReportOutline.of(report(1, 1, 1));
