@@ -13,8 +13,11 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * JSON-LD document format that keeps the ontology's prefixes, so {@link ConfigurableJsonLdStorer}
- * can put them into the JSON-LD @context. The JSON-LD settings themselves live in {@link JsonLdPreferences}.
+ * JSON-LD document format that carries prefix mappings alongside OWL API's RDF JSON-LD format.
+ * OWL API's base format does not expose prefixes; implementing {@link PrefixDocumentFormat}
+ * lets Protégé pass ontology mappings to the storer and keep mappings recovered when a file is reopened.
+ * {@link ConfigurableJsonLdStorer} uses those mappings to build the JSON-LD {@code @context}.
+ * Other serialization settings are stored in {@link JsonLdPreferences}.
  */
 public class ConfigurableJsonLDDocumentFormat extends RDFJsonLDDocumentFormat implements PrefixDocumentFormat {
 
@@ -22,11 +25,18 @@ public class ConfigurableJsonLDDocumentFormat extends RDFJsonLDDocumentFormat im
 
     private final DefaultPrefixManager prefixManager;
 
+    /** Creates a JSON-LD format with no prefix mappings. */
     public ConfigurableJsonLDDocumentFormat() {
         super();
         this.prefixManager = new DefaultPrefixManager();
     }
 
+    /**
+     * Creates a JSON-LD format with a copy of the supplied prefix mappings.
+     * Later changes to the supplied manager do not change this format.
+     *
+     * @param prefixManager the source of the prefix mappings
+     */
     public ConfigurableJsonLDDocumentFormat(@Nonnull PrefixManager prefixManager) {
         super();
         this.prefixManager = new DefaultPrefixManager();
