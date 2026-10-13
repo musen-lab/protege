@@ -21,16 +21,16 @@ public class DeclarationIssuesDialog_TestCase {
         String message = DeclarationIssuesDialog.warningMessageContentOf(DeclarationReportOutline.of(report(9, 3, 3)));
 
         assertEquals("<html>The ontology was saved with \"Preferences &gt; Axioms &gt; Suppress automatic entity "
-                + "declarations\" option enabled,<br>"
-                + "and the following issues remain:<br>"
+                + "declarations\" enabled,<br>"
+                + "which prevents Protégé from automatically adding missing declarations.<br>"
                 + "<br>"
                 + "&nbsp;• Missing entity declarations: 12<br>"
                 + "&nbsp;• Misplaced entity declarations: 3<br>"
                 + "<br>"
-                + "See the Protégé log for details.<br>"
+                + "See the Protégé log for details. To review these issues, use \"Tools &gt; Check entity declarations...\"<br>"
                 + "<br>"
-                + "<b>Warning: Protégé may not load ontologies with "
-                + "missing entity declarations correctly.</b></html>", message);
+                + "<b>Warning: Protégé may not load correctly ontologies with "
+                + "missing entity declarations and<br>we recommend repairing these issues.</b></html>", message);
     }
 
     @Test

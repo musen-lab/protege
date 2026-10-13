@@ -58,7 +58,7 @@ public class DeclarationReportLogWriter_TestCase {
         assertEquals("  Class  http://purl.obolibrary.org/obo/GO_0000000", lines.get(28));
         assertEquals("    owned by:    http://purl.obolibrary.org/obo/go.owl  (rule: "
                 + new OboIdentifierRule().getDisplay().getLabel() + ")", lines.get(29));
-        assertEquals("    declared in: http://example.org/pizza", lines.get(30));
+        assertEquals("    Suggested placement: http://example.org/pizza → http://purl.obolibrary.org/obo/go.owl", lines.get(30));
         // Three findings of three lines each follow the misplaced heading, then the banner closes.
         assertEquals(LogBanner.end(), lines.get(37));
         assertEquals(38, lines.size());
@@ -135,6 +135,25 @@ public class DeclarationReportLogWriter_TestCase {
         write(DeclarationReport.get(
                 MissingDeclarationReport.skipped(DeclarationCheckStatus.SKIPPED),
                 MisplacedDeclarationReport.skipped(DeclarationCheckStatus.SKIPPED)));
+    }
+
+    @Test
+    public void shouldLogAllDeclaringLocationsBeforeExpectedOwnerWithRuleDiagnosticsIntact() {
+        MisplacedDeclarationFinding finding = MisplacedDeclarationFinding.get(
+                org.semanticweb.owlapi.apibinding.OWLManager.getOWLDataFactory().getOWLClass(
+                        org.semanticweb.owlapi.model.IRI.create("http://example.org/QuickBaking")),
+                new org.semanticweb.owlapi.model.OWLOntologyID(
+                        org.semanticweb.owlapi.model.IRI.create("http://example.org/pizza-fixture/baking")),
+                java.util.Arrays.asList(
+                        new org.semanticweb.owlapi.model.OWLOntologyID(org.semanticweb.owlapi.model.IRI.create("http://example.org/pizza-fixture/menu")),
+                        new org.semanticweb.owlapi.model.OWLOntologyID(org.semanticweb.owlapi.model.IRI.create("http://example.org/other-menu"))),
+                "test-rule");
+        write(DeclarationReport.get(MissingDeclarationReport.get(java.util.Collections.emptyList()),
+                MisplacedDeclarationReport.get(java.util.Collections.singletonList(finding))));
+        assertTrue(lines().contains("    Suggested placement: http://example.org/pizza-fixture/menu, "
+                + "http://example.org/other-menu → http://example.org/pizza-fixture/baking"));
+        assertTrue(lines().contains("    owned by:    http://example.org/pizza-fixture/baking  (rule: test-rule)"));
+        assertEquals(DeclarationSeverity.WARNING, finding.getSeverity());
     }
 
     private void write(DeclarationReport report) {
