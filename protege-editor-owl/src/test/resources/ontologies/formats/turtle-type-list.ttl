@@ -1,0 +1,7 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#>.
+@prefix voaf: <http://purl.org/vocommons/voaf#>.
+@prefix ex: <http://import-test.invalid/formats/>.
+
+ex:type-list
+    a voaf:Vocabulary, <http://purl.org/vocommons/voaf#Thing>, owl:Ontology;
+    owl:versionInfo "1.18".

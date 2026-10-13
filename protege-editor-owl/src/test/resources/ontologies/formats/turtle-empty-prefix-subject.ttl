@@ -1,0 +1,5 @@
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX : <http://import-test.invalid/formats/empty-prefix/>
+
+:ns a owl:Ontology ;
+    owl:versionIRI : .

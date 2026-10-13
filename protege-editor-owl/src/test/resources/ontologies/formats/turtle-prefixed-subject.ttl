@@ -1,0 +1,7 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix ex: <http://import-test.invalid/formats/> .
+
+ex:prefixed.owl.ttl a owl:Ontology ;
+    owl:versionIRI ex:prefixed-1.2 .
+
+ex:prefixed-C a owl:Class .

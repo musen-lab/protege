@@ -1,0 +1,7 @@
+@base <http://import-test.invalid/formats/relprefix/ONTO_> .
+@prefix odo: <.> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+odo:ONTO_
+    a owl:Ontology ;
+    owl:versionIRI <ONTO_/1.0.0> .

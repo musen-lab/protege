@@ -1,0 +1,5 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix ex: <http://example.test/ns#> .
+ex:s ex:p """a long string
+that ends here""" ; ex:q "value with # hash" .
+<http://import-test.invalid/formats/turtle-midline> a owl:Ontology .

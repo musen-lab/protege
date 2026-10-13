@@ -1,0 +1,5 @@
+# <http://commented.test/onto> a owl:Ontology .
+   # <http://commented.test/indented> a owl:Ontology .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+<http://import-test.invalid/formats/turtle-comments> a owl:Ontology ; # continues here
+    owl:versionIRI <http://import-test.invalid/formats/turtle-comments/v1> . # trailing comment with <http://not-an-iri.test/x#frag>
