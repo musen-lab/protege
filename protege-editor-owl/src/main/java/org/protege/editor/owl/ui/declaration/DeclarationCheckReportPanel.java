@@ -66,6 +66,7 @@ public final class DeclarationCheckReportPanel extends JPanel {
      *
      * @param entityRenderer the renderer that draws a finding's entity
      * @param outline the declaration report outline to present
+     * @param ontologies the ontologies scanned for the "Used in" location of each missing finding
      */
     DeclarationCheckReportPanel(@Nonnull ListCellRenderer entityRenderer,
                                 @Nonnull DeclarationReportOutline outline,
@@ -111,6 +112,7 @@ public final class DeclarationCheckReportPanel extends JPanel {
      * finding rows or a single placeholder row when the section is empty.
      *
      * @param outline the declaration report outline to lay out
+     * @param ontologies the ontologies scanned for the "Used in" location of each missing finding
      * @return the ordered list rows, mixing {@link MListSectionHeader} and {@link MListItem}
      * @throws NullPointerException if {@code outline} is {@code null}
      */
