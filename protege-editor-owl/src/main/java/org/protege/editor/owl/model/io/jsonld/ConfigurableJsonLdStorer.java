@@ -23,7 +23,7 @@ import java.util.Objects;
  * <p>
  * Saving happens in two steps. First, OWL API's own JSON-LD writer writes the ontology with its default
  * settings (full IRIs, no context) into memory. Then {@link JsonLdPostProcessor} rebuilds that document with
- * jsonld-java, and shapes it with the @context from {@link JsonLdContextBuilder} and the other settings.
+ * jsonld-java, and shapes it with the {@code @context} from {@link JsonLdContextBuilder} and the other settings.
  */
 public class ConfigurableJsonLdStorer extends AbstractOWLStorer {
 
@@ -31,6 +31,11 @@ public class ConfigurableJsonLdStorer extends AbstractOWLStorer {
 
     private final JsonLdPreferences prefs;
 
+    /**
+     * Creates a storer that reads the supplied settings when an ontology is saved.
+     *
+     * @param prefs the JSON-LD settings to apply
+     */
     public ConfigurableJsonLdStorer(@Nonnull JsonLdPreferences prefs) {
         this.prefs = Objects.requireNonNull(prefs);
     }

@@ -55,6 +55,7 @@ public class ConfigurableJsonLDDocumentFormat extends RDFJsonLDDocumentFormat im
         return this;
     }
 
+    /** Replaces this format's mappings with a copy from the supplied manager. */
     @Override
     public void setPrefixManager(@Nonnull PrefixManager pm) {
         this.prefixManager.clear();

@@ -11,9 +11,11 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
- * Global JSON-LD save settings, stored through Protégé's preferences ("org.protege.editor.owl.jsonld").
+ * Typed model for JSON-LD save settings: context generation, output shape, literal handling,
+ * blank node embedding, and imports scope. The application instance is stored through Protégé's
+ * preferences under {@code org.protege.editor.owl.jsonld}; a new store can be supplied for tests.
  * Use {@link #getInstance()} for the settings Protégé saves with. Changes take effect for the next save;
- * call {@link #save()} to keep them across sessions.
+ * call {@link #save()} to keep them across sessions. Defaults match {@link JsonLdPreset#WEB_FRIENDLY}.
  */
 public class JsonLdPreferences {
 
@@ -100,6 +102,8 @@ public class JsonLdPreferences {
     /**
      * Creates settings backed by the given store and loads them from it.
      * Protégé itself uses {@link #getInstance()}; this constructor is for other stores, such as in tests.
+     *
+     * @param store supplies the preference store to read and write
      */
     public JsonLdPreferences(@Nonnull Supplier<Preferences> store) {
         this.store = Objects.requireNonNull(store);
@@ -113,6 +117,11 @@ public class JsonLdPreferences {
         applyPreset(preset);
     }
 
+    /**
+     * Returns the application-wide settings used by new JSON-LD storers.
+     *
+     * @return the shared, mutable settings instance
+     */
     public static JsonLdPreferences getInstance() {
         return INSTANCE;
     }
@@ -120,6 +129,9 @@ public class JsonLdPreferences {
     /**
      * The values of a preset, not connected to any store: they cannot be loaded or saved.
      * The preferences panel uses this to show a preset before the user clicks Apply or OK.
+     *
+     * @param preset the preset whose values should be shown
+     * @return a detached settings instance initialized with that preset
      */
     @Nonnull
     public static JsonLdPreferences ofPreset(@Nonnull JsonLdPreset preset) {
@@ -186,6 +198,8 @@ public class JsonLdPreferences {
     /**
      * Sets all settings to the values of the given preset. {@link JsonLdPreset#CUSTOM} keeps the current values.
      * Does not save.
+     *
+     * @param preset the preset to apply
      */
     public synchronized void applyPreset(@Nonnull JsonLdPreset preset) {
         Objects.requireNonNull(preset, "preset must not be null");
@@ -272,6 +286,7 @@ public class JsonLdPreferences {
     // --- Getters & Setters ---
 
     public JsonLdPreset getActivePreset() { return activePreset; }
+    /** Records the selected preset without applying its values; use {@link #applyPreset} to do that. */
     public void setActivePreset(JsonLdPreset activePreset) { this.activePreset = activePreset; }
 
     public boolean isIncludeOntologyPrefixes() { return includeOntologyPrefixes; }
@@ -306,6 +321,7 @@ public class JsonLdPreferences {
     public void setPrettyPrint(boolean prettyPrint) { this.prettyPrint = prettyPrint; }
 
     public int getIndentSpaces() { return indentSpaces; }
+    /** Sets indentation, clamped to the supported range of one to eight spaces. */
     public void setIndentSpaces(int indentSpaces) { this.indentSpaces = clampIndent(indentSpaces); }
 
     public boolean isUseNativeTypes() { return useNativeTypes; }

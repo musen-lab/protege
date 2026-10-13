@@ -20,8 +20,9 @@ import java.util.Map;
 import java.util.function.Predicate;
 
 /**
- * Reads the prefixes from the top-level @context of a JSON-LD file. OWL API's JSON-LD parser does not keep
- * prefixes, so Protégé uses this to keep them when a JSON-LD file is opened and saved again.
+ * Reads prefix mappings from the top-level {@code @context} of a local JSON-LD file. OWL API's
+ * JSON-LD parser does not retain those mappings, so Protégé restores them to its document format
+ * when a file is opened. Remote contexts are not fetched.
  */
 public final class JsonLdPrefixReader {
 
@@ -29,18 +30,20 @@ public final class JsonLdPrefixReader {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /** The key used for @vocab in the returned map: Protégé's default prefix. */
+    /** The key used for {@code @vocab} in the returned map: Protégé's default prefix. */
     public static final String DEFAULT_PREFIX_NAME = ":";
 
     private JsonLdPrefixReader() {
     }
 
     /**
-     * Returns prefix name (ending in ':') to namespace, read from the document's @context.
+     * Returns prefix name (ending in {@code :}) to namespace, read from the document's {@code @context}.
      * Only local files are read; for any other document, or if the file can't be read, the result is empty.
      *
+     * @param documentIRI the local file containing the JSON-LD document
      * @param isEntityIri tells which IRIs are entities of the ontology; context entries that map to an entity
      *                    are short names, not prefixes
+     * @return prefix names (ending in {@code :}) mapped to namespace IRIs, or an empty map if unreadable
      */
     @Nonnull
     public static Map<String, String> readPrefixes(@Nonnull IRI documentIRI, @Nonnull Predicate<String> isEntityIri) {
@@ -57,8 +60,8 @@ public final class JsonLdPrefixReader {
     }
 
     /**
-     * Returns prefix name (ending in ':') to namespace, read from the top-level @context of a JSON-LD document.
-     * Only the @context is read, not the rest of the document.
+     * Returns prefix name (ending in {@code :}) to namespace, read from the top-level
+     * {@code @context} of a JSON-LD document. Only the context is read, not the rest of the document.
      * <p>
      * In a context, prefixes and short names look alike ("ex": "http://example.org/zoo#" versus
      * "age": "http://example.org/zoo#age"). An entry counts as a prefix when its value is an IRI that is not
@@ -67,7 +70,10 @@ public final class JsonLdPrefixReader {
      * http://purl.obolibrary.org/obo/GO_ are kept even when nothing in the file uses them.
      * "@vocab" becomes the default prefix (":").
      *
+     * @param in the JSON-LD document stream
      * @param isEntityIri tells which IRIs are entities of the ontology
+     * @return prefix names (ending in {@code :}) mapped to namespace IRIs
+     * @throws IOException if the input cannot be read or parsed
      */
     @Nonnull
     public static Map<String, String> readPrefixes(@Nonnull InputStream in, @Nonnull Predicate<String> isEntityIri) throws IOException {

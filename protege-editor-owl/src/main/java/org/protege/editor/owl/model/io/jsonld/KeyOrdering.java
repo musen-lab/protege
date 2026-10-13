@@ -1,11 +1,14 @@
 package org.protege.editor.owl.model.io.jsonld;
 
 /**
- * Strategy for ordering object keys in serialized JSON-LD output.
+ * Ordering applied to JSON object keys after JSON-LD shaping.
  */
 public enum KeyOrdering {
+    /** Keep the order produced by the JSON-LD processing library. */
     NONE("Natural / Unspecified order"),
+    /** Sort all object keys lexicographically. */
     LEXICOGRAPHIC("Strict alphabetical key order"),
+    /** Place key JSON-LD keywords first, then sort other keys. */
     KEYWORDS_FIRST("JSON-LD keywords first (@context, @id, @type) then sorted");
 
     private final String description;

@@ -1,13 +1,19 @@
 package org.protege.editor.owl.model.io.jsonld;
 
 /**
- * Presets that set all JSON-LD save settings at once.
+ * Named groups of JSON-LD save settings. Applying a preset replaces the current setting values;
+ * {@link #CUSTOM} labels user-edited values without replacing them.
  */
 public enum JsonLdPreset {
+    /** Readable compact output with short terms, language maps, and nested restrictions. */
     WEB_FRIENDLY("Web-friendly (Default)", "Easiest to read: short names, language maps and nested restrictions"),
+    /** Preserve RDF details in a form intended for reliable reloads. */
     ROUND_TRIP_SAFE("Round-trip safe", "Closest to the raw RDF; every value keeps its exact spelling"),
+    /** Favor stable, compact diffs for version control. */
     DIFF_FRIENDLY("Diff-friendly", "Small, stable changes in version control"),
+    /** Use full IRIs and omit the context for inspection. */
     EXPANDED("Expanded (Debug)", "Full IRIs and no @context"),
+    /** Keep values chosen individually in the preferences panel. */
     CUSTOM("Custom", "Customized configuration");
 
     private final String label;

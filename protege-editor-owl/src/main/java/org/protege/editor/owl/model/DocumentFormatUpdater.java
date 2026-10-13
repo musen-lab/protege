@@ -16,6 +16,9 @@ import java.util.function.Predicate;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
+ * Replaces loaded OWL API formats with Protégé's equivalents. For local JSON-LD files it also
+ * recovers prefix mappings from the document context, which OWL API's parser does not retain.
+ *
  * Matthew Horridge
  * Stanford Center for Biomedical Informatics Research
  * 8 Feb 2017
@@ -31,6 +34,11 @@ public class DocumentFormatUpdater {
         this.formatMapper = checkNotNull(formatMapper);
     }
 
+    /**
+     * Updates the ontology's format after loading and restores local JSON-LD prefix mappings.
+     *
+     * @param ontology the loaded ontology whose format should be updated
+     */
     public void updateFormat(@Nonnull OWLOntology ontology) {
         checkNotNull(ontology);
         OWLOntologyManager man = ontology.getOWLOntologyManager();

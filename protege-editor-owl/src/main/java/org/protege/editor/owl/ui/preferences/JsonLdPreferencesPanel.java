@@ -10,8 +10,9 @@ import java.awt.event.ItemEvent;
 import java.util.Objects;
 
 /**
- * The JSON-LD tab in the Preferences window. Shows a preset selector and the JSON-LD save settings
- * in four groups, and saves them to {@link JsonLdPreferences}.
+ * The JSON-LD tab in the Preferences window. Shows presets and settings for context generation,
+ * document shape, literal handling, and scope. Controls edit a local UI state until
+ * {@link #applyChanges()} copies their values to {@link JsonLdPreferences} and persists them.
  */
 public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
 
@@ -50,10 +51,12 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
 
     private boolean isUpdatingUI = false;
 
+    /** Creates the panel for Protégé's application-wide JSON-LD settings. */
     public JsonLdPreferencesPanel() {
         this(JsonLdPreferences.getInstance());
     }
 
+    /** Creates a panel for a supplied settings instance, primarily for UI tests. */
     JsonLdPreferencesPanel(@Nonnull JsonLdPreferences prefs) {
         this.prefs = Objects.requireNonNull(prefs);
     }

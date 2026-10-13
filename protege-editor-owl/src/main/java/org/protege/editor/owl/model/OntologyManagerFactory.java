@@ -13,12 +13,19 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * Creates ontology managers configured for Protégé, including its JSON-LD save and load support.
+ *
  * Matthew Horridge
  * Stanford Center for Biomedical Informatics Research
  * 4 Sep 2018
  */
 public class OntologyManagerFactory {
 
+    /**
+     * Creates a concurrent ontology manager with configurable JSON-LD support installed.
+     *
+     * @return a manager ready to load and save JSON-LD documents
+     */
     @Nonnull
     public static OWLOntologyManager createManager() {
         OWLOntologyManager manager = OWLManager.createConcurrentOWLOntologyManager();
@@ -29,7 +36,10 @@ public class OntologyManagerFactory {
     /**
      * Sets up a manager for Protégé's JSON-LD support: JSON-LD is saved with the JSON-LD settings
      * ({@link ConfigurableJsonLdStorerFactory}), and compacted JSON-LD files can be opened without saying
-     * their format (see {@link RdfJsonParserFactoryWrapper}). Use this for every manager that loads or saves files.
+     * their format (see {@link RdfJsonParserFactoryWrapper}). Calling this more than once does not register
+     * another storer or wrap the parser again. Use this for every manager that loads or saves files.
+     *
+     * @param manager the OWL API manager to configure
      */
     public static void addJsonLdSupport(@Nonnull OWLOntologyManager manager) {
         boolean hasStorer = false;

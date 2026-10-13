@@ -8,9 +8,10 @@ import javax.annotation.Nullable;
 import java.util.*;
 
 /**
- * Builds the JSON-LD @context for an ontology from the ontology's prefixes and the settings in
- * {@link JsonLdPreferences}: prefixes, @vocab, short names for entities, "@type": "@id" for object
- * properties, and "@container": "@language" for language maps.
+ * Builds the JSON-LD {@code @context} for an ontology from its prefixes and
+ * {@link JsonLdPreferences}. Definitions may include {@code @vocab}, short entity names,
+ * {@code @type: @id} for IRI-valued properties, and {@code @container: @language} for language maps.
+ * Prefix names are kept separately so a later pass can remove declarations unused after compaction.
  */
 public class JsonLdContextBuilder {
 
@@ -40,14 +41,22 @@ public class JsonLdContextBuilder {
     // The prefix names put into the context by the last call to build()
     private final Set<String> prefixNames = new HashSet<>();
 
+    /**
+     * Creates a context builder for the supplied serialization settings.
+     *
+     * @param prefs the settings that control terms, prefixes, and value coercion
+     */
     public JsonLdContextBuilder(@Nonnull JsonLdPreferences prefs) {
         this.prefs = Objects.requireNonNull(prefs);
     }
 
     /**
-     * Returns the @context as a map from term to definition, in a stable order.
+     * Returns the {@code @context} as a map from term to definition, in a stable order.
      *
+     * @param ontology the ontology whose entities and annotations supply context terms
+     * @param format the document format carrying the ontology's prefix mappings
      * @param usedIris the IRIs that appear in the document, used to leave out unused prefixes
+     * @return the generated context definitions
      * @throws OWLOntologyStorageException if two entities want the same short name and the clash policy is ERROR
      */
     @Nonnull

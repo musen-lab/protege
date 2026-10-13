@@ -23,7 +23,9 @@ import java.util.*;
 
 /**
  * Turns the JSON-LD draft written by OWL API into the final document, and writes it out.
- * All jsonld-java calls are kept in this class.
+ * The rebuild step preserves RDF meaning while applying literal and type options; the shape step
+ * compacts or flattens the result and removes unused prefix declarations. All jsonld-java calls
+ * are kept in this class.
  */
 public final class JsonLdPostProcessor {
 
@@ -40,6 +42,11 @@ public final class JsonLdPostProcessor {
     /**
      * Turns the draft into triples and back into expanded JSON-LD, applying useNativeTypes and useRdfType.
      * RDF lists come out as JSON-LD lists.
+     *
+     * @param draft JSON-LD bytes written by OWL API
+     * @param prefs settings for native literal values and RDF type handling
+     * @return the expanded JSON-LD representation
+     * @throws IOException if the draft cannot be read or processed
      */
     @Nonnull
     public static Object rebuild(@Nonnull byte[] draft, @Nonnull JsonLdPreferences prefs) throws IOException {
@@ -62,11 +69,16 @@ public final class JsonLdPostProcessor {
     }
 
     /**
-     * Shapes the expanded document (compacted, flattened or expanded) with the given @context,
+     * Shapes the expanded document (compacted, flattened or expanded) with the given {@code @context},
      * and applies the finishing options. Returns the document as a JSON tree.
      *
+     * @param expanded the rebuilt, expanded JSON-LD document
+     * @param context context definitions for compaction and flattening
      * @param prefixNames the names of the entries in {@code context} that are prefixes; with pruneUnusedPrefixes
      *                    on, those the finished document doesn't use are removed
+     * @param prefs settings for document shape, embedding, and formatting
+     * @return the finished JSON document
+     * @throws IOException if JSON-LD shaping fails
      */
     @Nonnull
     public static JsonNode shapeAndFinish(@Nonnull Object expanded,
@@ -86,8 +98,12 @@ public final class JsonLdPostProcessor {
     }
 
     /**
-     * All IRIs in an expanded document: property keys, @id values and @type values (node types and datatypes).
+     * All IRIs in an expanded document: property keys, {@code @id} values and {@code @type} values
+     * (node types and datatypes).
      * Blank node ids are left out.
+     *
+     * @param expanded the expanded JSON-LD document to inspect
+     * @return IRIs referenced by the document
      */
     @Nonnull
     public static Set<String> usedIris(@Nonnull Object expanded) {
@@ -517,6 +533,11 @@ public final class JsonLdPostProcessor {
 
     /**
      * Writes the document to the stream. The stream is flushed but not closed.
+     *
+     * @param document the finished JSON tree
+     * @param prefs settings for pretty printing and indentation
+     * @param out the caller-owned output stream
+     * @throws IOException if writing fails
      */
     public static void write(@Nonnull JsonNode document, @Nonnull JsonLdPreferences prefs, @Nonnull OutputStream out) throws IOException {
         writer(prefs).writeValue(out, document);
@@ -525,6 +546,11 @@ public final class JsonLdPostProcessor {
 
     /**
      * Writes the document to the writer. The writer is flushed but not closed.
+     *
+     * @param document the finished JSON tree
+     * @param prefs settings for pretty printing and indentation
+     * @param out the caller-owned writer
+     * @throws IOException if writing fails
      */
     public static void write(@Nonnull JsonNode document, @Nonnull JsonLdPreferences prefs, @Nonnull Writer out) throws IOException {
         writer(prefs).writeValue(out, document);

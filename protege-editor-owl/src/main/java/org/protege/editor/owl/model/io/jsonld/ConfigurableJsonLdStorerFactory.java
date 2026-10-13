@@ -7,7 +7,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Factory for creating ConfigurableJsonLdStorer instances that use Protégé's JSON-LD settings.
+ * OWL API storer factory for configurable JSON-LD output. Production storers read the
+ * application preferences when created; tests may supply a separate settings instance.
  */
 public class ConfigurableJsonLdStorerFactory extends OWLStorerFactoryImpl {
 
@@ -21,7 +22,11 @@ public class ConfigurableJsonLdStorerFactory extends OWLStorerFactoryImpl {
         this(null);
     }
 
-    /** Storers from this factory use the given settings (for example in tests); null means the global settings. */
+    /**
+     * Creates a factory backed by the supplied settings, or by the global settings if they are absent.
+     *
+     * @param prefs settings for storers from this factory, or {@code null} for the application settings
+     */
     public ConfigurableJsonLdStorerFactory(@Nullable JsonLdPreferences prefs) {
         super(new ConfigurableJsonLDDocumentFormatFactory());
         this.prefs = prefs;

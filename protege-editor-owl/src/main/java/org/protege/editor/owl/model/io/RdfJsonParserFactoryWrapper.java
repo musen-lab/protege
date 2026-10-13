@@ -26,6 +26,11 @@ public class RdfJsonParserFactoryWrapper implements OWLParserFactory {
 
     private final OWLParserFactory delegate;
 
+    /**
+     * Wraps the RDF/JSON parser factory without changing its supported format or MIME types.
+     *
+     * @param delegate the OWL API parser factory to wrap
+     */
     public RdfJsonParserFactoryWrapper(@Nonnull OWLParserFactory delegate) {
         this.delegate = Objects.requireNonNull(delegate);
     }
