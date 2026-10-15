@@ -18,19 +18,19 @@ import static org.junit.Assert.assertFalse;
 /**
  * Tests how an entity IRI namespace is matched to the ontology that owns it.
  */
-public class NamespaceRule_TestCase {
+public class IriPrefixRule_TestCase {
 
     private OWLOntologyManager manager;
 
     private OWLDataFactory dataFactory;
 
-    private NamespaceRule rule;
+    private IriPrefixRule rule;
 
     @Before
     public void setUp() {
         manager = OWLManager.createOWLOntologyManager();
         dataFactory = manager.getOWLDataFactory();
-        rule = new NamespaceRule();
+        rule = new IriPrefixRule();
     }
 
     @Test

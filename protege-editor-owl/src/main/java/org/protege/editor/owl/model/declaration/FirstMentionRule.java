@@ -22,7 +22,7 @@ import java.util.Optional;
  * It also returns no owner when the first mentions are connected by an import cycle, because the
  * cycle gives them equal standing.
  *
- * <p>Unlike {@link NamespaceRule} and {@link OboIdentifierRule}, this rule does not inspect the
+ * <p>Unlike {@link IriPrefixRule} and {@link OboIdentifierRule}, this rule does not inspect the
  * entity or ontology IRIs. It can therefore resolve ownership in projects whose entities share a
  * namespace that does not identify any one ontology.
  *

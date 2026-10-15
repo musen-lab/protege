@@ -46,18 +46,18 @@ public class OwnershipPolicy_TestCase {
     }
 
     @Test
-    public void shouldFallBackToTheNamespaceRuleWhenTheOboRuleIsOff() throws Exception {
+    public void shouldFallBackToTheIriPrefixRuleWhenTheOboRuleIsOff() throws Exception {
         OWLOntology namespaceOwner = ontology("http://example.org/ns");
         OWLOntology idSpaceOwner = ontology("http://example.org/go.owl");
-        OwnershipPolicy policy = policyOf(ImmutableList.of(new NamespaceRule()),
+        OwnershipPolicy policy = policyOf(ImmutableList.of(new IriPrefixRule()),
                 namespaceOwner, idSpaceOwner);
 
         assertOwner(policy, clazz("http://example.org/ns/GO_0006915"),
-                namespaceOwner, NamespaceRule.ID);
+                namespaceOwner, IriPrefixRule.ID);
     }
 
     @Test
-    public void shouldResolveNothingWhenTheNamespaceRuleIsOff() throws Exception {
+    public void shouldResolveNothingWhenTheIriPrefixRuleIsOff() throws Exception {
         OWLOntology base = ontology("http://example.org/base");
         OwnershipPolicy policy = policyOf(ImmutableList.of(new OboIdentifierRule()), base);
 
@@ -77,11 +77,11 @@ public class OwnershipPolicy_TestCase {
         OWLOntology namespaceOwner = ontology("http://example.org/ns");
         OWLOntology idSpaceOwner = ontology("http://example.org/go.owl");
         // Reversing the order reverses which rule decides, and nothing else.
-        OwnershipPolicy policy = policyOf(ImmutableList.of(new NamespaceRule(), new OboIdentifierRule()),
+        OwnershipPolicy policy = policyOf(ImmutableList.of(new IriPrefixRule(), new OboIdentifierRule()),
                 namespaceOwner, idSpaceOwner);
 
         assertOwner(policy, clazz("http://example.org/ns/GO_0006915"),
-                namespaceOwner, NamespaceRule.ID);
+                namespaceOwner, IriPrefixRule.ID);
     }
 
     @Test
@@ -91,7 +91,7 @@ public class OwnershipPolicy_TestCase {
 
         Optional<DeclarationOwner> owner = policy.resolve(clazz("http://example.org/base#Term"));
         assertTrue(owner.isPresent());
-        assertEquals(NamespaceRule.ID, owner.get().getRuleId());
+        assertEquals(IriPrefixRule.ID, owner.get().getRuleId());
     }
 
     private static void assertOwner(OwnershipPolicy policy, OWLClass entity,

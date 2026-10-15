@@ -25,7 +25,7 @@ public class MisplacedDeclarationPreferences_TestCase {
 
     private static final String OBO_RULE_KEY = OboIdentifierRule.ID;
 
-    private static final String NAMESPACE_RULE_KEY = NamespaceRule.ID;
+    private static final String NAMESPACE_RULE_KEY = IriPrefixRule.ID;
 
     private static final String FIRST_MENTION_RULE_KEY = FirstMentionRule.ID;
 
@@ -38,7 +38,7 @@ public class MisplacedDeclarationPreferences_TestCase {
 
     private static final OwnershipRule OBO_RULE = new OboIdentifierRule();
 
-    private static final OwnershipRule NAMESPACE_RULE = new NamespaceRule();
+    private static final OwnershipRule NAMESPACE_RULE = new IriPrefixRule();
 
     private static final OwnershipRule FIRST_MENTION_RULE = new FirstMentionRule();
 

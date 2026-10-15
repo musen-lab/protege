@@ -104,7 +104,7 @@ public class MisplacedDeclarationChecker_TestCase {
         MisplacedDeclarationReport report = checker.check(leaf);
 
         assertEquals(ImmutableList.of(ClosureFixtures.BASE + "#Misplaced"), names(report));
-        assertEquals(NamespaceRule.ID, report.getFindings().get(0).getOwnershipRuleId());
+        assertEquals(IriPrefixRule.ID, report.getFindings().get(0).getOwnershipRuleId());
     }
 
     @Test
@@ -181,7 +181,7 @@ public class MisplacedDeclarationChecker_TestCase {
                 finding.getDeclaringOntologies().stream()
                         .map(id -> id.getOntologyIRI().get())
                         .collect(Collectors.toSet()));
-        assertEquals(NamespaceRule.ID, finding.getOwnershipRuleId());
+        assertEquals(IriPrefixRule.ID, finding.getOwnershipRuleId());
     }
 
     @Test
@@ -240,7 +240,7 @@ public class MisplacedDeclarationChecker_TestCase {
         assertEquals(ImmutableList.of(OBO + "GO_0006915"),
                 names(checkerWith(new OboIdentifierRule()).check(root)));
         assertEquals(ImmutableList.of("http://example.org/base#Misplaced"),
-                names(checkerWith(new NamespaceRule()).check(root)));
+                names(checkerWith(new IriPrefixRule()).check(root)));
     }
 
     @Test
@@ -304,7 +304,7 @@ public class MisplacedDeclarationChecker_TestCase {
         MisplacedDeclarationChecker rereading = new MisplacedDeclarationChecker(rules::get);
 
         assertEquals(2, rereading.check(root).size());
-        rules.set(ImmutableList.of(new NamespaceRule()));
+        rules.set(ImmutableList.of(new IriPrefixRule()));
         assertEquals("a cached value would need a restart to take effect",
                 1, rereading.check(root).size());
     }

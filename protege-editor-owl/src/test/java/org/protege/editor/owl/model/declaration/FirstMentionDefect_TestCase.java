@@ -66,7 +66,7 @@ public class FirstMentionDefect_TestCase {
 
         // Neither naming rule can place a term whose namespace belongs to no document, so without
         // this rule the whole project is invisible to the check.
-        assertTrue(checkerWith(ImmutableList.of(new OboIdentifierRule(), new NamespaceRule()))
+        assertTrue(checkerWith(ImmutableList.of(new OboIdentifierRule(), new IriPrefixRule()))
                 .check(sales).isEmpty());
     }
 

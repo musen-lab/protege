@@ -164,7 +164,7 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
     }
 
     @Test
-    public void shouldSwitchOffTheNamespaceRuleWhenItsBoxIsCleared() {
+    public void shouldSwitchOffTheIriPrefixRuleWhenItsBoxIsCleared() {
         AxiomsPreferencesPanel panel = buildPanel();
 
         namespaceRuleBoxOf(panel).setSelected(false);

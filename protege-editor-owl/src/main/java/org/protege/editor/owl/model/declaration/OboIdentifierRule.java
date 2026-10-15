@@ -22,7 +22,7 @@ import java.util.Optional;
  * no usable short name. If two different candidate ontologies have the same short name, the match
  * is ambiguous and the rule selects neither one.
  *
- * <p>This rule is separate from {@link NamespaceRule} because OBO entities from different
+ * <p>This rule is separate from {@link IriPrefixRule} because OBO entities from different
  * ontologies normally share the same {@code http://purl.obolibrary.org/obo/} IRI namespace.
  *
  * @author Josef Hardi

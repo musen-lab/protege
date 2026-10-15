@@ -19,7 +19,7 @@ import javax.annotation.Nonnull;
  *
  * @author Josef Hardi
  */
-final class NamespaceRule implements OwnershipRule {
+final class IriPrefixRule implements OwnershipRule {
 
     /** Stable identifier used to store this rule's preference and record its findings. */
     static final String ID = "misplaced.rule.use.namespace";

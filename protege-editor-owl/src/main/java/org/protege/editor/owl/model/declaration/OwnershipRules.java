@@ -22,7 +22,7 @@ public final class OwnershipRules {
     @Nonnull
     private static final ImmutableList<OwnershipRule> REGISTERED = ImmutableList.of(
             new OboIdentifierRule(),
-            new NamespaceRule(),
+            new IriPrefixRule(),
             new FirstMentionRule());
 
     private OwnershipRules() {
