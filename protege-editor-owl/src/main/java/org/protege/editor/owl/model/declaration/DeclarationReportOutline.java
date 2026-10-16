@@ -71,6 +71,21 @@ public final class DeclarationReportOutline {
                 .orElse(ruleId);
     }
 
+    /** Returns the compact rule name used alongside a suggested repair destination. */
+    @Nonnull
+    public static String shortRuleLabelOf(@Nonnull MisplacedDeclarationFinding finding) {
+        switch (checkNotNull(finding).getOwnershipRuleId()) {
+            case IriPrefixRule.ID:
+                return "IRI prefix";
+            case OboIdentifierRule.ID:
+                return "OBO ID";
+            case FirstMentionRule.ID:
+                return "Import closure";
+            default:
+                return ruleLabelOf(finding);
+        }
+    }
+
     /**
      * Formats the actual declaration locations followed by the expected owner, retaining all IRIs.
      *

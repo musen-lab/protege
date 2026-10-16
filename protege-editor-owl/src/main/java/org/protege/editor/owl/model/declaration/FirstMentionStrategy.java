@@ -7,6 +7,7 @@ import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import javax.annotation.Nonnull;
 import java.util.Optional;
+import java.util.Collection;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -29,6 +30,12 @@ public final class FirstMentionStrategy {
     @Nonnull
     public static FirstMentionStrategy over(@Nonnull OWLOntology root) {
         return new FirstMentionStrategy(DeclarationIndex.over(checkNotNull(root)));
+    }
+
+    /** Reuses a caller-supplied closure without choosing an arbitrary root ontology. */
+    @Nonnull
+    public static FirstMentionStrategy over(@Nonnull Collection<OWLOntology> closure) {
+        return new FirstMentionStrategy(DeclarationIndex.over(closure));
     }
 
     /** Returns the unique first mention, or empty when absent or ambiguous. */

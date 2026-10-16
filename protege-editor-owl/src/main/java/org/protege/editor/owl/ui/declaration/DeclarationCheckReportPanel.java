@@ -7,12 +7,10 @@ import org.protege.editor.core.ui.list.MListSectionHeader;
 import org.protege.editor.core.ui.util.ComponentFactory;
 import org.protege.editor.owl.OWLEditorKit;
 import org.protege.editor.owl.model.declaration.DeclarationReportOutline;
+import org.protege.editor.owl.model.declaration.FirstMentionStrategy;
 import org.protege.editor.owl.model.declaration.MisplacedDeclarationFinding;
 import org.protege.editor.owl.model.declaration.MissingDeclarationFinding;
 import org.protege.editor.owl.model.declaration.OntologyIdFormat;
-import org.protege.editor.owl.ui.renderer.OWLCellRenderer;
-import org.semanticweb.owlapi.model.OWLAnnotation;
-import org.semanticweb.owlapi.model.OWLAxiom;
 import org.semanticweb.owlapi.model.OWLEntity;
 import org.semanticweb.owlapi.model.OWLOntology;
 import org.semanticweb.owlapi.model.OWLOntologyID;
@@ -22,13 +20,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -51,7 +44,16 @@ public final class DeclarationCheckReportPanel extends JPanel {
 
     static final String NO_MISPLACED_DECLARATIONS = "No misplaced entity declarations.";
 
-    private final MList list = new MList();
+    private final MList list = new MList() {
+        @Override
+        protected javax.swing.border.Border createListItemBorder(JList list, Object value, int index,
+                                                                  boolean selected, boolean focused) {
+            // The default MList border reserves an unselected 20-pixel gutter on the left.
+            return BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(240, 240, 240)),
+                    BorderFactory.createEmptyBorder(1, 0, 1, 0));
+        }
+    };
 
     private DeclarationResolutionActions resolutionActions;
 
@@ -62,7 +64,7 @@ public final class DeclarationCheckReportPanel extends JPanel {
     }
 
     private DeclarationCheckReportPanel(OWLEditorKit owlEditorKit, List<Object> reportRows) {
-        this(new OWLCellRenderer(checkNotNull(owlEditorKit)), reportRows);
+        this(DeclarationDestinationPanel.entityRenderer(checkNotNull(owlEditorKit)), reportRows);
         OWLOntology root = owlEditorKit.getOWLModelManager().getActiveOntology();
         resolutionActions = new DeclarationResolutionActions(
                 owlEditorKit.getOWLModelManager(), root, list,
@@ -87,9 +89,6 @@ public final class DeclarationCheckReportPanel extends JPanel {
 
     private DeclarationCheckReportPanel(ListCellRenderer entityRenderer, List<Object> reportRows) {
         checkNotNull(entityRenderer);
-        if (entityRenderer instanceof OWLCellRenderer) {
-            ((OWLCellRenderer) entityRenderer).setWrap(false);
-        }
         setLayout(new BorderLayout(3, 3));
         list.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         list.setCellRenderer(new FindingCellRenderer(entityRenderer));
@@ -152,10 +151,10 @@ public final class DeclarationCheckReportPanel extends JPanel {
         if (outline.getMissing().isEmpty()) {
             rows.add(new MessageRow(NO_MISSING_DECLARATIONS));
         } else {
-            Map<OWLEntity, List<OWLOntologyID>> mentions = directMentionsOf(outline.getMissing(), ontologies);
+            FirstMentionStrategy suggestions = FirstMentionStrategy.over(ontologies);
             for (MissingDeclarationFinding finding : outline.getMissing()) {
                 rows.add(new FindingRow(finding, finding.getEntity(),
-                        missingDetail(mentions.getOrDefault(finding.getEntity(), ImmutableList.of()))));
+                        missingDetail(suggestions.resolve(finding.getEntity()))));
             }
         }
         rows.add(new SectionHeader(outline.getMisplacedSection().getHeading()));
@@ -169,53 +168,16 @@ public final class DeclarationCheckReportPanel extends JPanel {
         return rows;
     }
 
-    /**
-     * Maps each missing entity to the ontologies whose own axioms or header annotations mention
-     * it, scanning each ontology once for the whole report.
-     */
     @Nonnull
-    private static Map<OWLEntity, List<OWLOntologyID>> directMentionsOf(
-            @Nonnull Collection<MissingDeclarationFinding> findings,
-            @Nonnull Collection<OWLOntology> ontologies) {
-        Set<OWLEntity> missing = findings.stream()
-                .map(MissingDeclarationFinding::getEntity)
-                .collect(Collectors.toSet());
-        Map<OWLEntity, List<OWLOntologyID>> mentions = new HashMap<>();
-        for (OWLOntology ontology : ontologies) {
-            Set<OWLEntity> mentioned = new HashSet<>();
-            for (OWLAxiom axiom : ontology.getAxioms()) {
-                addMissing(axiom.getSignature(), missing, mentioned);
-            }
-            for (OWLAnnotation annotation : ontology.getAnnotations()) {
-                addMissing(annotation.getSignature(), missing, mentioned);
-            }
-            for (OWLEntity entity : mentioned) {
-                mentions.computeIfAbsent(entity, key -> new ArrayList<>()).add(ontology.getOntologyID());
-            }
-        }
-        return mentions;
-    }
-
-    private static void addMissing(@Nonnull Set<OWLEntity> signature,
-                                   @Nonnull Set<OWLEntity> missing,
-                                   @Nonnull Set<OWLEntity> mentioned) {
-        for (OWLEntity entity : signature) {
-            if (missing.contains(entity)) {
-                mentioned.add(entity);
-            }
-        }
-    }
-
-    @Nonnull
-    private static List<String> missingDetail(@Nonnull List<OWLOntologyID> mentioningOntologies) {
-        return ImmutableList.of("Used in: " + OntologyIdFormat.formatAll(mentioningOntologies.stream()
-                .sorted(Comparator.comparing(OntologyIdFormat::format))
-                .collect(Collectors.toList())));
+    private static List<String> missingDetail(@Nonnull Optional<OWLOntologyID> suggestion) {
+        return ImmutableList.of("Suggested: Add to "
+                + suggestion.map(OntologyIdFormat::format).orElse("(no unique first mention)"));
     }
 
     @Nonnull
     private static List<String> misplacedDetail(@Nonnull MisplacedDeclarationFinding finding) {
-        return ImmutableList.of(DeclarationReportOutline.suggestedPlacementOf(finding));
+        return ImmutableList.of("Suggested: Move to " + OntologyIdFormat.format(finding.getOwningOntology())
+                + " (based on: " + DeclarationReportOutline.shortRuleLabelOf(finding) + ")");
     }
 
     /**
@@ -263,16 +225,15 @@ public final class DeclarationCheckReportPanel extends JPanel {
 
         private final ListCellRenderer entityRenderer;
 
-        private final JPanel findingPanel = new JPanel(new BorderLayout(0, 1));
+        private final DeclarationRowPanel findingPanel = new DeclarationRowPanel(false, 2);
 
-        private final JPanel detailPanel = new JPanel(new GridLayout(0, 1));
+        // MList replaces its renderer's border; keep the shared row padding inside a holder.
+        private final JPanel findingHolder = new JPanel(new BorderLayout());
 
         private final JLabel messageLabel = new JLabel();
 
         private FindingCellRenderer(@Nonnull ListCellRenderer entityRenderer) {
             this.entityRenderer = checkNotNull(entityRenderer);
-            detailPanel.setOpaque(false);
-            detailPanel.setBorder(BorderFactory.createEmptyBorder(0, 20, 0, 0));
         }
 
         @Override
@@ -287,27 +248,12 @@ public final class DeclarationCheckReportPanel extends JPanel {
             FindingRow row = (FindingRow) value;
             Component entityComponent = entityRenderer.getListCellRendererComponent(
                     list, row.getEntity(), index, isSelected, cellHasFocus);
-            if (entityRenderer instanceof OWLCellRenderer) {
-                JViewport viewport = (JViewport) SwingUtilities.getAncestorOfClass(JViewport.class, list);
-                if (viewport != null && viewport.getExtentSize().width > 0) {
-                    Dimension size = entityComponent.getPreferredSize();
-                    entityComponent.setPreferredSize(new Dimension(
-                            Math.max(1, viewport.getExtentSize().width - 40), size.height));
-                }
+            Component content = findingPanel.render(list, entityComponent, null, row.getDetail().get(0), isSelected);
+            if (findingHolder.getComponentCount() == 0) {
+                findingHolder.add(content, BorderLayout.CENTER);
             }
-            findingPanel.removeAll();
-            findingPanel.setOpaque(true);
-            findingPanel.setBackground(isSelected ? list.getSelectionBackground() : list.getBackground());
-            findingPanel.add(entityComponent, BorderLayout.CENTER);
-            detailPanel.removeAll();
-            for (String line : row.getDetail()) {
-                JLabel detailLabel = new JLabel(line);
-                detailLabel.setForeground(isSelected ? list.getSelectionForeground() : Color.DARK_GRAY);
-                detailLabel.setFont(detailLabel.getFont().deriveFont(12.0f));
-                detailPanel.add(detailLabel);
-            }
-            findingPanel.add(detailPanel, BorderLayout.SOUTH);
-            return findingPanel;
+            findingHolder.setBackground(isSelected ? list.getSelectionBackground() : list.getBackground());
+            return findingHolder;
         }
     }
 

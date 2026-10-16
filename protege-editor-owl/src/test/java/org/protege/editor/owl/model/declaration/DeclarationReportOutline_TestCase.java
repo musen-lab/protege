@@ -18,6 +18,18 @@ import static org.junit.Assert.*;
 public class DeclarationReportOutline_TestCase {
 
     @Test
+    public void shouldUseCompactRuleNamesForSuggestedRepairs() {
+        String[] ids = {IriPrefixRule.ID, OboIdentifierRule.ID, FirstMentionRule.ID, "unknown-rule"};
+        String[] names = {"IRI prefix", "OBO ID", "Import closure", "unknown-rule"};
+        for (int i = 0; i < ids.length; i++) {
+            MisplacedDeclarationFinding finding = MisplacedDeclarationFinding.get(
+                    OWLManager.getOWLDataFactory().getOWLClass(IRI.create("urn:entity")), GO,
+                    Collections.singleton(PIZZA), ids[i]);
+            assertEquals(names[i], DeclarationReportOutline.shortRuleLabelOf(finding));
+        }
+    }
+
+    @Test
     public void shouldHeadBothSectionsWithTheirCountsInFixedOrder() {
         DeclarationReportOutline outline = DeclarationReportOutline.of(report(9, 3, 3));
 

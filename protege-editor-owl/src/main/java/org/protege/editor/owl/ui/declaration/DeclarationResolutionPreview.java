@@ -8,12 +8,8 @@ import org.semanticweb.owlapi.model.OWLOntologyChange;
 import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import javax.swing.*;
-import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -97,40 +93,17 @@ final class DeclarationResolutionPreview {
     /** Reuses one cell renderer; large previews do not retain a Swing component per finding. */
     private static final class RowRenderer implements ListCellRenderer<Row> {
         private final ListCellRenderer entityRenderer;
-        private final JPanel rowPanel = new JPanel(new BorderLayout(0, 2));
-        private final JPanel heading = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
-        private final JLabel location = new JLabel();
+        private final DeclarationRowPanel rowPanel = new DeclarationRowPanel(true);
 
         private RowRenderer(ListCellRenderer entityRenderer) {
             this.entityRenderer = entityRenderer;
-            heading.setOpaque(false);
-            location.setFont(location.getFont().deriveFont(Math.max(10.0f, location.getFont().getSize2D() - 1.0f)));
-            Color separator = UIManager.getColor("Separator.foreground");
-            rowPanel.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createMatteBorder(0, 0, 1, 0, separator != null ? separator : Color.LIGHT_GRAY),
-                    BorderFactory.createEmptyBorder(5, 10, 5, 10)));
-            location.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 0));
-            rowPanel.add(heading, BorderLayout.NORTH);
-            rowPanel.add(location, BorderLayout.CENTER);
         }
 
         @Override
         public Component getListCellRendererComponent(JList<? extends Row> list, Row row, int index,
                                                         boolean selected, boolean focused) {
-            Color foreground = selected ? list.getSelectionForeground() : list.getForeground();
-            rowPanel.setBackground(selected ? list.getSelectionBackground() : list.getBackground());
-            heading.removeAll();
-            JLabel action = new JLabel(row.heading() + ":");
-            action.setFont(action.getFont().deriveFont(Font.BOLD));
-            action.setForeground(foreground);
-            heading.add(action);
             Component entity = entityRenderer.getListCellRendererComponent(list, row.entity, index, selected, focused);
-            entity.setForeground(foreground);
-            heading.add(entity);
-            location.setText(row.location());
-            Color secondary = UIManager.getColor("Label.disabledForeground");
-            location.setForeground(selected ? list.getSelectionForeground() : secondary != null ? secondary : Color.GRAY);
-            return rowPanel;
+            return rowPanel.render(list, entity, row.heading() + ":", row.location(), selected);
         }
     }
 }

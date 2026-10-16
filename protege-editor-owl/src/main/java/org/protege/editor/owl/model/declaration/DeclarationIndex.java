@@ -7,6 +7,7 @@ import org.semanticweb.owlapi.model.parameters.Imports;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayDeque;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -66,14 +67,20 @@ class DeclarationIndex implements ImportClosureView {
      */
     @Nonnull
     static DeclarationIndex over(@Nonnull OWLOntology ontology) {
-        checkNotNull(ontology);
+        return over(checkNotNull(ontology).getImportsClosure());
+    }
+
+    /** Builds the same index when the caller already has the complete closure. */
+    @Nonnull
+    static DeclarationIndex over(@Nonnull Collection<OWLOntology> closure) {
+        checkNotNull(closure);
         Map<OWLEntity, ImmutableSet.Builder<OWLOntologyID>> declaredBy = new LinkedHashMap<>();
         Map<OWLEntity, ImmutableSet.Builder<OWLOntologyID>> usedBy = new LinkedHashMap<>();
         Map<OWLOntologyID, Set<OWLOntologyID>> directImports = new LinkedHashMap<>();
         ImmutableSet.Builder<OWLOntologyID> ontologies = ImmutableSet.builder();
         // getImportsClosure() includes the ontology itself and visits each import once, so a
         // cycle between two ontologies ends rather than repeating.
-        for (OWLOntology importOntology : ontology.getImportsClosure()) {
+        for (OWLOntology importOntology : closure) {
             OWLOntologyID importOntologyId = importOntology.getOntologyID();
             ontologies.add(importOntologyId);
             for (OWLDeclarationAxiom declaration : importOntology.getAxioms(AxiomType.DECLARATION)) {
