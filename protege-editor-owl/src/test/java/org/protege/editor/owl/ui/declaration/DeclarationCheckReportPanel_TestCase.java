@@ -4,6 +4,8 @@ import org.junit.Test;
 import org.protege.editor.core.ui.list.MList;
 import org.protege.editor.core.ui.list.MListSectionHeader;
 import org.protege.editor.owl.model.declaration.*;
+import org.protege.editor.owl.model.declaration.detection.MissingDeclarationChecker;
+import org.protege.editor.owl.model.declaration.reporting.DeclarationReportOutline;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.*;
 

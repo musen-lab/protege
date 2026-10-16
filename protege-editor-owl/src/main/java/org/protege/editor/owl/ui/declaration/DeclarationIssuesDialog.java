@@ -2,7 +2,7 @@ package org.protege.editor.owl.ui.declaration;
 
 import com.google.common.html.HtmlEscapers;
 import org.protege.editor.core.ProtegeApplication;
-import org.protege.editor.owl.model.declaration.DeclarationReportOutline;
+import org.protege.editor.owl.model.declaration.reporting.DeclarationReportOutline;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;

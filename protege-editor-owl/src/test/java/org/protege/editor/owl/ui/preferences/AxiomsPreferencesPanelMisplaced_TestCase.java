@@ -8,11 +8,11 @@ import org.protege.editor.core.prefs.Preferences;
 import org.protege.editor.core.prefs.PreferencesManager;
 import org.protege.editor.core.ui.preferences.PreferencesDialogPanel;
 import org.protege.editor.owl.model.declaration.EntityDeclarationPreferences;
-import org.protege.editor.owl.model.declaration.ImportClosureView;
-import org.protege.editor.owl.model.declaration.MisplacedDeclarationPreferences;
-import org.protege.editor.owl.model.declaration.OwnershipRule;
-import org.protege.editor.owl.model.declaration.OwnershipRuleDisplay;
-import org.protege.editor.owl.model.declaration.OwnershipRules;
+import org.protege.editor.owl.model.declaration.detection.ImportClosureView;
+import org.protege.editor.owl.model.declaration.MisplacedDeclarationRulesPreferences;
+import org.protege.editor.owl.model.declaration.placement.OwnershipRule;
+import org.protege.editor.owl.model.declaration.placement.OwnershipRuleDisplay;
+import org.protege.editor.owl.model.declaration.placement.OwnershipRules;
 
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
@@ -433,8 +433,8 @@ public class AxiomsPreferencesPanelMisplaced_TestCase {
         throw new AssertionError("No control mentioning " + wanted + " in the Axioms panel");
     }
 
-    private static MisplacedDeclarationPreferences preferences() {
-        return MisplacedDeclarationPreferences.getInstance();
+    private static MisplacedDeclarationRulesPreferences preferences() {
+        return MisplacedDeclarationRulesPreferences.getInstance();
     }
 
     private AxiomsPreferencesPanel buildPanel() {

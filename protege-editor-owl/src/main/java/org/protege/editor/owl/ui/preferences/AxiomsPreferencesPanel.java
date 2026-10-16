@@ -3,10 +3,10 @@ package org.protege.editor.owl.ui.preferences;
 import com.google.common.html.HtmlEscapers;
 import org.protege.editor.core.ui.preferences.PreferencesLayoutPanel;
 import org.protege.editor.owl.model.declaration.EntityDeclarationPreferences;
-import org.protege.editor.owl.model.declaration.MisplacedDeclarationPreferences;
-import org.protege.editor.owl.model.declaration.OwnershipRule;
-import org.protege.editor.owl.model.declaration.OwnershipRuleDisplay;
-import org.protege.editor.owl.model.declaration.OwnershipRules;
+import org.protege.editor.owl.model.declaration.MisplacedDeclarationRulesPreferences;
+import org.protege.editor.owl.model.declaration.placement.OwnershipRule;
+import org.protege.editor.owl.model.declaration.placement.OwnershipRuleDisplay;
+import org.protege.editor.owl.model.declaration.placement.OwnershipRules;
 
 import javax.swing.*;
 import java.awt.*;
@@ -80,8 +80,8 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
 
         panel.addVerticalPadding();
         panel.addGroup(MISPLACED_GROUP_LABEL);
-        MisplacedDeclarationPreferences misplacedPreferences =
-                MisplacedDeclarationPreferences.getInstance();
+        MisplacedDeclarationRulesPreferences misplacedPreferences =
+                MisplacedDeclarationRulesPreferences.getInstance();
         for (OwnershipRule rule : ownershipRules) {
             OwnershipRuleDisplay display = rule.getDisplay();
             JCheckBox checkBox = new JCheckBox(display.getLabel(), misplacedPreferences.isRuleEnabled(rule));
@@ -96,8 +96,8 @@ public class AxiomsPreferencesPanel extends OWLPreferencesPanel {
     public void applyChanges() {
         EntityDeclarationPreferences.getInstance().setSuppressingAutomaticDeclarations(
                 suppressAutomaticEntityDeclarationsCheckBox.isSelected());
-        MisplacedDeclarationPreferences misplacedPreferences =
-                MisplacedDeclarationPreferences.getInstance();
+        MisplacedDeclarationRulesPreferences misplacedPreferences =
+                MisplacedDeclarationRulesPreferences.getInstance();
         ownershipRuleCheckBoxes.forEach(
                 (rule, checkBox) -> misplacedPreferences.setRuleEnabled(rule, checkBox.isSelected()));
     }

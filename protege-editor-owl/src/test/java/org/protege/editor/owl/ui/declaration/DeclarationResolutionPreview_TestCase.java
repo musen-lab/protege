@@ -3,6 +3,8 @@ package org.protege.editor.owl.ui.declaration;
 import org.junit.Before;
 import org.junit.Test;
 import org.protege.editor.owl.model.declaration.*;
+import org.protege.editor.owl.model.declaration.detection.DeclarationChecker;
+import org.protege.editor.owl.model.declaration.resolution.DeclarationResolutionPlanner;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.*;
 

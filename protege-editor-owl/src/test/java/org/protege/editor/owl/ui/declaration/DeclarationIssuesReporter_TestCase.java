@@ -10,7 +10,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.protege.editor.owl.model.declaration.DeclarationCheckStatus;
 import org.protege.editor.owl.model.declaration.DeclarationReport;
-import org.protege.editor.owl.model.declaration.DeclarationReportOutline;
+import org.protege.editor.owl.model.declaration.reporting.DeclarationReportOutline;
 import org.protege.editor.owl.model.declaration.MisplacedDeclarationReport;
 import org.protege.editor.owl.model.declaration.MissingDeclarationReport;
 import org.semanticweb.owlapi.apibinding.OWLManager;

@@ -1,10 +1,10 @@
 package org.protege.editor.owl.ui.declaration;
 
-import org.protege.editor.owl.model.declaration.DeclarationChecker;
+import org.protege.editor.owl.model.declaration.detection.DeclarationChecker;
 import org.protege.editor.owl.model.declaration.DeclarationCheckStatus;
 import org.protege.editor.owl.model.declaration.DeclarationReport;
-import org.protege.editor.owl.model.declaration.DeclarationReportLogWriter;
-import org.protege.editor.owl.model.declaration.DeclarationReportOutline;
+import org.protege.editor.owl.model.declaration.reporting.DeclarationReportLogWriter;
+import org.protege.editor.owl.model.declaration.reporting.DeclarationReportOutline;
 import org.semanticweb.owlapi.model.OWLOntology;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

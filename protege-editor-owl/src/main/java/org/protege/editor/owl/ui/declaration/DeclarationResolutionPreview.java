@@ -1,6 +1,6 @@
 package org.protege.editor.owl.ui.declaration;
 
-import org.protege.editor.owl.model.declaration.DeclarationResolutionPlanner;
+import org.protege.editor.owl.model.declaration.resolution.DeclarationResolutionPlanner;
 import org.protege.editor.owl.model.declaration.OntologyIdFormat;
 import org.semanticweb.owlapi.model.OWLDeclarationAxiom;
 import org.semanticweb.owlapi.model.OWLEntity;

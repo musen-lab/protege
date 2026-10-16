@@ -1,7 +1,7 @@
 package org.protege.editor.owl.ui.declaration;
 
 import org.junit.Test;
-import org.protege.editor.owl.model.declaration.DeclarationReportOutline;
+import org.protege.editor.owl.model.declaration.reporting.DeclarationReportOutline;
 
 import javax.swing.*;
 import java.util.concurrent.atomic.AtomicInteger;

@@ -87,7 +87,7 @@ public final class DeclarationReportFixtures {
     /**
      * Creates misplaced-declaration findings for sequential Gene Ontology classes.
      *
-     * <p>Each class is owned by {@link #GO} according to {@link OboIdentifierRule}, but is declared
+     * <p>Each class is owned by {@link #GO} according to the OBO identifier rule, but is declared
      * in {@link #PIZZA}.
      *
      * @param count the non-negative number of misplaced class findings to create
@@ -100,7 +100,7 @@ public final class DeclarationReportFixtures {
                     DF.getOWLClass(IRI.create(String.format("http://purl.obolibrary.org/obo/GO_%07d", i))),
                     GO,
                     Collections.singleton(PIZZA),
-                    OboIdentifierRule.ID));
+                    "misplaced.rule.use.obo.identifier"));
         }
         return MisplacedDeclarationReport.get(findings.build());
     }

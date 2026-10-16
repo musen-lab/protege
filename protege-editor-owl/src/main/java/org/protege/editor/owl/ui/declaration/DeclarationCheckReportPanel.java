@@ -6,7 +6,7 @@ import org.protege.editor.core.ui.list.MListItem;
 import org.protege.editor.core.ui.list.MListSectionHeader;
 import org.protege.editor.core.ui.util.ComponentFactory;
 import org.protege.editor.owl.OWLEditorKit;
-import org.protege.editor.owl.model.declaration.DeclarationReportOutline;
+import org.protege.editor.owl.model.declaration.reporting.DeclarationReportOutline;
 import org.protege.editor.owl.model.declaration.MisplacedDeclarationFinding;
 import org.protege.editor.owl.model.declaration.MissingDeclarationFinding;
 import org.protege.editor.owl.model.declaration.OntologyIdFormat;
