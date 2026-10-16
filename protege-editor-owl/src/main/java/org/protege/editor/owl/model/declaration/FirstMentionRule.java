@@ -1,11 +1,8 @@
 package org.protege.editor.owl.model.declaration;
 
-import com.google.common.collect.ImmutableSet;
-import org.semanticweb.owlapi.model.OWLEntity;
 import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import javax.annotation.Nonnull;
-import java.util.Optional;
 
 /**
  * Selects an entity's owner from the first ontology in the import chain that mentions it.
@@ -54,59 +51,11 @@ final class FirstMentionRule implements OwnershipRule {
     @Override
     @Nonnull
     public Resolver compile(@Nonnull ImportClosureView closure) {
-        return entity -> ownerIn(closure, entity);
+        return new FirstMentionStrategy(closure)::resolve;
     }
 
     @Override
     public boolean standsInForOwner(@Nonnull OWLOntologyID owner, @Nonnull OWLOntologyID candidate) {
         return false;
-    }
-
-    /**
-     * Finds the unique mentioning ontology with no earlier mention below it in the import graph.
-     *
-     * @param closure the import closure to search
-     * @param entity the entity whose owner is required
-     * @return the unique first mention, or an empty optional if the entity is not mentioned or its
-     *         first mention is ambiguous
-     */
-    @Nonnull
-    private static Optional<OWLOntologyID> ownerIn(ImportClosureView closure, OWLEntity entity) {
-        ImmutableSet<OWLOntologyID> mentioners = closure.getMentioningOntologies(entity);
-        if (mentioners.size() == 1) {
-            return Optional.of(mentioners.iterator().next());
-        }
-        OWLOntologyID first = null;
-        for (OWLOntologyID candidate : mentioners) {
-            if (nothingMentioningIsBelow(closure, candidate, mentioners)) {
-                if (first != null) {
-                    return Optional.empty();    // two documents are equally first, so neither owns it
-                }
-                first = candidate;
-            }
-        }
-        return Optional.ofNullable(first);
-    }
-
-    /** Checks that no other mentioning ontology occurs earlier in the import direction. */
-    private static boolean nothingMentioningIsBelow(ImportClosureView closure,
-                                                    OWLOntologyID candidate,
-                                                    ImmutableSet<OWLOntologyID> mentioners) {
-        for (OWLOntologyID other : mentioners) {
-            if (!other.equals(candidate) && isBelow(closure, other, candidate)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Tests whether {@code lower} is strictly below {@code upper} in the import graph.
-     *
-     * <p>The relation is strict because {@code lower} must not also reach {@code upper}. Ontologies
-     * in an import cycle reach each other, so neither is below the other.
-     */
-    private static boolean isBelow(ImportClosureView closure, OWLOntologyID lower, OWLOntologyID upper) {
-        return closure.reaches(upper, lower) && !closure.reaches(lower, upper);
     }
 }

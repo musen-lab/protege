@@ -66,7 +66,9 @@ public final class DeclarationCheckReportPanel extends JPanel {
         OWLOntology root = owlEditorKit.getOWLModelManager().getActiveOntology();
         resolutionActions = new DeclarationResolutionActions(
                 owlEditorKit.getOWLModelManager(), root, list,
-                updated -> list.setListData(updated.toArray()), new DeclarationResolutionDialogs(this));
+                updated -> list.setListData(updated.toArray()),
+                new DeclarationResolutionDialogs(this,
+                        DeclarationDestinationPanel.entityRenderer(owlEditorKit)));
         add(resolutionActions.getToolbar(), BorderLayout.SOUTH);
     }
 

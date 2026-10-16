@@ -12,6 +12,9 @@ import javax.swing.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
@@ -232,6 +235,102 @@ public class DeclarationResolutionActions_TestCase {
         assertTrue(prompts.errors.isEmpty());
     }
 
+    @Test
+    public void shouldPromptForEveryMissingEntityWithIndependentTargetsAndFirstMentionSuggestions() throws Exception {
+        OWLClass another = factory.getOWLClass(IRI.create("http://example.org/Another"));
+        ontologies.addAxiom(owner, factory.getOWLSubClassOfAxiom(another, factory.getOWLThing()));
+        prompts.chosenTargets.put(missing, root);
+        prompts.chosenTargets.put(another, owner);
+        click("Refresh");
+        click("Resolve all…");
+        assertEquals(2, prompts.choices);
+        assertEquals(Optional.of(root.getOntologyID()), prompts.suggestions.get(missing));
+        assertEquals(Optional.of(owner.getOntologyID()), prompts.suggestions.get(another));
+        assertTrue(root.containsAxiom(factory.getOWLDeclarationAxiom(missing)));
+        assertTrue(owner.containsAxiom(factory.getOWLDeclarationAxiom(another)));
+        assertTrue(root.getDeclarationAxioms(another).isEmpty());
+        assertEquals(1, batches.size());
+    }
+
+    @Test
+    public void shouldCancelTheWholeBatchWhenASecondEntityChoiceIsCancelled() throws Exception {
+        OWLClass another = factory.getOWLClass(IRI.create("http://example.org/Another"));
+        ontologies.addAxiom(owner, factory.getOWLSubClassOfAxiom(another, factory.getOWLThing()));
+        prompts.cancelOnChoice = 2;
+        click("Refresh");
+        click("Resolve all…");
+        assertEquals(2, prompts.choices);
+        assertTrue(batches.isEmpty());
+        assertNull(prompts.preview);
+        assertTrue(root.getDeclarationAxioms(missing).isEmpty());
+        assertTrue(owner.getDeclarationAxioms(another).isEmpty());
+    }
+
+    @Test
+    public void shouldRejectOntologyChangesDuringIndividualDestinationChoice() throws Exception {
+        prompts.duringChoice = () -> ontologies.addAxiom(root, factory.getOWLDeclarationAxiom(missing));
+        click("Resolve all…");
+        assertTrue(batches.isEmpty());
+        assertNull(prompts.preview);
+        assertEquals(1, prompts.errors.size());
+    }
+
+    @Test
+    public void shouldNotInventASuggestionForSiblingMentions() throws Exception {
+        OWLOntology sibling = ontologies.createOntology(IRI.create("http://example.org/sibling"));
+        ontologies.applyChange(new AddImport(root, factory.getOWLImportsDeclaration(
+                sibling.getOntologyID().getOntologyIRI().get())));
+        OWLClass ambiguous = factory.getOWLClass(IRI.create("http://example.org/Ambiguous"));
+        ontologies.addAxiom(owner, factory.getOWLSubClassOfAxiom(ambiguous, factory.getOWLThing()));
+        ontologies.addAxiom(sibling, factory.getOWLSubClassOfAxiom(ambiguous, factory.getOWLThing()));
+        click("Refresh");
+        click("Resolve all…");
+        assertEquals(Optional.empty(), prompts.suggestions.get(ambiguous));
+        assertEquals(2, prompts.choices);
+        assertEquals(1, batches.size());
+    }
+
+    @Test
+    public void shouldAskForEachMisplacedEntityAndHonorIndependentDestinations() throws Exception {
+        OWLOntology alternative = ontologies.createOntology(IRI.create("http://example.org/alternative"));
+        ontologies.applyChange(new AddImport(root, factory.getOWLImportsDeclaration(
+                alternative.getOntologyID().getOntologyIRI().get())));
+        OWLClass another = factory.getOWLClass(IRI.create("http://example.org/owner#Another"));
+        ontologies.addAxiom(root, factory.getOWLDeclarationAxiom(another));
+        prompts.chosenTargets.put(another, alternative);
+        click("Refresh");
+        click("Resolve all…");
+        assertEquals(2, prompts.misplacedChoices);
+        assertEquals(Optional.of(owner.getOntologyID()), prompts.suggestions.get(another));
+        assertEquals(Optional.of(owner.getOntologyID()), prompts.suggestions.get(misplaced));
+        assertFalse(owner.getDeclarationAxioms(misplaced).isEmpty());
+        assertFalse(alternative.getDeclarationAxioms(another).isEmpty());
+        assertTrue(owner.getDeclarationAxioms(another).isEmpty());
+        assertTrue(root.getDeclarationAxioms(another).isEmpty());
+        assertEquals(1, batches.size());
+    }
+
+    @Test
+    public void shouldApplyNoRepairsWhenAMisplacedDestinationIsCancelled() throws Exception {
+        prompts.cancelOnMisplacedChoice = 1;
+        click("Resolve all…");
+        assertEquals(1, prompts.choices);
+        assertEquals(1, prompts.misplacedChoices);
+        assertTrue(batches.isEmpty());
+        assertNull(prompts.preview);
+        assertTrue(owner.getDeclarationAxioms(missing).isEmpty());
+        assertFalse(root.getDeclarationAxioms(misplaced).isEmpty());
+    }
+
+    @Test
+    public void shouldRejectChangesDuringTheMisplacedDestinationPrompt() throws Exception {
+        prompts.duringMisplacedChoice = () -> ontologies.addAxiom(owner, factory.getOWLDeclarationAxiom(misplaced));
+        click("Resolve all…");
+        assertTrue(batches.isEmpty());
+        assertNull(prompts.preview);
+        assertEquals(1, prompts.errors.size());
+    }
+
     private Object[] rows() {
         return DeclarationCheckReportPanel.rows(DeclarationReportOutline.of(
                 DeclarationChecker.forcingAllChecks().check(root)), root.getImportsClosure()).toArray();
@@ -276,14 +375,39 @@ public class DeclarationResolutionActions_TestCase {
         OWLOntology target;
         boolean approve = true;
         int choices;
+        int cancelOnChoice;
+        int misplacedChoices;
+        int cancelOnMisplacedChoice;
+        final Map<OWLEntity, OWLOntology> chosenTargets = new HashMap<>();
+        final Map<OWLEntity, Optional<OWLOntologyID>> suggestions = new HashMap<>();
+        Runnable duringChoice = () -> { };
+        Runnable duringMisplacedChoice = () -> { };
         Runnable duringConfirmation = () -> { };
         DeclarationResolutionPlanner.Plan preview;
         final List<String> errors = new ArrayList<>();
 
         @Override
-        public OWLOntology chooseMissingTarget(List<OWLOntology> ontologies, OWLOntology root) {
+        public OWLOntology chooseMissingTarget(OWLEntity entity, List<OWLOntology> ontologies,
+                                               Optional<OWLOntologyID> suggested, int index, int total) {
+            assertTrue(SwingUtilities.isEventDispatchThread());
             choices++;
-            return target;
+            assertEquals(choices, index);
+            assertTrue(total >= index);
+            suggestions.put(entity, suggested);
+            duringChoice.run();
+            return choices == cancelOnChoice ? null : chosenTargets.getOrDefault(entity, target);
+        }
+
+        @Override
+        public OWLOntology chooseMisplacedTarget(OWLEntity entity, List<OWLOntology> ontologies,
+                                                 Optional<OWLOntologyID> suggested, int index, int total) {
+            assertTrue(SwingUtilities.isEventDispatchThread());
+            misplacedChoices++;
+            assertEquals(misplacedChoices, index);
+            assertTrue(total >= index);
+            suggestions.put(entity, suggested);
+            duringMisplacedChoice.run();
+            return misplacedChoices == cancelOnMisplacedChoice ? null : chosenTargets.getOrDefault(entity, target);
         }
 
         @Override

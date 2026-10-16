@@ -2,7 +2,9 @@ package org.protege.editor.owl.ui.declaration;
 
 import org.protege.editor.owl.model.OWLModelManager;
 import org.protege.editor.owl.model.declaration.*;
+import org.semanticweb.owlapi.model.OWLEntity;
 import org.semanticweb.owlapi.model.OWLOntology;
+import org.semanticweb.owlapi.model.OWLOntologyID;
 import org.semanticweb.owlapi.model.OWLOntologyChangeListener;
 import org.semanticweb.owlapi.model.OWLOntologyManager;
 import org.slf4j.Logger;
@@ -12,8 +14,13 @@ import javax.swing.*;
 import java.awt.FlowLayout;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -26,7 +33,10 @@ final class DeclarationResolutionActions {
     private static final Logger logger = LoggerFactory.getLogger(DeclarationResolutionActions.class);
 
     interface Interaction {
-        OWLOntology chooseMissingTarget(List<OWLOntology> ontologies, OWLOntology root);
+        OWLOntology chooseMissingTarget(OWLEntity entity, List<OWLOntology> ontologies,
+                                        Optional<OWLOntologyID> suggested, int index, int total);
+        OWLOntology chooseMisplacedTarget(OWLEntity entity, List<OWLOntology> ontologies,
+                                          Optional<OWLOntologyID> suggested, int index, int total);
         boolean confirm(DeclarationResolutionPlanner.Plan plan);
         void showError(String message);
     }
@@ -156,28 +166,68 @@ final class DeclarationResolutionActions {
             }
             Set<OWLOntology> editable = new HashSet<>();
             root.getImportsClosure().stream().filter(modelManager::isMutable).forEach(editable::add);
-            OWLOntology target = chooseTarget(missing, editable);
-            if (!missing.isEmpty() && target == null) {
-                return;
-            }
-            requireCurrentRoot();
             long expected = revision.get();
-            DeclarationResolutionPlanner planner = new DeclarationResolutionPlanner(root, editable::contains);
-            runInBackground(() -> planner.plan(missing, misplaced, target),
-                    plan -> confirmAndApply(plan, expected), "Preparing repairs…");
+            runInBackground(() -> missing.isEmpty()
+                            ? Collections.<OWLEntity, Optional<OWLOntologyID>>emptyMap() : suggestionsFor(missing),
+                    suggestions -> chooseTargetsAndPlan(missing, misplaced, editable, suggestions, expected),
+                    "Finding suggested locations…");
         } catch (RuntimeException ex) {
             reportError(ex, "No repairs were applied.\n");
         }
     }
 
-    private OWLOntology chooseTarget(List<MissingDeclarationFinding> missing, Set<OWLOntology> editable) {
-        if (missing.isEmpty()) {
-            return null;
+    private Map<OWLEntity, Optional<OWLOntologyID>> suggestionsFor(List<MissingDeclarationFinding> missing) {
+        FirstMentionStrategy strategy = FirstMentionStrategy.over(root);
+        Map<OWLEntity, Optional<OWLOntologyID>> suggestions = new HashMap<>();
+        for (MissingDeclarationFinding finding : missing) {
+            suggestions.put(finding.getEntity(), strategy.resolve(finding.getEntity()));
         }
+        return suggestions;
+    }
+
+    private void chooseTargetsAndPlan(List<MissingDeclarationFinding> missing,
+                                      List<MisplacedDeclarationFinding> misplaced,
+                                      Set<OWLOntology> editable,
+                                      Map<OWLEntity, Optional<OWLOntologyID>> suggestions, long expected) {
+        requireRevision(expected);
         if (editable.isEmpty()) {
             throw new IllegalStateException("No ontology in this report's import closure is editable.");
         }
-        return interaction.chooseMissingTarget(Collections.unmodifiableList(new ArrayList<>(editable)), root);
+        List<OWLOntology> choices = new ArrayList<>(editable);
+        choices.sort(Comparator.comparing(ontology -> OntologyIdFormat.format(ontology.getOntologyID())));
+        choices = Collections.unmodifiableList(choices);
+        Map<OWLEntity, OWLOntology> targets = new LinkedHashMap<>();
+        for (MissingDeclarationFinding finding : missing) {
+            OWLEntity entity = finding.getEntity();
+            OWLOntology target = interaction.chooseMissingTarget(entity, choices, suggestions.get(entity),
+                    targets.size() + 1, missing.size());
+            if (target == null) {
+                return; // Cancellation abandons the whole batch, including earlier choices.
+            }
+            requireRevision(expected);
+            targets.put(entity, target);
+        }
+        int index = 0;
+        for (MisplacedDeclarationFinding finding : misplaced) {
+            OWLEntity entity = finding.getEntity();
+            OWLOntology target = interaction.chooseMisplacedTarget(entity, choices,
+                    Optional.of(finding.getOwningOntology()), ++index, misplaced.size());
+            if (target == null) {
+                return; // No changes, including missing declarations, are applied until every choice is made.
+            }
+            requireRevision(expected);
+            targets.put(entity, target);
+        }
+        preparePlan(missing, misplaced, editable, targets, expected);
+    }
+
+    private void preparePlan(List<MissingDeclarationFinding> missing,
+                             List<MisplacedDeclarationFinding> misplaced, Set<OWLOntology> editable,
+                             Map<OWLEntity, OWLOntology> targets, long expected) {
+        requireRevision(expected);
+        DeclarationResolutionPlanner planner = new DeclarationResolutionPlanner(root, editable::contains);
+        runInBackground(() -> planner.planForTargets(missing, misplaced, targets),
+                plan -> confirmAndApply(plan, expected), "Preparing repairs…");
     }
 
     private void confirmAndApply(DeclarationResolutionPlanner.Plan plan, long expected) {

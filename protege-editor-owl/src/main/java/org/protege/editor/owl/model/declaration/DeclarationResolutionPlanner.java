@@ -1,12 +1,14 @@
 package org.protege.editor.owl.model.declaration;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import org.semanticweb.owlapi.model.*;
 
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,7 +20,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Plans declaration-only repairs without modifying an ontology.
  *
  * <p>Reuses the manual report's checkers to reject stale findings. Missing declarations go to an
- * explicitly chosen ontology; misplaced declarations go to the owner recorded by the checker.
+ * explicitly chosen ontology; misplaced declarations move to their individually chosen targets.
  * All declaration annotations are retained when a declaration is moved.
  */
 public final class DeclarationResolutionPlanner {
@@ -45,6 +47,18 @@ public final class DeclarationResolutionPlanner {
     public Plan plan(Collection<MissingDeclarationFinding> missing,
                      Collection<MisplacedDeclarationFinding> misplaced,
                      OWLOntology missingTarget) {
+        Map<OWLEntity, OWLOntology> targets = new HashMap<>();
+        missing.forEach(finding -> targets.put(finding.getEntity(), missingTarget));
+        misplaced.forEach(finding -> targets.put(finding.getEntity(),
+                root.getOWLOntologyManager().getOntology(finding.getOwningOntology())));
+        return planForTargets(missing, misplaced, targets);
+    }
+
+    /** Plans a batch using each missing or misplaced entity's individually chosen destination. */
+    public Plan planForTargets(Collection<MissingDeclarationFinding> missing,
+                               Collection<MisplacedDeclarationFinding> misplaced,
+                               Map<OWLEntity, OWLOntology> targets) {
+        checkNotNull(targets);
         DeclarationReport current = DeclarationChecker.forcingAllChecks().check(root);
         require(new HashSet<>(current.getMissing().getFindings()).containsAll(missing)
                         && new HashSet<>(current.getMisplaced().getFindings()).containsAll(misplaced),
@@ -54,19 +68,26 @@ public final class DeclarationResolutionPlanner {
         Set<OWLOntology> checked = new HashSet<>();
         Set<OWLOntologyChange> additions = new LinkedHashSet<>();
         Set<OWLOntologyChange> removals = new LinkedHashSet<>();
+        Map<OWLEntity, OWLOntology> destinations = new LinkedHashMap<>();
         if (!missing.isEmpty()) {
-            requireEditable(missingTarget, closure, checked);
             OWLDataFactory factory = root.getOWLOntologyManager().getOWLDataFactory();
             for (MissingDeclarationFinding finding : missing) {
-                additions.add(new AddAxiom(missingTarget, factory.getOWLDeclarationAxiom(finding.getEntity())));
+                OWLOntology target = targets.get(finding.getEntity());
+                requireEditable(target, closure, checked);
+                destinations.put(finding.getEntity(), target);
+                additions.add(new AddAxiom(target, factory.getOWLDeclarationAxiom(finding.getEntity())));
             }
         }
         for (MisplacedDeclarationFinding finding : misplaced) {
-            OWLOntology target = ontologyIn(closure, finding.getOwningOntology());
+            OWLOntology target = targets.get(finding.getEntity());
             requireEditable(target, closure, checked);
+            destinations.put(finding.getEntity(), target);
             for (OWLOntologyID sourceId : finding.getDeclaringOntologies()) {
                 OWLOntology source = ontologyIn(closure, sourceId);
                 requireEditable(source, closure, checked);
+                if (source.equals(target)) {
+                    continue; // Keep declarations already in the chosen destination.
+                }
                 for (OWLDeclarationAxiom declaration : source.getDeclarationAxioms(finding.getEntity())) {
                     // Copy the actual axiom, including annotations, rather than reconstructing it.
                     if (!target.containsAxiom(declaration)) {
@@ -77,7 +98,7 @@ public final class DeclarationResolutionPlanner {
             }
         }
         return new Plan(ImmutableList.<OWLOntologyChange>builder()
-                .addAll(additions).addAll(removals).build(),
+                .addAll(additions).addAll(removals).build(), destinations,
                 new LinkedHashSet<>(missing).size() + new LinkedHashSet<>(misplaced).size());
     }
 
@@ -109,11 +130,19 @@ public final class DeclarationResolutionPlanner {
     public static final class Plan {
 
         private final ImmutableList<OWLOntologyChange> changes;
+        private final ImmutableMap<OWLEntity, OWLOntology> destinations;
         private final int findingCount;
 
-        private Plan(ImmutableList<OWLOntologyChange> changes, int findingCount) {
+        private Plan(ImmutableList<OWLOntologyChange> changes, Map<OWLEntity, OWLOntology> destinations,
+                     int findingCount) {
             this.changes = changes;
+            this.destinations = ImmutableMap.copyOf(destinations);
             this.findingCount = findingCount;
+        }
+
+        /** Includes chosen destinations even when their declaration axioms already exist. */
+        public Map<OWLEntity, OWLOntology> getDestinations() {
+            return destinations;
         }
 
         public List<OWLOntologyChange> getChanges() {

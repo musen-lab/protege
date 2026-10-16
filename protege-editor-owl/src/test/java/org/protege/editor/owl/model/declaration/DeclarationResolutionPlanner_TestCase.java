@@ -214,6 +214,73 @@ public class DeclarationResolutionPlanner_TestCase {
                 (planned - start) / 1e9, (System.nanoTime() - planned) / 1e9);
     }
 
+    @Test
+    public void shouldUseAnIndividualDestinationForEachPunnedEntity() {
+        OWLNamedIndividual individual = factory.getOWLNamedIndividual(entity.getIRI());
+        manager.addAxiom(root, factory.getOWLClassAssertionAxiom(entity, individual));
+        java.util.Map<OWLEntity, OWLOntology> targets = new java.util.HashMap<>();
+        targets.put(entity, root);
+        targets.put(individual, owner);
+        DeclarationResolutionPlanner.Plan plan = planner().planForTargets(check().getMissing().getFindings(),
+                Collections.emptyList(), targets);
+        manager.applyChanges(plan.getChanges());
+        assertFalse(root.getDeclarationAxioms(entity).isEmpty());
+        assertTrue(owner.getDeclarationAxioms(entity).isEmpty());
+        assertFalse(owner.getDeclarationAxioms(individual).isEmpty());
+        assertTrue(root.getDeclarationAxioms(individual).isEmpty());
+    }
+
+    @Test
+    public void shouldRejectAnIncompleteSetOfIndividualChoicesBeforeApplyingAnyRepairs() {
+        manager.addAxiom(root, factory.getOWLSubClassOfAxiom(entity, factory.getOWLThing()));
+        assertThrows(IllegalStateException.class, () -> planner().planForTargets(
+                check().getMissing().getFindings(), Collections.emptyList(), Collections.emptyMap()));
+        assertTrue(root.getDeclarationAxioms(entity).isEmpty());
+        assertTrue(owner.getDeclarationAxioms(entity).isEmpty());
+    }
+
+    @Test
+    public void shouldMoveMisplacedAxiomsToTheChosenDestinationInsteadOfTheSuggestion() throws Exception {
+        OWLOntology chosen = imported("http://example.org/chosen");
+        OWLDeclarationAxiom declaration = factory.getOWLDeclarationAxiom(entity, Collections.singleton(
+                factory.getOWLAnnotation(factory.getRDFSLabel(), factory.getOWLLiteral("preserve me"))));
+        manager.addAxiom(root, declaration);
+        DeclarationResolutionPlanner.Plan plan = planner().planForTargets(Collections.emptyList(),
+                check().getMisplaced().getFindings(), Collections.singletonMap(entity, chosen));
+        manager.applyChanges(plan.getChanges());
+        assertTrue(chosen.containsAxiom(declaration));
+        assertTrue(root.getDeclarationAxioms(entity).isEmpty());
+        assertTrue(owner.getDeclarationAxioms(entity).isEmpty());
+    }
+
+    @Test
+    public void shouldNotRemoveDeclarationsAlreadyInTheChosenSourceOntology() throws Exception {
+        OWLOntology another = imported("http://example.org/another");
+        OWLDeclarationAxiom original = factory.getOWLDeclarationAxiom(entity);
+        OWLDeclarationAxiom annotated = factory.getOWLDeclarationAxiom(entity, Collections.singleton(
+                factory.getOWLAnnotation(factory.getRDFSLabel(), factory.getOWLLiteral("preserve me"))));
+        manager.addAxiom(root, original);
+        manager.addAxiom(another, annotated);
+        DeclarationResolutionPlanner.Plan plan = planner().planForTargets(Collections.emptyList(),
+                check().getMisplaced().getFindings(), Collections.singletonMap(entity, root));
+        manager.applyChanges(plan.getChanges());
+        assertTrue(root.containsAxiom(original));
+        assertTrue(root.containsAxiom(annotated));
+        assertTrue(another.getDeclarationAxioms(entity).isEmpty());
+    }
+
+    @Test
+    public void shouldRejectAnUneditableOrMissingChosenMisplacedDestination() {
+        manager.addAxiom(root, factory.getOWLDeclarationAxiom(entity));
+        List<MisplacedDeclarationFinding> findings = check().getMisplaced().getFindings();
+        assertThrows(IllegalStateException.class, () -> planner().planForTargets(
+                Collections.emptyList(), findings, Collections.emptyMap()));
+        assertThrows(IllegalStateException.class, () -> new DeclarationResolutionPlanner(root, ontology -> false)
+                .planForTargets(Collections.emptyList(), findings, Collections.singletonMap(entity, owner)));
+        assertFalse(root.getDeclarationAxioms(entity).isEmpty());
+        assertTrue(owner.getDeclarationAxioms(entity).isEmpty());
+    }
+
     private OWLOntology imported(String iri) throws Exception {
         OWLOntology ontology = manager.createOntology(IRI.create(iri));
         manager.applyChange(new AddImport(root, factory.getOWLImportsDeclaration(IRI.create(iri))));

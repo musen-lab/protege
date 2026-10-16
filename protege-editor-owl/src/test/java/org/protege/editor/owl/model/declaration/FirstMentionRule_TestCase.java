@@ -146,10 +146,12 @@ public class FirstMentionRule_TestCase {
     private void assertOwner(OWLOntology root, OWLClass entity, OWLOntology expected) {
         Optional<OWLOntologyID> owner = rule.compile(DeclarationIndex.over(root)).resolve(entity);
         assertEquals(Optional.of(expected.getOntologyID()), owner);
+        assertEquals(owner, FirstMentionStrategy.over(root).resolve(entity));
     }
 
     private void assertNoOwner(OWLOntology root, OWLClass entity) {
         assertFalse(rule.compile(DeclarationIndex.over(root)).resolve(entity).isPresent());
+        assertFalse(FirstMentionStrategy.over(root).resolve(entity).isPresent());
     }
 
     private void importInto(OWLOntology importer, OWLOntology imported) {
