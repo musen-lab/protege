@@ -8,6 +8,8 @@ import org.semanticweb.owlapi.model.*;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 import static org.junit.Assert.*;
 
@@ -32,8 +34,8 @@ public class DeclarationResolutionPlanner_TestCase {
     public void shouldPlanMissingInChosenOntologyWithoutMutatingIt() {
         manager.addAxiom(root, factory.getOWLSubClassOfAxiom(entity, factory.getOWLThing()));
         DeclarationReport report = check();
-        DeclarationResolutionPlanner.Plan plan = planner().plan(report.getMissing().getFindings(),
-                Collections.emptyList(), owner);
+        DeclarationResolutionPlanner.Plan plan = planner().planForTargets(report.getMissing().getFindings(),
+                Collections.emptyList(), Collections.singletonMap(entity, owner));
         assertEquals(1, plan.getFindingCount());
         assertEquals(Collections.singletonList(new AddAxiom(owner, factory.getOWLDeclarationAxiom(entity))),
                 plan.getChanges());
@@ -53,8 +55,8 @@ public class DeclarationResolutionPlanner_TestCase {
         manager.addAxiom(root, plain);
         manager.addAxiom(root, use);
         manager.addAxiom(anotherSource, annotated);
-        DeclarationResolutionPlanner.Plan plan = planner().plan(Collections.emptyList(),
-                check().getMisplaced().getFindings(), null);
+        DeclarationResolutionPlanner.Plan plan = planner().planForTargets(Collections.emptyList(),
+                check().getMisplaced().getFindings(), Collections.singletonMap(entity, owner));
         assertEquals(1, plan.getFindingCount());
         assertEquals(5, plan.getChanges().size());
         assertTrue(plan.getChanges().get(0).isAddAxiom());
@@ -77,8 +79,11 @@ public class DeclarationResolutionPlanner_TestCase {
         DeclarationReport report = check();
         MissingDeclarationFinding selected = report.getMissing().getFindings().stream()
                 .filter(finding -> finding.getEntity().equals(missing)).findFirst().get();
-        DeclarationResolutionPlanner.Plan plan = planner().plan(Collections.singletonList(selected),
-                report.getMisplaced().getFindings(), owner);
+        Map<OWLEntity, OWLOntology> targets = new HashMap<>();
+        targets.put(missing, owner);
+        targets.put(entity, owner);
+        DeclarationResolutionPlanner.Plan plan = planner().planForTargets(Collections.singletonList(selected),
+                report.getMisplaced().getFindings(), targets);
         assertEquals(2, plan.getFindingCount());
         manager.applyChanges(plan.getChanges());
         assertEquals(1, check().getMissing().size());
@@ -90,8 +95,11 @@ public class DeclarationResolutionPlanner_TestCase {
     public void shouldRetainEntityTypeWhenClassAndIndividualShareAnIri() {
         OWLNamedIndividual individual = factory.getOWLNamedIndividual(entity.getIRI());
         manager.addAxiom(root, factory.getOWLClassAssertionAxiom(entity, individual));
-        DeclarationResolutionPlanner.Plan plan = planner().plan(check().getMissing().getFindings(),
-                Collections.emptyList(), owner);
+        Map<OWLEntity, OWLOntology> targets = new HashMap<>();
+        targets.put(entity, owner);
+        targets.put(individual, owner);
+        DeclarationResolutionPlanner.Plan plan = planner().planForTargets(check().getMissing().getFindings(),
+                Collections.emptyList(), targets);
         assertEquals(2, plan.getFindingCount());
         manager.applyChanges(plan.getChanges());
         assertFalse(owner.getDeclarationAxioms(entity).isEmpty());
@@ -103,7 +111,8 @@ public class DeclarationResolutionPlanner_TestCase {
     public void shouldRejectReadOnlyDestinationBeforeAnyEdits() {
         manager.addAxiom(root, factory.getOWLSubClassOfAxiom(entity, factory.getOWLThing()));
         assertThrows(IllegalStateException.class, () -> new DeclarationResolutionPlanner(root, ontology -> false)
-                .plan(check().getMissing().getFindings(), Collections.emptyList(), owner));
+                .planForTargets(check().getMissing().getFindings(), Collections.emptyList(),
+                        Collections.singletonMap(entity, owner)));
         assertTrue(owner.getDeclarationAxioms(entity).isEmpty());
     }
 
@@ -111,7 +120,8 @@ public class DeclarationResolutionPlanner_TestCase {
     public void shouldRejectReadOnlySourceBeforeAnyEdits() {
         manager.addAxiom(root, factory.getOWLDeclarationAxiom(entity));
         assertThrows(IllegalStateException.class, () -> new DeclarationResolutionPlanner(root, ontology -> !ontology.equals(root))
-                .plan(Collections.emptyList(), check().getMisplaced().getFindings(), null));
+                .planForTargets(Collections.emptyList(), check().getMisplaced().getFindings(),
+                        Collections.singletonMap(entity, owner)));
         assertFalse(root.getDeclarationAxioms(entity).isEmpty());
         assertTrue(owner.getDeclarationAxioms(entity).isEmpty());
     }
@@ -120,19 +130,19 @@ public class DeclarationResolutionPlanner_TestCase {
     public void shouldRejectDestinationOutsideClosure() throws Exception {
         OWLOntology unrelated = manager.createOntology();
         manager.addAxiom(root, factory.getOWLSubClassOfAxiom(entity, factory.getOWLThing()));
-        assertThrows(IllegalStateException.class, () -> planner().plan(check().getMissing().getFindings(),
-                Collections.emptyList(), unrelated));
+        assertThrows(IllegalStateException.class, () -> planner().planForTargets(check().getMissing().getFindings(),
+                Collections.emptyList(), Collections.singletonMap(entity, unrelated)));
     }
 
     @Test
     public void shouldRejectStaleMissingFindingAndRepeatedRepair() {
         manager.addAxiom(root, factory.getOWLSubClassOfAxiom(entity, factory.getOWLThing()));
         DeclarationReport report = check();
-        DeclarationResolutionPlanner.Plan plan = planner().plan(report.getMissing().getFindings(),
-                Collections.emptyList(), owner);
+        DeclarationResolutionPlanner.Plan plan = planner().planForTargets(report.getMissing().getFindings(),
+                Collections.emptyList(), Collections.singletonMap(entity, owner));
         manager.applyChanges(plan.getChanges());
-        assertThrows(IllegalStateException.class, () -> planner().plan(report.getMissing().getFindings(),
-                Collections.emptyList(), owner));
+        assertThrows(IllegalStateException.class, () -> planner().planForTargets(report.getMissing().getFindings(),
+                Collections.emptyList(), Collections.singletonMap(entity, owner)));
     }
 
     @Test
@@ -141,8 +151,8 @@ public class DeclarationResolutionPlanner_TestCase {
         DeclarationReport report = check();
         manager.applyChange(new RemoveImport(root, factory.getOWLImportsDeclaration(
                 owner.getOntologyID().getOntologyIRI().get())));
-        assertThrows(IllegalStateException.class, () -> planner().plan(Collections.emptyList(),
-                report.getMisplaced().getFindings(), null));
+        assertThrows(IllegalStateException.class, () -> planner().planForTargets(Collections.emptyList(),
+                report.getMisplaced().getFindings(), Collections.singletonMap(entity, owner)));
         assertFalse(root.getDeclarationAxioms(entity).isEmpty());
     }
 
@@ -150,8 +160,8 @@ public class DeclarationResolutionPlanner_TestCase {
     public void shouldDeduplicateSelectionsAndExposeImmutableChanges() {
         manager.addAxiom(root, factory.getOWLSubClassOfAxiom(entity, factory.getOWLThing()));
         MissingDeclarationFinding finding = check().getMissing().getFindings().get(0);
-        DeclarationResolutionPlanner.Plan plan = planner().plan(Arrays.asList(finding, finding),
-                Collections.emptyList(), owner);
+        DeclarationResolutionPlanner.Plan plan = planner().planForTargets(Arrays.asList(finding, finding),
+                Collections.emptyList(), Collections.singletonMap(entity, owner));
         assertEquals(1, plan.getFindingCount());
         assertEquals(1, plan.getChanges().size());
         assertThrows(UnsupportedOperationException.class, () -> plan.getChanges().clear());
@@ -159,14 +169,15 @@ public class DeclarationResolutionPlanner_TestCase {
 
     @Test
     public void shouldAllowEmptySelectionWithoutATarget() {
-        assertTrue(planner().plan(Collections.emptyList(), Collections.emptyList(), null).getChanges().isEmpty());
+        assertTrue(planner().planForTargets(Collections.emptyList(), Collections.emptyList(),
+                Collections.emptyMap()).getChanges().isEmpty());
     }
 
     @Test
     public void shouldBeReversibleUsingOwlApiChanges() {
         manager.addAxiom(root, factory.getOWLDeclarationAxiom(entity));
-        DeclarationResolutionPlanner.Plan plan = planner().plan(Collections.emptyList(),
-                check().getMisplaced().getFindings(), null);
+        DeclarationResolutionPlanner.Plan plan = planner().planForTargets(Collections.emptyList(),
+                check().getMisplaced().getFindings(), Collections.singletonMap(entity, owner));
         manager.applyChanges(plan.getChanges());
         List<OWLOntologyChange> reverse = new java.util.ArrayList<>();
         for (OWLOntologyChange change : plan.getChanges()) {
@@ -183,12 +194,15 @@ public class DeclarationResolutionPlanner_TestCase {
         int count = 10_000;
         java.util.Set<OWLAxiom> sourceAxioms = new java.util.HashSet<>();
         java.util.Set<OWLAxiom> ownerAxioms = new java.util.HashSet<>();
+        Map<OWLEntity, OWLOntology> targets = new HashMap<>();
         for (int i = 0; i < 100_000; i++) {
             OWLClass term = factory.getOWLClass(IRI.create("http://example.org/owner#Scale" + i));
             if (i < count) {
                 sourceAxioms.add(factory.getOWLSubClassOfAxiom(term, factory.getOWLThing()));
+                targets.put(term, owner);
             } else if (i < count * 2) {
                 sourceAxioms.add(factory.getOWLDeclarationAxiom(term));
+                targets.put(term, owner);
             } else {
                 ownerAxioms.add(factory.getOWLDeclarationAxiom(term));
             }
@@ -203,7 +217,7 @@ public class DeclarationResolutionPlanner_TestCase {
         DeclarationResolutionPlanner.Plan plan = new DeclarationResolutionPlanner(root, ontology -> {
             permissionChecks.incrementAndGet();
             return true;
-        }).plan(report.getMissing().getFindings(), report.getMisplaced().getFindings(), owner);
+        }).planForTargets(report.getMissing().getFindings(), report.getMisplaced().getFindings(), targets);
         long planned = System.nanoTime();
         assertEquals(count * 2, plan.getFindingCount());
         assertEquals(count * 3, plan.getChanges().size());

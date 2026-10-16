@@ -12,6 +12,8 @@ import java.awt.Container;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 import static org.junit.Assert.*;
 
@@ -132,7 +134,8 @@ public class DeclarationResolutionPreview_TestCase {
         manager.addAxiom(other, factory.getOWLDeclarationAxiom(misplaced));
         DeclarationReport report = DeclarationChecker.forcingAllChecks().check(root);
         DeclarationResolutionPlanner.Plan plan = new DeclarationResolutionPlanner(root, ontology -> true)
-                .plan(Collections.emptyList(), report.getMisplaced().getFindings(), owner);
+                .planForTargets(Collections.emptyList(), report.getMisplaced().getFindings(),
+                        Collections.singletonMap(misplaced, owner));
         DeclarationResolutionPreview.Row row = DeclarationResolutionPreview.rows(plan).get(0);
         assertEquals(2, row.sources.size());
         String location = row.location();
@@ -147,8 +150,11 @@ public class DeclarationResolutionPreview_TestCase {
         OWLNamedIndividual individual = factory.getOWLNamedIndividual(missing.getIRI());
         manager.addAxiom(root, factory.getOWLClassAssertionAxiom(missing, individual));
         DeclarationReport report = DeclarationChecker.forcingAllChecks().check(root);
+        Map<OWLEntity, OWLOntology> targets = new HashMap<>();
+        targets.put(missing, owner);
+        targets.put(individual, owner);
         DeclarationResolutionPlanner.Plan plan = new DeclarationResolutionPlanner(root, ontology -> true)
-                .plan(report.getMissing().getFindings(), Collections.emptyList(), owner);
+                .planForTargets(report.getMissing().getFindings(), Collections.emptyList(), targets);
         List<DeclarationResolutionPreview.Row> rows = DeclarationResolutionPreview.rows(plan);
         assertEquals(2, rows.size());
         assertNotEquals(rows.get(0).entity.getEntityType(), rows.get(1).entity.getEntityType());
@@ -156,14 +162,16 @@ public class DeclarationResolutionPreview_TestCase {
 
     @Test(timeout = 30_000)
     public void shouldBuildALargePreviewWithoutRetainingThousandsOfSwingComponents() throws Exception {
+        Map<OWLEntity, OWLOntology> targets = new HashMap<>();
         for (int i = 0; i < 10_000; i++) {
             OWLClass entity = factory.getOWLClass(IRI.create("http://example.org/owner#C" + i));
             manager.addAxiom(root, i % 2 == 0 ? factory.getOWLSubClassOfAxiom(entity, factory.getOWLThing())
                     : factory.getOWLDeclarationAxiom(entity));
+            targets.put(entity, owner);
         }
         DeclarationReport report = DeclarationChecker.forcingAllChecks().check(root);
         DeclarationResolutionPlanner.Plan plan = new DeclarationResolutionPlanner(root, ontology -> true)
-                .plan(report.getMissing().getFindings(), report.getMisplaced().getFindings(), owner);
+                .planForTargets(report.getMissing().getFindings(), report.getMisplaced().getFindings(), targets);
         assertEquals(10_000, DeclarationResolutionPreview.rows(plan).size());
         SwingUtilities.invokeAndWait(() -> {
             DeclarationResolutionPreview preview = new DeclarationResolutionPreview(plan, new DefaultListCellRenderer());
@@ -179,8 +187,11 @@ public class DeclarationResolutionPreview_TestCase {
         manager.addAxiom(root, factory.getOWLDeclarationAxiom(misplaced, Collections.singleton(
                 factory.getOWLAnnotation(factory.getRDFSLabel(), factory.getOWLLiteral("keep annotation")))));
         DeclarationReport report = DeclarationChecker.forcingAllChecks().check(root);
+        Map<OWLEntity, OWLOntology> targets = new HashMap<>();
+        targets.put(missing, owner);
+        targets.put(misplaced, owner);
         return new DeclarationResolutionPlanner(root, ontology -> true)
-                .plan(report.getMissing().getFindings(), report.getMisplaced().getFindings(), owner);
+                .planForTargets(report.getMissing().getFindings(), report.getMisplaced().getFindings(), targets);
     }
 
     private static DeclarationResolutionPreview.Row row(List<DeclarationResolutionPreview.Row> rows, OWLEntity entity) {

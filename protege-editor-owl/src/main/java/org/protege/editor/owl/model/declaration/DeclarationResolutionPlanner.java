@@ -40,21 +40,10 @@ public final class DeclarationResolutionPlanner {
      *
      * @param missing selected missing findings
      * @param misplaced selected misplaced findings
-     * @param missingTarget the destination for missing declarations; unused when none are selected
+     * @param targets the accepted destination for each selected entity
      * @return an immutable batch, with destination additions ordered before source removals
      * @throws IllegalStateException if the report is stale or an affected ontology is not editable
      */
-    public Plan plan(Collection<MissingDeclarationFinding> missing,
-                     Collection<MisplacedDeclarationFinding> misplaced,
-                     OWLOntology missingTarget) {
-        Map<OWLEntity, OWLOntology> targets = new HashMap<>();
-        missing.forEach(finding -> targets.put(finding.getEntity(), missingTarget));
-        misplaced.forEach(finding -> targets.put(finding.getEntity(),
-                root.getOWLOntologyManager().getOntology(finding.getOwningOntology())));
-        return planForTargets(missing, misplaced, targets);
-    }
-
-    /** Plans a batch using each missing or misplaced entity's individually chosen destination. */
     public Plan planForTargets(Collection<MissingDeclarationFinding> missing,
                                Collection<MisplacedDeclarationFinding> misplaced,
                                Map<OWLEntity, OWLOntology> targets) {
@@ -102,7 +91,8 @@ public final class DeclarationResolutionPlanner {
                 new LinkedHashSet<>(missing).size() + new LinkedHashSet<>(misplaced).size());
     }
 
-    private void requireEditable(OWLOntology ontology, Map<OWLOntologyID, OWLOntology> closure,
+    private void requireEditable(OWLOntology ontology,
+                                 Map<OWLOntologyID, OWLOntology> closure,
                                  Set<OWLOntology> checked) {
         require(ontology != null && ontology.equals(closure.get(ontology.getOntologyID()))
                         && ontology.getOWLOntologyManager() == root.getOWLOntologyManager(),
@@ -133,7 +123,8 @@ public final class DeclarationResolutionPlanner {
         private final ImmutableMap<OWLEntity, OWLOntology> destinations;
         private final int findingCount;
 
-        private Plan(ImmutableList<OWLOntologyChange> changes, Map<OWLEntity, OWLOntology> destinations,
+        private Plan(ImmutableList<OWLOntologyChange> changes,
+                     Map<OWLEntity, OWLOntology> destinations,
                      int findingCount) {
             this.changes = changes;
             this.destinations = ImmutableMap.copyOf(destinations);
