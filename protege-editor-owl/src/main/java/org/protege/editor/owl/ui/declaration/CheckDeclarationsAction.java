@@ -2,6 +2,7 @@ package org.protege.editor.owl.ui.declaration;
 
 import org.protege.editor.owl.model.declaration.DeclarationChecker;
 import org.protege.editor.owl.model.declaration.DeclarationReportOutline;
+import org.protege.editor.owl.model.event.OWLModelManagerListener;
 import org.protege.editor.owl.ui.action.ProtegeOWLAction;
 import org.semanticweb.owlapi.model.OWLOntology;
 import org.semanticweb.owlapi.model.OWLOntologyChangeListener;
@@ -32,10 +33,13 @@ public class CheckDeclarationsAction extends ProtegeOWLAction {
 
     private SwingWorker<List<Object>, Void> checkWorker;
     private boolean disposed;
+    private final OWLModelManagerListener modelListener = event -> requestEnabledUpdate();
+    private final OWLOntologyChangeListener contentListener = changes -> requestEnabledUpdate();
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (disposed || (checkWorker != null && !checkWorker.isDone())) {
+        if (disposed || checkWorker != null || !hasCheckableOntology()) {
+            updateEnabledState();
             return;
         }
         OWLOntology ontology = getOWLModelManager().getActiveOntology();
@@ -58,6 +62,9 @@ public class CheckDeclarationsAction extends ProtegeOWLAction {
                         return;
                     }
                     List<Object> rows = get();
+                    if (!hasCheckableOntology()) {
+                        return;
+                    }
                     if (changed.get() || getOWLModelManager().getActiveOntology() != ontology) {
                         throw new IllegalStateException("The ontologies changed during the check. Run the check again.");
                     }
@@ -71,9 +78,8 @@ public class CheckDeclarationsAction extends ProtegeOWLAction {
                     showFailure(ex);
                 } finally {
                     manager.removeOntologyChangeListener(listener);
-                    if (!disposed) {
-                        setEnabled(true);
-                    }
+                    checkWorker = null;
+                    updateEnabledState();
                 }
             }
         };
@@ -87,14 +93,36 @@ public class CheckDeclarationsAction extends ProtegeOWLAction {
                 DeclarationCheckReportPanel.TITLE, JOptionPane.ERROR_MESSAGE);
     }
 
+    private boolean hasCheckableOntology() {
+        OWLOntology ontology = getOWLModelManager().getActiveOntology();
+        return ontology != null && getOWLModelManager().getOntologies().contains(ontology) && !ontology.isEmpty();
+    }
+
+    private void requestEnabledUpdate() {
+        if (SwingUtilities.isEventDispatchThread()) {
+            updateEnabledState();
+        } else {
+            SwingUtilities.invokeLater(this::updateEnabledState);
+        }
+    }
+
+    private void updateEnabledState() {
+        setEnabled(!disposed && checkWorker == null && hasCheckableOntology());
+    }
+
     @Override
     public void initialise() throws Exception {
-        // nothing to initialise
+        getOWLModelManager().addListener(modelListener);
+        getOWLModelManager().addOntologyChangeListener(contentListener);
+        updateEnabledState();
     }
 
     @Override
     public void dispose() {
         disposed = true;
+        getOWLModelManager().removeListener(modelListener);
+        getOWLModelManager().removeOntologyChangeListener(contentListener);
+        setEnabled(false);
         if (checkWorker != null) {
             checkWorker.cancel(false);
         }
