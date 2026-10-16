@@ -85,7 +85,7 @@ public class DeclarationIssuesReporter_TestCase {
         assertEquals("Checked ontology: http://example.org/pizza",
                 appender.list.get(1).getFormattedMessage());
         assertEquals(1, warnings.size());
-        assertEquals("Missing entity declarations: 12", warnings.get(0).getMissingSection().getHeading());
+        assertEquals("Entities that have missing declarations: 12", warnings.get(0).getMissingSection().getHeading());
     }
 
     @Test

@@ -24,8 +24,8 @@ public class DeclarationIssuesDialog_TestCase {
                 + "declarations\" enabled,<br>"
                 + "which prevents Protégé from automatically adding missing declarations.<br>"
                 + "<br>"
-                + "&nbsp;• Missing entity declarations: 12<br>"
-                + "&nbsp;• Misplaced entity declarations: 3<br>"
+                + "&nbsp;• Entities that have missing declarations: 12<br>"
+                + "&nbsp;• Entity declarations that are misplaced: 3<br>"
                 + "<br>"
                 + "See the Protégé log for details. To review these issues, use \"Tools &gt; Check entity declarations...\"<br>"
                 + "<br>"
@@ -38,8 +38,8 @@ public class DeclarationIssuesDialog_TestCase {
         String message = DeclarationIssuesDialog.warningMessageContentOf(
                 DeclarationReportOutline.of(reportWithMisplacedDisabled(9, 3)));
 
-        assertTrue(message.contains("&nbsp;• Missing entity declarations: 12<br>"
-                + "&nbsp;• Misplaced entity declarations: &lt;detection disabled&gt;<br>"));
+        assertTrue(message.contains("&nbsp;• Entities that have missing declarations: 12<br>"
+                + "&nbsp;• Entity declarations that are misplaced: &lt;detection disabled&gt;<br>"));
     }
 
     @Test

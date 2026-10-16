@@ -74,7 +74,6 @@ public final class DeclarationReportLogWriter {
         logger.info(section.getHeading());
         for (MissingDeclarationFinding finding : shown(findings)) {
             logger.info("  {}  {}", finding.getEntityType().getPrintName(), finding.getEntity().toStringID());
-            logger.info("              used in: {}", OntologyIdFormat.formatAll(finding.getMentioningOntologies()));
         }
         writeOmitted(logger, findings.size());
     }
@@ -84,10 +83,7 @@ public final class DeclarationReportLogWriter {
         ImmutableList<MisplacedDeclarationFinding> findings = outline.getMisplaced();
         logger.info(outline.getMisplacedSection().getHeading());
         for (MisplacedDeclarationFinding finding : shown(findings)) {
-            logger.info("  {}  {}", finding.getEntityType().getPrintName(), finding.getEntity().toStringID());
-            logger.info("    owned by:    {}  (rule: {})", OntologyIdFormat.format(finding.getOwningOntology()),
-                    DeclarationReportOutline.ruleLabelOf(finding));
-            logger.info("    {}", DeclarationReportOutline.suggestedPlacementOf(finding));
+            logger.info("  {}  Declaration({})", finding.getEntityType().getPrintName(), finding.getEntity().toStringID());
         }
         writeOmitted(logger, findings.size());
     }

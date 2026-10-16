@@ -19,9 +19,9 @@ public final class DeclarationReportOutline {
      */
     public static final String DETECTION_DISABLED = "<detection disabled>";
 
-    private static final String MISSING_ENTITY_DECLARATIONS_TITLE = "Missing entity declarations";
+    private static final String MISSING_ENTITY_DECLARATIONS_TITLE = "Entities that have missing declarations";
 
-    private static final String MISPLACED_ENTITY_DECLARATIONS_TITLE = "Misplaced entity declarations";
+    private static final String MISPLACED_ENTITY_DECLARATIONS_TITLE = "Entity declarations that are misplaced";
 
     @Nonnull
     private final DeclarationReport report;

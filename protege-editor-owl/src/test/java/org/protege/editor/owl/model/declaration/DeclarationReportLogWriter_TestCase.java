@@ -49,19 +49,17 @@ public class DeclarationReportLogWriter_TestCase {
         List<String> lines = lines();
         assertEquals(LogBanner.start("Entity Declaration Check"), lines.get(0));
         assertEquals("Checked ontology: http://example.org/pizza", lines.get(1));
-        assertEquals("Missing entity declarations: 12", lines.get(2));
+        assertEquals("Entities that have missing declarations: 12", lines.get(2));
         assertEquals("  Class  http://example.org/pizza#Class0", lines.get(3));
-        assertEquals("              used in: http://example.org/pizza", lines.get(4));
-        // Twelve findings of two lines each follow the missing heading.
-        assertEquals("  Named individual  http://example.org/pizza#individual2", lines.get(25));
-        assertEquals("Misplaced entity declarations: 3", lines.get(27));
-        assertEquals("  Class  http://purl.obolibrary.org/obo/GO_0000000", lines.get(28));
-        assertEquals("    owned by:    http://purl.obolibrary.org/obo/go.owl  (rule: "
-                + new OboIdentifierRule().getDisplay().getLabel() + ")", lines.get(29));
-        assertEquals("    Suggested placement: http://example.org/pizza → http://purl.obolibrary.org/obo/go.owl", lines.get(30));
-        // Three findings of three lines each follow the misplaced heading, then the banner closes.
-        assertEquals(LogBanner.end(), lines.get(37));
-        assertEquals(38, lines.size());
+        // Each missing entity occupies one line, followed by the misplaced declaration axioms.
+        assertEquals("  Named individual  http://example.org/pizza#individual2", lines.get(14));
+        assertEquals("Entity declarations that are misplaced: 3", lines.get(15));
+        for (int i = 0; i < 3; i++) {
+            assertEquals("  Class  Declaration(http://purl.obolibrary.org/obo/GO_000000" + i + ")",
+                    lines.get(16 + i));
+        }
+        assertEquals(LogBanner.end(), lines.get(19));
+        assertEquals(20, lines.size());
     }
 
     @Test
@@ -77,8 +75,8 @@ public class DeclarationReportLogWriter_TestCase {
     public void shouldHeadASectionThatFoundNothingWithZero() {
         write(report(0, 0, 3));
 
-        assertEquals("Missing entity declarations: 0", lines().get(2));
-        assertEquals("Misplaced entity declarations: 3", lines().get(3));
+        assertEquals("Entities that have missing declarations: 0", lines().get(2));
+        assertEquals("Entity declarations that are misplaced: 3", lines().get(3));
     }
 
     @Test
@@ -86,8 +84,8 @@ public class DeclarationReportLogWriter_TestCase {
         write(reportWithMisplacedDisabled(1, 0));
 
         List<String> lines = lines();
-        assertEquals("Missing entity declarations: 1", lines.get(2));
-        assertEquals("Misplaced entity declarations: <detection disabled>", lines.get(5));
+        assertEquals("Entities that have missing declarations: 1", lines.get(2));
+        assertEquals("Entity declarations that are misplaced: <detection disabled>", lines.get(4));
     }
 
     @Test
@@ -95,12 +93,16 @@ public class DeclarationReportLogWriter_TestCase {
         write(report(2043, 0, 0));
 
         List<String> lines = lines();
-        assertEquals("Missing entity declarations: 2,043", lines.get(2));
-        long rows = lines.stream().filter(line -> line.contains("used in:")).count();
+        assertEquals("Entities that have missing declarations: 2,043", lines.get(2));
+        long rows = lines.stream().filter(line -> line.startsWith("  Class  ")).count();
         assertEquals(DeclarationReportLogWriter.MAX_ROWS_PER_SECTION, rows);
-        assertEquals("  Class  http://example.org/pizza#Class199", lines.get(2 + 2 * 199 + 1));
-        assertEquals("  ...and 1,843 more", lines.get(2 + 2 * 200 + 1));
-        assertEquals("Misplaced entity declarations: 0", lines.get(2 + 2 * 200 + 2));
+        for (int i = 0; i < DeclarationReportLogWriter.MAX_ROWS_PER_SECTION; i++) {
+            assertEquals("  Class  http://example.org/pizza#Class" + i, lines.get(3 + i));
+        }
+        assertEquals("  ...and 1,843 more", lines.get(203));
+        assertEquals("Entity declarations that are misplaced: 0", lines.get(204));
+        assertEquals(LogBanner.end(), lines.get(205));
+        assertEquals(206, lines.size());
     }
 
     @Test
@@ -138,7 +140,7 @@ public class DeclarationReportLogWriter_TestCase {
     }
 
     @Test
-    public void shouldLogAllDeclaringLocationsBeforeExpectedOwnerWithRuleDiagnosticsIntact() {
+    public void shouldLogOnlyTheDeclarationAxiomWhileRetainingPlacementDiagnosticsInTheFinding() {
         MisplacedDeclarationFinding finding = MisplacedDeclarationFinding.create(
                 org.semanticweb.owlapi.apibinding.OWLManager.getOWLDataFactory().getOWLClass(
                         org.semanticweb.owlapi.model.IRI.create("http://example.org/QuickBaking")),
@@ -150,9 +152,17 @@ public class DeclarationReportLogWriter_TestCase {
                 "test-rule");
         write(DeclarationReport.get(MissingDeclarationReport.get(java.util.Collections.emptyList()),
                 MisplacedDeclarationReport.get(java.util.Collections.singletonList(finding))));
-        assertTrue(lines().contains("    Suggested placement: http://example.org/pizza-fixture/menu, "
-                + "http://example.org/other-menu → http://example.org/pizza-fixture/baking"));
-        assertTrue(lines().contains("    owned by:    http://example.org/pizza-fixture/baking  (rule: test-rule)"));
+        assertEquals(java.util.Arrays.asList(
+                LogBanner.start("Entity Declaration Check"),
+                "Checked ontology: http://example.org/pizza",
+                "Entities that have missing declarations: 0",
+                "Entity declarations that are misplaced: 1",
+                "  Class  Declaration(http://example.org/QuickBaking)",
+                LogBanner.end()), lines());
+        assertEquals("Suggested placement: http://example.org/pizza-fixture/menu, "
+                        + "http://example.org/other-menu → http://example.org/pizza-fixture/baking",
+                DeclarationReportOutline.suggestedPlacementOf(finding));
+        assertEquals("test-rule", DeclarationReportOutline.ruleLabelOf(finding));
         assertEquals(DeclarationSeverity.WARNING, finding.getSeverity());
     }
 

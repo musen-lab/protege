@@ -33,9 +33,9 @@ public class DeclarationReportOutline_TestCase {
     public void shouldHeadBothSectionsWithTheirCountsInFixedOrder() {
         DeclarationReportOutline outline = DeclarationReportOutline.of(report(9, 3, 3));
 
-        assertEquals(ImmutableList.of("Missing entity declarations: 12", "Misplaced entity declarations: 3"),
+        assertEquals(ImmutableList.of("Entities that have missing declarations: 12", "Entity declarations that are misplaced: 3"),
                 headingsOf(outline));
-        assertEquals(ImmutableList.of("Missing entity declarations", "Misplaced entity declarations"),
+        assertEquals(ImmutableList.of("Entities that have missing declarations", "Entity declarations that are misplaced"),
                 outline.getSections().stream().map(DeclarationReportOutline.Section::getTitle)
                         .collect(Collectors.toList()));
         assertEquals(12, outline.getMissingSection().getCount());
@@ -47,7 +47,7 @@ public class DeclarationReportOutline_TestCase {
     public void shouldShowZeroForACheckThatRanAndFoundNothing() {
         DeclarationReportOutline outline = DeclarationReportOutline.of(report(9, 3, 0));
 
-        assertEquals(ImmutableList.of("Missing entity declarations: 12", "Misplaced entity declarations: 0"),
+        assertEquals(ImmutableList.of("Entities that have missing declarations: 12", "Entity declarations that are misplaced: 0"),
                 headingsOf(outline));
         assertEquals(DeclarationCheckStatus.EXECUTED, outline.getMisplacedSection().getStatus());
     }
@@ -56,7 +56,7 @@ public class DeclarationReportOutline_TestCase {
     public void shouldShowDetectionDisabledForACheckThatDidNotRun() {
         DeclarationReportOutline outline = DeclarationReportOutline.of(reportWithMisplacedDisabled(9, 3));
 
-        assertEquals("Misplaced entity declarations: <detection disabled>",
+        assertEquals("Entity declarations that are misplaced: <detection disabled>",
                 outline.getMisplacedSection().getHeading());
         assertEquals(DeclarationCheckStatus.MISPLACED_SKIPPED,
                 outline.getMisplacedSection().getStatus());
@@ -69,8 +69,8 @@ public class DeclarationReportOutline_TestCase {
                 MissingDeclarationReport.skipped(DeclarationCheckStatus.SKIPPED),
                 MisplacedDeclarationReport.skipped(DeclarationCheckStatus.SKIPPED)));
 
-        assertEquals(ImmutableList.of("Missing entity declarations: <detection disabled>",
-                        "Misplaced entity declarations: <detection disabled>"),
+        assertEquals(ImmutableList.of("Entities that have missing declarations: <detection disabled>",
+                        "Entity declarations that are misplaced: <detection disabled>"),
                 headingsOf(outline));
     }
 
@@ -91,7 +91,7 @@ public class DeclarationReportOutline_TestCase {
     public void shouldSeparateThousandsInACount() {
         DeclarationReportOutline outline = DeclarationReportOutline.of(report(2043, 0, 0));
 
-        assertEquals("Missing entity declarations: 2,043", outline.getMissingSection().getHeading());
+        assertEquals("Entities that have missing declarations: 2,043", outline.getMissingSection().getHeading());
     }
 
     @Test

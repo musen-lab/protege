@@ -146,14 +146,14 @@ public final class DeclarationCheckReportPanel extends JPanel {
     @Nonnull
     private static List<String> missingDetail(@Nonnull Optional<OWLOntologyID> suggestion) {
         return ImmutableList.of(suggestion
-                .map(id -> "Suggested: Add the declaration axiom to " + OntologyIdFormat.format(id))
-                .orElse("Suggested: No unique location found; choose one when resolving."));
+                .map(id -> "Suggested fix: Add the declaration axiom to " + OntologyIdFormat.format(id))
+                .orElse("Suggested fix: (No unique location found; choose one when resolving)"));
     }
 
     @Nonnull
     private static List<String> misplacedDetail(@Nonnull MisplacedDeclarationFinding finding) {
         return ImmutableList.of(
-                "Suggested: Move the declaration axiom to " + OntologyIdFormat.format(finding.getOwningOntology())
+                "Suggested fix: Move the declaration axiom to " + OntologyIdFormat.format(finding.getOwningOntology())
                 + " (based on: " + DeclarationReportOutline.shortRuleLabelOf(finding) + ")");
     }
 

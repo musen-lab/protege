@@ -33,8 +33,9 @@ final class FirstMentionRule implements OwnershipRule {
     @Nonnull
     private static final OwnershipRuleDisplay DISPLAY = OwnershipRuleDisplay.get(
             "Decide ownership from the import closure",
-            "Matches an entity to the first document in the closure that mentions it: a term used "
-                    + "in core.owl but declared in sales.owl belongs to core.owl.");
+            "Matches an entity to the first document that mentions it in the import dependency "
+                    + "graph: a term mentioned in both core.owl and its imported module.owl belongs to "
+                    + "module.owl.");
 
     @Override
     @Nonnull

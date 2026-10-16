@@ -26,8 +26,8 @@ public class DeclarationCheckReportPanel_TestCase {
         DeclarationReportOutline outline = DeclarationReportOutline.of(report(2, 1, 3));
         List<Object> rows = DeclarationCheckReportPanel.rows(outline);
         assertEquals(8, rows.size());
-        assertEquals("Missing entity declarations: 3", ((MListSectionHeader) rows.get(0)).getName());
-        assertEquals("Misplaced entity declarations: 3", ((MListSectionHeader) rows.get(4)).getName());
+        assertEquals("Entities that have missing declarations: 3", ((MListSectionHeader) rows.get(0)).getName());
+        assertEquals("Entity declarations that are misplaced: 3", ((MListSectionHeader) rows.get(4)).getName());
         rows = DeclarationCheckReportPanel.rows(DeclarationReportOutline.of(report(0, 0, 0)));
         assertEquals(4, rows.size());
         assertEquals(DeclarationCheckReportPanel.NO_MISSING_DECLARATIONS,
@@ -43,7 +43,7 @@ public class DeclarationCheckReportPanel_TestCase {
         OWLClass entity = OWLManager.getOWLDataFactory().getOWLClass(IRI.create("urn:entity"));
         MissingDeclarationFinding finding = MissingDeclarationFinding.create(entity,
                 Collections.singletonList(referring), Optional.of(target));
-        assertEquals(Collections.singletonList("Suggested: Add to http://example.org/target"),
+        assertEquals(Collections.singletonList("Suggested fix: Add the declaration axiom to http://example.org/target"),
                 findingRow(missingOutline(Collections.singletonList(finding)), 1).getDetail());
     }
 
@@ -57,14 +57,14 @@ public class DeclarationCheckReportPanel_TestCase {
         OWLAnnotationProperty note = df.getOWLAnnotationProperty(IRI.create("http://example.org/headerNote"));
         manager.applyChange(new AddOntologyAnnotation(module, df.getOWLAnnotation(note, df.getOWLLiteral("module"))));
         DeclarationReportOutline outline = missingOutline(new MissingDeclarationChecker().check(root).getFindings());
-        assertEquals(Collections.singletonList("Suggested: Add to http://example.org/module"), findingRow(outline, 1).getDetail());
+        assertEquals(Collections.singletonList("Suggested fix: Add the declaration axiom to http://example.org/module"), findingRow(outline, 1).getDetail());
     }
 
     @Test
     public void shouldExplainAnAbsentRecordedPlacement() {
         OWLClass entity = OWLManager.getOWLDataFactory().getOWLClass(IRI.create("urn:ambiguous"));
         MissingDeclarationFinding finding = MissingDeclarationFinding.create(entity, Collections.emptyList(), Optional.empty());
-        assertEquals(Collections.singletonList("Suggested: No unique location found; choose one when resolving."),
+        assertEquals(Collections.singletonList("Suggested fix: (No unique location found; choose one when resolving)"),
                 findingRow(missingOutline(Collections.singletonList(finding)), 1).getDetail());
     }
 
@@ -92,7 +92,7 @@ public class DeclarationCheckReportPanel_TestCase {
             DeclarationCheckReportPanel.FindingRow row = (DeclarationCheckReportPanel.FindingRow) rows.get(index);
             String iri = row.getEntity().getIRI().toString();
             int term = Integer.parseInt(iri.substring(iri.lastIndexOf("#C") + 2));
-            assertEquals(Collections.singletonList("Suggested: Add to http://example.org/scale/o" + term % members.size()),
+            assertEquals(Collections.singletonList("Suggested fix: Add the declaration axiom to http://example.org/scale/o" + term % members.size()),
                     row.getDetail());
         }
     }
@@ -110,8 +110,8 @@ public class DeclarationCheckReportPanel_TestCase {
                 List<JLabel> labels = findAll(rendered, JLabel.class);
                 assertEquals(2, labels.size());
                 assertEquals(index == 4
-                        ? "Suggested: Move to http://purl.obolibrary.org/obo/go.owl (based on: OBO ID)"
-                        : "Suggested: Add to http://example.org/pizza", labels.get(1).getText());
+                        ? "Suggested fix: Move the declaration axiom to http://purl.obolibrary.org/obo/go.owl (based on: OBO ID)"
+                        : "Suggested fix: Add the declaration axiom to http://example.org/pizza", labels.get(1).getText());
                 JComponent content = (JComponent) ((Container) rendered).getComponent(0);
                 assertEquals(2, content.getInsets().top);
                 assertEquals(2, content.getInsets().bottom);
@@ -130,7 +130,7 @@ public class DeclarationCheckReportPanel_TestCase {
         DeclarationReportOutline outline = DeclarationReportOutline.of(DeclarationReport.get(
                 MissingDeclarationReport.get(Collections.emptyList()),
                 MisplacedDeclarationReport.get(Collections.singletonList(finding))));
-        String expected = "Suggested: Move to " + longIri + " (based on: test-rule)";
+        String expected = "Suggested fix: Move the declaration axiom to " + longIri + " (based on: test-rule)";
         assertEquals(Collections.singletonList(expected), findingRow(outline, 3).getDetail());
         SwingUtilities.invokeAndWait(() -> {
             DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(new DefaultListCellRenderer(),
@@ -198,7 +198,8 @@ public class DeclarationCheckReportPanel_TestCase {
                     assertEquals(2, labels.size());
                     assertEquals(selected ? foreground : secondary != null ? secondary : Color.GRAY, labels.get(1).getForeground());
                     assertEquals(selected ? background : list.getBackground(), rendered.getBackground());
-                    assertTrue(labels.get(1).getText().startsWith(index == 4 ? "Suggested: Move to " : "Suggested: Add to "));
+                    assertTrue(labels.get(1).getText().startsWith(index == 4
+                            ? "Suggested fix: Move the declaration axiom to " : "Suggested fix: Add the declaration axiom to "));
                 }
             }
         });
