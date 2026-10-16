@@ -44,9 +44,9 @@ public final class DeclarationResolutionPlanner {
      * @return an immutable batch, with destination additions ordered before source removals
      * @throws IllegalStateException if the report is stale or an affected ontology is not editable
      */
-    public Plan planForTargets(Collection<MissingDeclarationFinding> missing,
-                               Collection<MisplacedDeclarationFinding> misplaced,
-                               Map<OWLEntity, OWLOntology> targets) {
+    public Plan plan(Collection<MissingDeclarationFinding> missing,
+                     Collection<MisplacedDeclarationFinding> misplaced,
+                     Map<OWLEntity, OWLOntology> targets) {
         checkNotNull(targets);
         DeclarationReport current = DeclarationChecker.forcingAllChecks().check(root);
         require(new HashSet<>(current.getMissing().getFindings()).containsAll(missing)

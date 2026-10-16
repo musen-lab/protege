@@ -271,7 +271,7 @@ final class DeclarationResolutionActions {
                              Map<OWLEntity, OWLOntology> targets, long expected) {
         requireRevision(expected);
         DeclarationResolutionPlanner planner = new DeclarationResolutionPlanner(root, editable::contains);
-        runInBackground(() -> planner.planForTargets(missing, misplaced, targets),
+        runInBackground(() -> planner.plan(missing, misplaced, targets),
                 plan -> confirmAndApply(plan, expected), "Preparing repairs…");
     }
 

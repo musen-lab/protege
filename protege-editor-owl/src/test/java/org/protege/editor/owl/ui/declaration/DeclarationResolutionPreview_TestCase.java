@@ -64,7 +64,7 @@ public class DeclarationResolutionPreview_TestCase {
         manager.addAxiom(other, factory.getOWLDeclarationAxiom(misplaced));
         DeclarationReport report = DeclarationChecker.forcingAllChecks().check(root);
         DeclarationResolutionPlanner.Plan plan = new DeclarationResolutionPlanner(root, ontology -> true)
-                .planForTargets(Collections.emptyList(), report.getMisplaced().getFindings(),
+                .plan(Collections.emptyList(), report.getMisplaced().getFindings(),
                         Collections.singletonMap(misplaced, root));
         DeclarationResolutionPreview.Row move = DeclarationResolutionPreview.rows(plan).get(0);
         assertEquals("Move declaration", move.heading());
@@ -79,7 +79,7 @@ public class DeclarationResolutionPreview_TestCase {
         manager.addAxiom(root, factory.getOWLDeclarationAxiom(misplaced));
         DeclarationReport report = DeclarationChecker.forcingAllChecks().check(root);
         DeclarationResolutionPlanner.Plan plan = new DeclarationResolutionPlanner(root, ontology -> true)
-                .planForTargets(Collections.emptyList(), report.getMisplaced().getFindings(),
+                .plan(Collections.emptyList(), report.getMisplaced().getFindings(),
                         Collections.singletonMap(misplaced, root));
         assertEquals("Keep declaration", DeclarationResolutionPreview.rows(plan).get(0).heading());
     }
@@ -134,7 +134,7 @@ public class DeclarationResolutionPreview_TestCase {
         manager.addAxiom(other, factory.getOWLDeclarationAxiom(misplaced));
         DeclarationReport report = DeclarationChecker.forcingAllChecks().check(root);
         DeclarationResolutionPlanner.Plan plan = new DeclarationResolutionPlanner(root, ontology -> true)
-                .planForTargets(Collections.emptyList(), report.getMisplaced().getFindings(),
+                .plan(Collections.emptyList(), report.getMisplaced().getFindings(),
                         Collections.singletonMap(misplaced, owner));
         DeclarationResolutionPreview.Row row = DeclarationResolutionPreview.rows(plan).get(0);
         assertEquals(2, row.sources.size());
@@ -154,7 +154,7 @@ public class DeclarationResolutionPreview_TestCase {
         targets.put(missing, owner);
         targets.put(individual, owner);
         DeclarationResolutionPlanner.Plan plan = new DeclarationResolutionPlanner(root, ontology -> true)
-                .planForTargets(report.getMissing().getFindings(), Collections.emptyList(), targets);
+                .plan(report.getMissing().getFindings(), Collections.emptyList(), targets);
         List<DeclarationResolutionPreview.Row> rows = DeclarationResolutionPreview.rows(plan);
         assertEquals(2, rows.size());
         assertNotEquals(rows.get(0).entity.getEntityType(), rows.get(1).entity.getEntityType());
@@ -171,7 +171,7 @@ public class DeclarationResolutionPreview_TestCase {
         }
         DeclarationReport report = DeclarationChecker.forcingAllChecks().check(root);
         DeclarationResolutionPlanner.Plan plan = new DeclarationResolutionPlanner(root, ontology -> true)
-                .planForTargets(report.getMissing().getFindings(), report.getMisplaced().getFindings(), targets);
+                .plan(report.getMissing().getFindings(), report.getMisplaced().getFindings(), targets);
         assertEquals(10_000, DeclarationResolutionPreview.rows(plan).size());
         SwingUtilities.invokeAndWait(() -> {
             DeclarationResolutionPreview preview = new DeclarationResolutionPreview(plan, new DefaultListCellRenderer());
@@ -191,7 +191,7 @@ public class DeclarationResolutionPreview_TestCase {
         targets.put(missing, owner);
         targets.put(misplaced, owner);
         return new DeclarationResolutionPlanner(root, ontology -> true)
-                .planForTargets(report.getMissing().getFindings(), report.getMisplaced().getFindings(), targets);
+                .plan(report.getMissing().getFindings(), report.getMisplaced().getFindings(), targets);
     }
 
     private static DeclarationResolutionPreview.Row row(List<DeclarationResolutionPreview.Row> rows, OWLEntity entity) {
