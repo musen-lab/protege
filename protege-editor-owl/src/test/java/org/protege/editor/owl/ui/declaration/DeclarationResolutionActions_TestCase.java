@@ -118,6 +118,7 @@ public class DeclarationResolutionActions_TestCase {
         assertTrue(DeclarationChecker.forcingAllChecks().check(root).isEmpty());
         SwingUtilities.invokeAndWait(() -> {
             assertFalse(button("Resolve all…").isEnabled());
+            assertFalse(button("Accept and resolve all…").isEnabled());
             assertFalse(button("Resolve selected…").isEnabled());
         });
     }
@@ -219,6 +220,7 @@ public class DeclarationResolutionActions_TestCase {
             SwingUtilities.invokeAndWait(() -> {
                 assertTrue(actions.isBusy());
                 assertFalse(button("Resolve all…").isEnabled());
+                assertFalse(button("Accept and resolve all…").isEnabled());
             });
         } finally {
             release.countDown();
@@ -329,6 +331,116 @@ public class DeclarationResolutionActions_TestCase {
         assertTrue(batches.isEmpty());
         assertNull(prompts.preview);
         assertEquals(1, prompts.errors.size());
+    }
+
+    @Test
+    public void shouldPlaceAcceptAllBetweenResolveAllAndRefresh() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            java.awt.Component[] controls = actions.getToolbar().getComponents();
+            assertEquals("Resolve all…", ((JButton) controls[1]).getText());
+            assertEquals("Accept and resolve all…", ((JButton) controls[2]).getText());
+            assertEquals("Refresh", ((JButton) controls[3]).getText());
+            assertTrue(button("Accept and resolve all…").isEnabled());
+        });
+    }
+
+    @Test
+    public void shouldAcceptAllSuggestionsAndPreviewWithoutDestinationPromptsOrImmediateEdits() throws Exception {
+        prompts.approve = false;
+        SwingUtilities.invokeAndWait(() -> list.setSelectedIndex(3)); // Accept all ignores the selection.
+        prompts.duringConfirmation = () -> assertTrue(batches.isEmpty());
+        click("Accept and resolve all…");
+        assertEquals(0, prompts.choices);
+        assertEquals(0, prompts.misplacedChoices);
+        assertNotNull(prompts.preview);
+        assertEquals(2, prompts.preview.getFindingCount());
+        assertEquals(root, prompts.preview.getDestinations().get(missing));
+        assertEquals(owner, prompts.preview.getDestinations().get(misplaced));
+        assertTrue(batches.isEmpty());
+        assertTrue(prompts.errors.isEmpty());
+    }
+
+    @Test
+    public void shouldApplyAcceptedSuggestionsAsOneBatchOnlyAfterConfirmation() throws Exception {
+        click("Accept and resolve all…");
+        assertEquals(0, prompts.choices);
+        assertEquals(0, prompts.misplacedChoices);
+        assertEquals(1, batches.size());
+        assertEquals(3, batches.get(0).size());
+        assertFalse(root.getDeclarationAxioms(missing).isEmpty());
+        assertFalse(owner.getDeclarationAxioms(misplaced).isEmpty());
+        assertTrue(root.getDeclarationAxioms(misplaced).isEmpty());
+        assertEquals(1, refreshes.get());
+    }
+
+    @Test
+    public void shouldRejectAcceptAllIfAnyMissingSuggestionIsAmbiguous() throws Exception {
+        OWLOntology sibling = ontologies.createOntology(IRI.create("http://example.org/sibling"));
+        ontologies.applyChange(new AddImport(root, factory.getOWLImportsDeclaration(
+                sibling.getOntologyID().getOntologyIRI().get())));
+        OWLClass ambiguous = factory.getOWLClass(IRI.create("urn:ambiguous"));
+        ontologies.addAxiom(owner, factory.getOWLSubClassOfAxiom(ambiguous, factory.getOWLThing()));
+        ontologies.addAxiom(sibling, factory.getOWLSubClassOfAxiom(ambiguous, factory.getOWLThing()));
+        click("Refresh");
+        click("Accept and resolve all…");
+        assertTrue(batches.isEmpty());
+        assertNull(prompts.preview);
+        assertEquals(0, prompts.choices);
+        assertEquals(0, prompts.misplacedChoices);
+        assertEquals(1, prompts.errors.size());
+        assertTrue(prompts.errors.get(0).contains("No unique suggested ontology"));
+        assertTrue(prompts.errors.get(0).contains("Resolve all…"));
+    }
+
+    @Test
+    public void shouldRejectAcceptAllIfASuggestedOntologyIsReadOnly() throws Exception {
+        when(model.isMutable(owner)).thenReturn(false);
+        click("Accept and resolve all…");
+        assertTrue(batches.isEmpty());
+        assertNull(prompts.preview);
+        assertEquals(0, prompts.choices);
+        assertEquals(0, prompts.misplacedChoices);
+        assertEquals(1, prompts.errors.size());
+        assertTrue(prompts.errors.get(0).contains("not editable"));
+    }
+
+    @Test
+    public void shouldRejectAcceptAllWhenTheReportIsStale() throws Exception {
+        ontologies.addAxiom(owner, factory.getOWLDeclarationAxiom(missing));
+        click("Accept and resolve all…");
+        assertTrue(batches.isEmpty());
+        assertNull(prompts.preview);
+        assertEquals(1, prompts.errors.size());
+        assertEquals(0, prompts.choices);
+        assertEquals(0, prompts.misplacedChoices);
+    }
+
+    @Test
+    public void shouldRecheckAcceptedSuggestionsAfterThePreview() throws Exception {
+        prompts.duringConfirmation = () -> when(model.isMutable(owner)).thenReturn(false);
+        click("Accept and resolve all…");
+        assertNotNull(prompts.preview);
+        assertTrue(batches.isEmpty());
+        assertEquals(1, prompts.errors.size());
+        assertEquals(0, prompts.choices);
+        assertEquals(0, prompts.misplacedChoices);
+    }
+
+    @Test(timeout = 30_000)
+    public void shouldPreviewThousandsOfAcceptedSuggestionsWithoutPerEntityPrompts() throws Exception {
+        for (int i = 0; i < 2_000; i++) {
+            OWLClass entity = factory.getOWLClass(IRI.create("http://example.org/root#Scale" + i));
+            ontologies.addAxiom(root, factory.getOWLSubClassOfAxiom(entity, factory.getOWLThing()));
+        }
+        prompts.approve = false;
+        click("Refresh");
+        click("Accept and resolve all…");
+        assertNotNull(prompts.preview);
+        assertEquals(2_002, prompts.preview.getFindingCount());
+        assertEquals(2_003, prompts.preview.getChanges().size());
+        assertEquals(0, prompts.choices);
+        assertEquals(0, prompts.misplacedChoices);
+        assertTrue(batches.isEmpty());
     }
 
     private Object[] rows() {

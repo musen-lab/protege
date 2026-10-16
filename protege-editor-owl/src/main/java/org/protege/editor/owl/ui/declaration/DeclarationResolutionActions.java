@@ -49,6 +49,7 @@ final class DeclarationResolutionActions {
     private final Interaction interaction;
     private final JButton selected = new JButton("Resolve selected…");
     private final JButton all = new JButton("Resolve all…");
+    private final JButton acceptAll = new JButton("Accept and resolve all…");
     private final JButton refresh = new JButton("Refresh");
     private final JLabel progress = new JLabel();
     private final JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEADING));
@@ -69,11 +70,14 @@ final class DeclarationResolutionActions {
         ontologyManager.addOntologyChangeListener(changeListener);
         selected.setToolTipText("Resolve the selected findings; use Ctrl/Command or Shift to select multiple rows.");
         all.setToolTipText("Preview repairs for all findings in this report.");
-        selected.addActionListener(event -> resolve(false));
-        all.addActionListener(event -> resolve(true));
+        acceptAll.setToolTipText("Use all suggested ontology locations and go straight to the repair preview.");
+        selected.addActionListener(event -> resolve(false, false));
+        all.addActionListener(event -> resolve(true, false));
+        acceptAll.addActionListener(event -> resolve(true, true));
         refresh.addActionListener(event -> refresh());
         toolbar.add(selected);
         toolbar.add(all);
+        toolbar.add(acceptAll);
         toolbar.add(refresh);
         toolbar.add(progress);
         list.addListSelectionListener(event -> updateEnabled());
@@ -128,6 +132,7 @@ final class DeclarationResolutionActions {
         }
         selected.setEnabled(!disposed && !isBusy() && selectedFinding);
         all.setEnabled(!disposed && !isBusy() && hasFindings);
+        acceptAll.setEnabled(!disposed && !isBusy() && hasFindings);
         refresh.setEnabled(!disposed && !isBusy());
     }
 
@@ -146,7 +151,7 @@ final class DeclarationResolutionActions {
         }
     }
 
-    private void resolve(boolean everyRow) {
+    private void resolve(boolean everyRow, boolean acceptSuggestions) {
         if (isBusy() || disposed) {
             return;
         }
@@ -169,7 +174,13 @@ final class DeclarationResolutionActions {
             long expected = revision.get();
             runInBackground(() -> missing.isEmpty()
                             ? Collections.<OWLEntity, Optional<OWLOntologyID>>emptyMap() : suggestionsFor(missing),
-                    suggestions -> chooseTargetsAndPlan(missing, misplaced, editable, suggestions, expected),
+                    suggestions -> {
+                        if (acceptSuggestions) {
+                            acceptTargetsAndPlan(missing, misplaced, editable, suggestions, expected);
+                        } else {
+                            chooseTargetsAndPlan(missing, misplaced, editable, suggestions, expected);
+                        }
+                    },
                     "Finding suggested locations…");
         } catch (RuntimeException ex) {
             reportError(ex, "No repairs were applied.\n");
@@ -183,6 +194,40 @@ final class DeclarationResolutionActions {
             suggestions.put(finding.getEntity(), strategy.resolve(finding.getEntity()));
         }
         return suggestions;
+    }
+
+    /** Accepts only actual editable suggestions; it never guesses or silently skips findings. */
+    private void acceptTargetsAndPlan(List<MissingDeclarationFinding> missing,
+                                      List<MisplacedDeclarationFinding> misplaced, Set<OWLOntology> editable,
+                                      Map<OWLEntity, Optional<OWLOntologyID>> suggestions, long expected) {
+        requireRevision(expected);
+        Map<OWLOntologyID, OWLOntology> byId = new HashMap<>();
+        editable.forEach(ontology -> byId.put(ontology.getOntologyID(), ontology));
+        Map<OWLEntity, OWLOntology> targets = new LinkedHashMap<>();
+        for (MissingDeclarationFinding finding : missing) {
+            OWLEntity entity = finding.getEntity();
+            targets.put(entity, requireSuggestedTarget(entity, suggestions.get(entity), byId));
+        }
+        for (MisplacedDeclarationFinding finding : misplaced) {
+            targets.put(finding.getEntity(), requireSuggestedTarget(finding.getEntity(),
+                    Optional.of(finding.getOwningOntology()), byId));
+        }
+        preparePlan(missing, misplaced, editable, targets, expected);
+    }
+
+    private static OWLOntology requireSuggestedTarget(OWLEntity entity, Optional<OWLOntologyID> suggestion,
+                                                      Map<OWLOntologyID, OWLOntology> editable) {
+        if (suggestion == null || !suggestion.isPresent()) {
+            throw new IllegalStateException("No unique suggested ontology for " + entity.getIRI()
+                    + ". Use Resolve all… to choose its destination. No repairs were applied.");
+        }
+        OWLOntology target = editable.get(suggestion.get());
+        if (target == null) {
+            throw new IllegalStateException("The suggested ontology for " + entity.getIRI()
+                    + " is not editable or is no longer in the import closure. "
+                    + "Use Resolve all… to choose its destination. No repairs were applied.");
+        }
+        return target;
     }
 
     private void chooseTargetsAndPlan(List<MissingDeclarationFinding> missing,
