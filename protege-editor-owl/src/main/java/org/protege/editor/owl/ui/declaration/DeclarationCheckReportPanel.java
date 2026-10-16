@@ -7,7 +7,6 @@ import org.protege.editor.core.ui.list.MListSectionHeader;
 import org.protege.editor.core.ui.util.ComponentFactory;
 import org.protege.editor.owl.OWLEditorKit;
 import org.protege.editor.owl.model.declaration.DeclarationReportOutline;
-import org.protege.editor.owl.model.declaration.FirstMentionStrategy;
 import org.protege.editor.owl.model.declaration.MisplacedDeclarationFinding;
 import org.protege.editor.owl.model.declaration.MissingDeclarationFinding;
 import org.protege.editor.owl.model.declaration.OntologyIdFormat;
@@ -18,10 +17,8 @@ import org.semanticweb.owlapi.model.OWLOntologyID;
 import javax.annotation.Nonnull;
 import javax.swing.*;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.Collection;
+import java.util.*;
 import java.util.List;
-import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -57,37 +54,19 @@ public final class DeclarationCheckReportPanel extends JPanel {
 
     private DeclarationResolutionActions resolutionActions;
 
-    DeclarationCheckReportPanel(@Nonnull OWLEditorKit owlEditorKit,
-                                @Nonnull DeclarationReportOutline outline) {
-        this(owlEditorKit, rows(outline,
-                owlEditorKit.getOWLModelManager().getActiveOntology().getImportsClosure()));
-    }
-
     private DeclarationCheckReportPanel(OWLEditorKit owlEditorKit, List<Object> reportRows) {
         this(DeclarationDestinationPanel.entityRenderer(checkNotNull(owlEditorKit)), reportRows);
         OWLOntology root = owlEditorKit.getOWLModelManager().getActiveOntology();
+        ListCellRenderer<OWLEntity> entityRenderer = DeclarationDestinationPanel.entityRenderer(owlEditorKit);
         resolutionActions = new DeclarationResolutionActions(
                 owlEditorKit.getOWLModelManager(), root, list,
                 updated -> list.setListData(updated.toArray()),
-                new DeclarationResolutionDialogs(this,
-                        DeclarationDestinationPanel.entityRenderer(owlEditorKit)));
+                new DeclarationResolutionDialogs(this, entityRenderer));
         add(resolutionActions.getToolbar(), BorderLayout.SOUTH);
     }
 
-    /**
-     * Lays out the report with the given renderer for the entity part of each finding row.
-     *
-     * @param entityRenderer the renderer that draws a finding's entity
-     * @param outline the declaration report outline to present
-     * @param ontologies the ontologies in the import closure
-     */
-    DeclarationCheckReportPanel(@Nonnull ListCellRenderer entityRenderer,
-                                @Nonnull DeclarationReportOutline outline,
-                                @Nonnull Collection<OWLOntology> ontologies) {
-        this(entityRenderer, rows(outline, ontologies));
-    }
-
-    private DeclarationCheckReportPanel(ListCellRenderer entityRenderer, List<Object> reportRows) {
+    /** Lays out precomputed report rows with the supplied entity renderer. */
+    DeclarationCheckReportPanel(ListCellRenderer entityRenderer, List<Object> reportRows) {
         checkNotNull(entityRenderer);
         setLayout(new BorderLayout(3, 3));
         list.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
@@ -113,11 +92,10 @@ public final class DeclarationCheckReportPanel extends JPanel {
      */
     public static void showDialog(@Nonnull OWLEditorKit owlEditorKit,
                                   @Nonnull DeclarationReportOutline outline) {
-        showDialog(owlEditorKit, rows(outline,
-                owlEditorKit.getOWLModelManager().getActiveOntology().getImportsClosure()));
+        showDialog(owlEditorKit, rows(outline));
     }
 
-    /** Shows precomputed rows so the Tools action need not scan large ontologies on the EDT. */
+    /** Shows precomputed rows so the Tools action need not scan large ontologies on the UI thread. */
     static void showDialog(OWLEditorKit owlEditorKit, List<Object> reportRows) {
         DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(owlEditorKit, reportRows);
         JOptionPane pane = new JOptionPane(panel, JOptionPane.PLAIN_MESSAGE, JOptionPane.DEFAULT_OPTION);
@@ -138,23 +116,20 @@ public final class DeclarationCheckReportPanel extends JPanel {
      * finding rows or a single placeholder row when the section is empty.
      *
      * @param outline the declaration report outline to lay out
-     * @param ontologies the ontologies in the import closure
      * @return the ordered list rows, mixing {@link MListSectionHeader} and {@link MListItem}
      * @throws NullPointerException if {@code outline} is {@code null}
      */
     @Nonnull
-    static List<Object> rows(@Nonnull DeclarationReportOutline outline,
-                             @Nonnull Collection<OWLOntology> ontologies) {
+    static List<Object> rows(@Nonnull DeclarationReportOutline outline) {
         checkNotNull(outline);
         List<Object> rows = new ArrayList<>();
         rows.add(new SectionHeader(outline.getMissingSection().getHeading()));
         if (outline.getMissing().isEmpty()) {
             rows.add(new MessageRow(NO_MISSING_DECLARATIONS));
         } else {
-            FirstMentionStrategy suggestions = FirstMentionStrategy.over(ontologies);
             for (MissingDeclarationFinding finding : outline.getMissing()) {
                 rows.add(new FindingRow(finding, finding.getEntity(),
-                        missingDetail(suggestions.resolve(finding.getEntity()))));
+                        missingDetail(finding.getPlacementOntology())));
             }
         }
         rows.add(new SectionHeader(outline.getMisplacedSection().getHeading()));
@@ -170,13 +145,15 @@ public final class DeclarationCheckReportPanel extends JPanel {
 
     @Nonnull
     private static List<String> missingDetail(@Nonnull Optional<OWLOntologyID> suggestion) {
-        return ImmutableList.of("Suggested: Add to "
-                + suggestion.map(OntologyIdFormat::format).orElse("(no unique first mention)"));
+        return ImmutableList.of(suggestion
+                .map(id -> "Suggested: Add the declaration axiom to " + OntologyIdFormat.format(id))
+                .orElse("Suggested: No unique location found; choose one when resolving."));
     }
 
     @Nonnull
     private static List<String> misplacedDetail(@Nonnull MisplacedDeclarationFinding finding) {
-        return ImmutableList.of("Suggested: Move to " + OntologyIdFormat.format(finding.getOwningOntology())
+        return ImmutableList.of(
+                "Suggested: Move the declaration axiom to " + OntologyIdFormat.format(finding.getOwningOntology())
                 + " (based on: " + DeclarationReportOutline.shortRuleLabelOf(finding) + ")");
     }
 

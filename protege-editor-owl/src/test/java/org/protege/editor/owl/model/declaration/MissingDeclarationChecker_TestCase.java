@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -43,6 +44,59 @@ public class MissingDeclarationChecker_TestCase {
 
         assertEquals(names(report), ImmutableList.of(ClosureFixtures.MID + "#Ghost"));
         assertEquals(DeclarationSeverity.ERROR, report.getFindings().get(0).getSeverity());
+    }
+
+    @Test
+    public void shouldRecordTheImportedFirstMentionEvenWhenTheIriPrefixPointsElsewhere() throws Exception {
+        OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
+        OWLDataFactory df = manager.getOWLDataFactory();
+        OWLOntology root = manager.createOntology(IRI.create("http://example.org/root"));
+        OWLOntology module = manager.createOntology(IRI.create("http://example.org/module"));
+        manager.applyChange(new AddImport(root, df.getOWLImportsDeclaration(module.getOntologyID().getOntologyIRI().get())));
+        OWLClass entity = df.getOWLClass(IRI.create("http://example.org/root#Entity"));
+        manager.addAxiom(root, df.getOWLSubClassOfAxiom(entity, df.getOWLThing()));
+        manager.addAxiom(module, df.getOWLSubClassOfAxiom(entity, df.getOWLThing()));
+        MissingDeclarationFinding finding = checker.check(root).getFindings().get(0);
+        assertEquals(Optional.of(module.getOntologyID()), finding.getPlacementOntology());
+        assertEquals(2, finding.getMentioningOntologies().size());
+    }
+
+    @Test
+    public void shouldKeepAmbiguousTargetsAbsentAndCapturePlacementChangesInNewFindings() throws Exception {
+        OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
+        OWLDataFactory df = manager.getOWLDataFactory();
+        OWLOntology root = manager.createOntology(IRI.create("http://example.org/root"));
+        OWLOntology left = manager.createOntology(IRI.create("http://example.org/left"));
+        OWLOntology right = manager.createOntology(IRI.create("http://example.org/right"));
+        OWLClass entity = df.getOWLClass(IRI.create("urn:ambiguous"));
+        for (OWLOntology member : new OWLOntology[]{left, right}) {
+            manager.applyChange(new AddImport(root, df.getOWLImportsDeclaration(member.getOntologyID().getOntologyIRI().get())));
+            manager.addAxiom(member, df.getOWLSubClassOfAxiom(entity, df.getOWLThing()));
+        }
+        MissingDeclarationFinding before = checker.check(root).getFindings().get(0);
+        assertEquals(Optional.empty(), before.getPlacementOntology());
+        manager.applyChange(new AddImport(left, df.getOWLImportsDeclaration(right.getOntologyID().getOntologyIRI().get())));
+        MissingDeclarationFinding after = checker.check(root).getFindings().get(0);
+        assertEquals(Optional.of(right.getOntologyID()), after.getPlacementOntology());
+        assertEquals(before.getMentioningOntologies(), after.getMentioningOntologies());
+        assertNotEquals(before, after);
+        assertEquals(Optional.empty(), before.getPlacementOntology());
+        manager.applyChange(new AddImport(right, df.getOWLImportsDeclaration(left.getOntologyID().getOntologyIRI().get())));
+        assertEquals(Optional.empty(), checker.check(root).getFindings().get(0).getPlacementOntology());
+    }
+
+    @Test
+    public void shouldReuseTheExistingIndexWithoutAnotherOntologyTraversal() throws Exception {
+        OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
+        OWLDataFactory df = manager.getOWLDataFactory();
+        OWLOntology root = manager.createOntology(IRI.create("urn:root"));
+        manager.addAxiom(root, df.getOWLSubClassOfAxiom(df.getOWLClass(IRI.create("urn:entity")), df.getOWLThing()));
+        OWLOntology observed = org.mockito.Mockito.spy(root);
+        DeclarationIndex index = DeclarationIndex.over(observed);
+        org.mockito.Mockito.clearInvocations(observed);
+        MissingDeclarationFinding finding = checker.check(index).getFindings().get(0);
+        assertEquals(Optional.of(root.getOntologyID()), finding.getPlacementOntology());
+        org.mockito.Mockito.verifyNoInteractions(observed);
     }
 
     @Test
@@ -112,11 +166,11 @@ public class MissingDeclarationChecker_TestCase {
 
         assertEquals(ImmutableList.of("http://example.org/shared#Missing"), names(report));
         assertEquals("both ontologies use it, so both are named",
-                2, report.getFindings().get(0).getReferringOntologies().size());
+                2, report.getFindings().get(0).getMentioningOntologies().size());
     }
 
     @Test
-    public void shouldIncludeEntityTypeSeverityAndReferringOntologiesInAFinding() throws Exception {
+    public void shouldIncludeEntityTypeSeverityAndMentioningOntologiesInAFinding() throws Exception {
         OWLOntology leaf = ClosureFixtures.threeLevelClosure();
         OWLDataFactory df = leaf.getOWLOntologyManager().getOWLDataFactory();
         OWLClass ghost = df.getOWLClass(IRI.create(ClosureFixtures.MID + "#Ghost"));
@@ -126,9 +180,10 @@ public class MissingDeclarationChecker_TestCase {
         assertEquals(ghost, finding.getEntity());
         assertEquals(EntityType.CLASS, finding.getEntityType());
         assertEquals(DeclarationSeverity.ERROR, finding.getSeverity());
-        assertEquals(1, finding.getReferringOntologies().size());
-        assertEquals(ClosureFixtures.MID, finding.getReferringOntologies().iterator().next()
+        assertEquals(1, finding.getMentioningOntologies().size());
+        assertEquals(ClosureFixtures.MID, finding.getMentioningOntologies().iterator().next()
                 .getOntologyIRI().get().toString());
+        assertEquals(Optional.of(finding.getMentioningOntologies().iterator().next()), finding.getPlacementOntology());
     }
 
     @Test
@@ -295,7 +350,7 @@ public class MissingDeclarationChecker_TestCase {
 
         assertNotEquals(originalId, o.getOntologyID());
         assertEquals(ImmutableList.of(originalId),
-                ImmutableList.copyOf(finding.getReferringOntologies()));
+                ImmutableList.copyOf(finding.getMentioningOntologies()));
         assertEquals(hashBeforeRename, finding.hashCode());
     }
 

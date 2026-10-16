@@ -139,7 +139,7 @@ public class DeclarationReportLogWriter_TestCase {
 
     @Test
     public void shouldLogAllDeclaringLocationsBeforeExpectedOwnerWithRuleDiagnosticsIntact() {
-        MisplacedDeclarationFinding finding = MisplacedDeclarationFinding.get(
+        MisplacedDeclarationFinding finding = MisplacedDeclarationFinding.create(
                 org.semanticweb.owlapi.apibinding.OWLManager.getOWLDataFactory().getOWLClass(
                         org.semanticweb.owlapi.model.IRI.create("http://example.org/QuickBaking")),
                 new org.semanticweb.owlapi.model.OWLOntologyID(

@@ -35,10 +35,10 @@ public abstract class MisplacedDeclarationFinding {
      * @return a finding at warning severity
      */
     @Nonnull
-    public static MisplacedDeclarationFinding get(@Nonnull OWLEntity entity,
-                                                  @Nonnull OWLOntologyID owningOntology,
-                                                  @Nonnull Collection<OWLOntologyID> declaringOntologies,
-                                                  @Nonnull String ownershipRuleId) {
+    public static MisplacedDeclarationFinding create(@Nonnull OWLEntity entity,
+                                                     @Nonnull OWLOntologyID owningOntology,
+                                                     @Nonnull Collection<OWLOntologyID> declaringOntologies,
+                                                     @Nonnull String ownershipRuleId) {
         checkNotNull(entity);
         checkNotNull(owningOntology);
         checkNotNull(declaringOntologies);

@@ -1,6 +1,7 @@
 package org.protege.editor.owl.ui.declaration;
 
 import org.protege.editor.owl.model.declaration.DeclarationChecker;
+import org.protege.editor.owl.model.declaration.DeclarationReport;
 import org.protege.editor.owl.model.declaration.DeclarationReportOutline;
 import org.protege.editor.owl.model.event.OWLModelManagerListener;
 import org.protege.editor.owl.ui.action.ProtegeOWLAction;
@@ -22,8 +23,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>Unlike the save-time warning, this action always runs both checks: it does not consult the
  * Axioms preferences that would otherwise skip them. Checking and preparing report rows run off
- * the UI thread and change no preference or ontology. The report offers explicit, previewed
- * resolution actions; merely opening it applies none. Check failures are surfaced as errors.
+ * the UI thread and change no preference or ontology. The report offers resolution actions and
+ * check failures are surfaced as errors.
  *
  * @author Josef Hardi
  */
@@ -51,8 +52,8 @@ public class CheckDeclarationsAction extends ProtegeOWLAction {
         checkWorker = new SwingWorker<List<Object>, Void>() {
             @Override
             protected List<Object> doInBackground() {
-                return DeclarationCheckReportPanel.rows(DeclarationReportOutline.of(
-                        DeclarationChecker.forcingAllChecks().check(ontology)), ontology.getImportsClosure());
+                DeclarationReport report = DeclarationChecker.forcingAllChecks().check(ontology);
+                return DeclarationCheckReportPanel.rows(DeclarationReportOutline.of(report));
             }
 
             @Override

@@ -81,7 +81,7 @@ final class DeclarationResolutionActions {
         toolbar.add(refresh);
         toolbar.add(progress);
         list.addListSelectionListener(event -> updateEnabled());
-        hasFindings = !findings(true).isEmpty();
+        hasFindings = !selectFindings(true).isEmpty();
         updateEnabled();
     }
 
@@ -101,7 +101,7 @@ final class DeclarationResolutionActions {
         }
     }
 
-    private List<Object> findings(boolean everyRow) {
+    private List<Object> selectFindings(boolean everyRow) {
         List<?> values;
         if (everyRow) {
             List<Object> rows = new ArrayList<>();
@@ -159,7 +159,7 @@ final class DeclarationResolutionActions {
             requireCurrentRoot();
             List<MissingDeclarationFinding> missing = new ArrayList<>();
             List<MisplacedDeclarationFinding> misplaced = new ArrayList<>();
-            for (Object finding : findings(everyRow)) {
+            for (Object finding : selectFindings(everyRow)) {
                 if (finding instanceof MissingDeclarationFinding) {
                     missing.add((MissingDeclarationFinding) finding);
                 } else if (finding instanceof MisplacedDeclarationFinding) {
@@ -172,45 +172,31 @@ final class DeclarationResolutionActions {
             Set<OWLOntology> editable = new HashSet<>();
             root.getImportsClosure().stream().filter(modelManager::isMutable).forEach(editable::add);
             long expected = revision.get();
-            runInBackground(() -> missing.isEmpty()
-                            ? Collections.<OWLEntity, Optional<OWLOntologyID>>emptyMap() : suggestionsFor(missing),
-                    suggestions -> {
-                        if (acceptSuggestions) {
-                            acceptTargetsAndPlan(missing, misplaced, editable, suggestions, expected);
-                        } else {
-                            chooseTargetsAndPlan(missing, misplaced, editable, suggestions, expected);
-                        }
-                    },
-                    "Finding suggested locations…");
+            if (acceptSuggestions) {
+                acceptTargetsAndPlan(missing, misplaced, editable, expected);
+            } else {
+                chooseTargetsAndPlan(missing, misplaced, editable, expected);
+            }
         } catch (RuntimeException ex) {
             reportError(ex, "No repairs were applied.\n");
         }
     }
 
-    private Map<OWLEntity, Optional<OWLOntologyID>> suggestionsFor(List<MissingDeclarationFinding> missing) {
-        FirstMentionStrategy strategy = FirstMentionStrategy.over(root);
-        Map<OWLEntity, Optional<OWLOntologyID>> suggestions = new HashMap<>();
-        for (MissingDeclarationFinding finding : missing) {
-            suggestions.put(finding.getEntity(), strategy.resolve(finding.getEntity()));
-        }
-        return suggestions;
-    }
-
     /** Accepts only actual editable suggestions; it never guesses or silently skips findings. */
     private void acceptTargetsAndPlan(List<MissingDeclarationFinding> missing,
                                       List<MisplacedDeclarationFinding> misplaced, Set<OWLOntology> editable,
-                                      Map<OWLEntity, Optional<OWLOntologyID>> suggestions, long expected) {
+                                      long expected) {
         requireRevision(expected);
         Map<OWLOntologyID, OWLOntology> byId = new HashMap<>();
         editable.forEach(ontology -> byId.put(ontology.getOntologyID(), ontology));
         Map<OWLEntity, OWLOntology> targets = new LinkedHashMap<>();
         for (MissingDeclarationFinding finding : missing) {
             OWLEntity entity = finding.getEntity();
-            targets.put(entity, requireSuggestedTarget(entity, suggestions.get(entity), byId));
+            targets.put(entity, requireSuggestedTarget(entity, finding.getPlacementOntology(), byId));
         }
         for (MisplacedDeclarationFinding finding : misplaced) {
-            targets.put(finding.getEntity(), requireSuggestedTarget(finding.getEntity(),
-                    Optional.of(finding.getOwningOntology()), byId));
+            OWLEntity entity = finding.getEntity();
+            targets.put(finding.getEntity(), requireSuggestedTarget(entity, Optional.of(finding.getOwningOntology()), byId));
         }
         preparePlan(missing, misplaced, editable, targets, expected);
     }
@@ -232,8 +218,7 @@ final class DeclarationResolutionActions {
 
     private void chooseTargetsAndPlan(List<MissingDeclarationFinding> missing,
                                       List<MisplacedDeclarationFinding> misplaced,
-                                      Set<OWLOntology> editable,
-                                      Map<OWLEntity, Optional<OWLOntologyID>> suggestions, long expected) {
+                                      Set<OWLOntology> editable, long expected) {
         requireRevision(expected);
         if (editable.isEmpty()) {
             throw new IllegalStateException("No ontology in this report's import closure is editable.");
@@ -244,7 +229,7 @@ final class DeclarationResolutionActions {
         Map<OWLEntity, OWLOntology> targets = new LinkedHashMap<>();
         for (MissingDeclarationFinding finding : missing) {
             OWLEntity entity = finding.getEntity();
-            OWLOntology target = interaction.chooseMissingTarget(entity, choices, suggestions.get(entity),
+            OWLOntology target = interaction.chooseMissingTarget(entity, choices, finding.getPlacementOntology(),
                     targets.size() + 1, missing.size());
             if (target == null) {
                 return; // Cancellation abandons the whole batch, including earlier choices.
@@ -314,8 +299,7 @@ final class DeclarationResolutionActions {
     private void refreshReport() {
         long expected = revision.get();
         runInBackground(() -> DeclarationCheckReportPanel.rows(
-                        DeclarationReportOutline.of(DeclarationChecker.forcingAllChecks().check(root)),
-                        root.getImportsClosure()),
+                        DeclarationReportOutline.of(DeclarationChecker.forcingAllChecks().check(root))),
                 rows -> {
                     requireRevision(expected);
                     display.accept(rows);

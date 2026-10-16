@@ -7,6 +7,7 @@ import org.semanticweb.owlapi.model.OWLDataFactory;
 import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import java.util.Collections;
+import java.util.Optional;
 
 /**
  * Factory methods and ontology identifiers shared by declaration-report presentation tests.
@@ -71,14 +72,14 @@ public final class DeclarationReportFixtures {
     public static MissingDeclarationReport missing(int errors, int warnings) {
         ImmutableList.Builder<MissingDeclarationFinding> findings = ImmutableList.builder();
         for (int i = 0; i < errors; i++) {
-            findings.add(MissingDeclarationFinding.get(
+            findings.add(MissingDeclarationFinding.create(
                     DF.getOWLClass(IRI.create("http://example.org/pizza#Class" + i)),
-                    Collections.singleton(PIZZA)));
+                    Collections.singleton(PIZZA), Optional.of(PIZZA)));
         }
         for (int i = 0; i < warnings; i++) {
-            findings.add(MissingDeclarationFinding.get(
+            findings.add(MissingDeclarationFinding.create(
                     DF.getOWLNamedIndividual(IRI.create("http://example.org/pizza#individual" + i)),
-                    Collections.singleton(PIZZA)));
+                    Collections.singleton(PIZZA), Optional.of(PIZZA)));
         }
         return MissingDeclarationReport.get(findings.build());
     }
@@ -95,7 +96,7 @@ public final class DeclarationReportFixtures {
     public static MisplacedDeclarationReport misplaced(int count) {
         ImmutableList.Builder<MisplacedDeclarationFinding> findings = ImmutableList.builder();
         for (int i = 0; i < count; i++) {
-            findings.add(MisplacedDeclarationFinding.get(
+            findings.add(MisplacedDeclarationFinding.create(
                     DF.getOWLClass(IRI.create(String.format("http://purl.obolibrary.org/obo/GO_%07d", i))),
                     GO,
                     Collections.singleton(PIZZA),

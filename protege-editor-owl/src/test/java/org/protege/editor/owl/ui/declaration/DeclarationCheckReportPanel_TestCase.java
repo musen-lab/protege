@@ -13,21 +13,22 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.Assert.*;
 import static org.protege.editor.owl.model.declaration.DeclarationReportFixtures.report;
 
-/** Tests the two-line suggestions independently of checking and log diagnostics. */
+/** Tests the two-line suggestions from immutable findings, without consulting live ontologies. */
 public class DeclarationCheckReportPanel_TestCase {
 
     @Test
     public void shouldGroupFindingsAndKeepEmptySectionPlaceholders() {
         DeclarationReportOutline outline = DeclarationReportOutline.of(report(2, 1, 3));
-        List<Object> rows = DeclarationCheckReportPanel.rows(outline, Collections.emptyList());
+        List<Object> rows = DeclarationCheckReportPanel.rows(outline);
         assertEquals(8, rows.size());
         assertEquals("Missing entity declarations: 3", ((MListSectionHeader) rows.get(0)).getName());
         assertEquals("Misplaced entity declarations: 3", ((MListSectionHeader) rows.get(4)).getName());
-        rows = DeclarationCheckReportPanel.rows(DeclarationReportOutline.of(report(0, 0, 0)), Collections.emptyList());
+        rows = DeclarationCheckReportPanel.rows(DeclarationReportOutline.of(report(0, 0, 0)));
         assertEquals(4, rows.size());
         assertEquals(DeclarationCheckReportPanel.NO_MISSING_DECLARATIONS,
                 ((DeclarationCheckReportPanel.MessageRow) rows.get(1)).getText());
@@ -36,28 +37,18 @@ public class DeclarationCheckReportPanel_TestCase {
     }
 
     @Test
-    public void shouldSuggestTheImportedFirstMentionRatherThanAllMentionersOrFindingMetadata() throws Exception {
-        OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
-        OWLOntology root = manager.createOntology(IRI.create("http://example.org/root"));
-        OWLOntology module = manager.createOntology(IRI.create("http://example.org/module"));
-        OWLDataFactory df = manager.getOWLDataFactory();
-        manager.applyChange(new AddImport(root, df.getOWLImportsDeclaration(module.getOntologyID().getOntologyIRI().get())));
-        OWLClass entity = df.getOWLClass(IRI.create("http://example.org/Undeclared"));
-        manager.addAxiom(module, df.getOWLSubClassOfAxiom(entity, df.getOWLThing()));
-        root.getSignature(org.semanticweb.owlapi.model.parameters.Imports.INCLUDED);
-        MissingDeclarationFinding finding = MissingDeclarationFinding.get(entity,
-                Arrays.asList(root.getOntologyID(), module.getOntologyID()));
-        DeclarationReportOutline outline = missingOutline(Collections.singletonList(finding));
-        assertEquals(Collections.singletonList("Suggested: Add to http://example.org/module"),
-                findingRow(outline, root.getImportsClosure(), 1).getDetail());
-        manager.addAxiom(root, df.getOWLSubClassOfAxiom(entity, df.getOWLThing()));
-        assertEquals(Collections.singletonList("Suggested: Add to http://example.org/module"),
-                findingRow(outline, root.getImportsClosure(), 1).getDetail());
-        assertEquals(1, new MissingDeclarationChecker().check(root).size());
+    public void shouldPresentRecordedPlacementWithoutInferringItFromReferringOntologies() {
+        OWLOntologyID referring = new OWLOntologyID(IRI.create("http://example.org/referring"));
+        OWLOntologyID target = new OWLOntologyID(IRI.create("http://example.org/target"));
+        OWLClass entity = OWLManager.getOWLDataFactory().getOWLClass(IRI.create("urn:entity"));
+        MissingDeclarationFinding finding = MissingDeclarationFinding.create(entity,
+                Collections.singletonList(referring), Optional.of(target));
+        assertEquals(Collections.singletonList("Suggested: Add to http://example.org/target"),
+                findingRow(missingOutline(Collections.singletonList(finding)), 1).getDetail());
     }
 
     @Test
-    public void shouldSuggestTheFirstMentionForAHeaderOnlyAnnotationProperty() throws Exception {
+    public void shouldPresentTheCheckedPlacementForAHeaderOnlyAnnotationProperty() throws Exception {
         OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
         OWLDataFactory df = manager.getOWLDataFactory();
         OWLOntology root = manager.createOntology(IRI.create("http://example.org/root"));
@@ -66,36 +57,19 @@ public class DeclarationCheckReportPanel_TestCase {
         OWLAnnotationProperty note = df.getOWLAnnotationProperty(IRI.create("http://example.org/headerNote"));
         manager.applyChange(new AddOntologyAnnotation(module, df.getOWLAnnotation(note, df.getOWLLiteral("module"))));
         DeclarationReportOutline outline = missingOutline(new MissingDeclarationChecker().check(root).getFindings());
-        assertEquals(Collections.singletonList("Suggested: Add to http://example.org/module"),
-                findingRow(outline, root.getImportsClosure(), 1).getDetail());
-        manager.applyChange(new AddOntologyAnnotation(root, df.getOWLAnnotation(note, df.getOWLLiteral("root"))));
-        assertEquals(Collections.singletonList("Suggested: Add to http://example.org/module"),
-                findingRow(outline, root.getImportsClosure(), 1).getDetail());
+        assertEquals(Collections.singletonList("Suggested: Add to http://example.org/module"), findingRow(outline, 1).getDetail());
     }
 
     @Test
-    public void shouldNotInventATargetForSiblingOrCyclicFirstMentions() throws Exception {
-        OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
-        OWLDataFactory df = manager.getOWLDataFactory();
-        OWLOntology root = manager.createOntology(IRI.create("http://example.org/root"));
-        OWLOntology left = manager.createOntology(IRI.create("http://example.org/left"));
-        OWLOntology right = manager.createOntology(IRI.create("http://example.org/right"));
-        for (OWLOntology member : Arrays.asList(left, right)) {
-            manager.applyChange(new AddImport(root, df.getOWLImportsDeclaration(member.getOntologyID().getOntologyIRI().get())));
-        }
-        OWLClass entity = df.getOWLClass(IRI.create("urn:ambiguous"));
-        manager.addAxiom(left, df.getOWLSubClassOfAxiom(entity, df.getOWLThing()));
-        manager.addAxiom(right, df.getOWLSubClassOfAxiom(entity, df.getOWLThing()));
-        DeclarationReportOutline outline = missingOutline(new MissingDeclarationChecker().check(root).getFindings());
-        String expected = "Suggested: Add to (no unique first mention)";
-        assertEquals(Collections.singletonList(expected), findingRow(outline, root.getImportsClosure(), 1).getDetail());
-        manager.applyChange(new AddImport(left, df.getOWLImportsDeclaration(right.getOntologyID().getOntologyIRI().get())));
-        manager.applyChange(new AddImport(right, df.getOWLImportsDeclaration(left.getOntologyID().getOntologyIRI().get())));
-        assertEquals(Collections.singletonList(expected), findingRow(outline, root.getImportsClosure(), 1).getDetail());
+    public void shouldExplainAnAbsentRecordedPlacement() {
+        OWLClass entity = OWLManager.getOWLDataFactory().getOWLClass(IRI.create("urn:ambiguous"));
+        MissingDeclarationFinding finding = MissingDeclarationFinding.create(entity, Collections.emptyList(), Optional.empty());
+        assertEquals(Collections.singletonList("Suggested: No unique location found; choose one when resolving."),
+                findingRow(missingOutline(Collections.singletonList(finding)), 1).getDetail());
     }
 
     @Test(timeout = 30_000)
-    public void shouldSuggestEveryMissingEntityInALargeClosureWithoutRescanningPerFinding() throws Exception {
+    public void shouldPresentTenThousandRecordedPlacementsInALargeClosure() throws Exception {
         OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
         OWLDataFactory df = manager.getOWLDataFactory();
         OWLOntology root = manager.createOntology(IRI.create("http://example.org/scale/root"));
@@ -105,18 +79,14 @@ public class DeclarationCheckReportPanel_TestCase {
             members.add(manager.createOntology(memberIri));
             manager.applyChange(new AddImport(root, df.getOWLImportsDeclaration(memberIri)));
         }
-        List<MissingDeclarationFinding> findings = new ArrayList<>();
         for (int i = 0; i < 100_000; i++) {
             OWLClass term = df.getOWLClass(IRI.create("http://example.org/scale#C" + i));
-            OWLOntology member = members.get(i % members.size());
-            if (i % 10 == 0) {
-                manager.addAxiom(member, df.getOWLSubClassOfAxiom(term, df.getOWLThing()));
-                findings.add(MissingDeclarationFinding.get(term, Collections.singletonList(root.getOntologyID())));
-            } else {
-                manager.addAxiom(member, df.getOWLDeclarationAxiom(term));
-            }
+            manager.addAxiom(members.get(i % members.size()), i % 10 == 0
+                    ? df.getOWLSubClassOfAxiom(term, df.getOWLThing()) : df.getOWLDeclarationAxiom(term));
         }
-        List<Object> rows = DeclarationCheckReportPanel.rows(missingOutline(findings), root.getImportsClosure());
+        List<MissingDeclarationFinding> findings = new MissingDeclarationChecker().check(root).getFindings();
+        List<Object> rows = DeclarationCheckReportPanel.rows(missingOutline(findings));
+        assertEquals(10_000, findings.size());
         assertEquals(findings.size() + 3, rows.size());
         for (int index = 1; index <= findings.size(); index++) {
             DeclarationCheckReportPanel.FindingRow row = (DeclarationCheckReportPanel.FindingRow) rows.get(index);
@@ -130,14 +100,9 @@ public class DeclarationCheckReportPanel_TestCase {
     @Test
     public void shouldRenderTwoSpacedLinesWithCompactRuleNames() throws Exception {
         DeclarationReportOutline outline = DeclarationReportOutline.of(report(1, 1, 1));
-        OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
-        OWLOntology pizza = manager.createOntology(IRI.create("http://example.org/pizza"));
-        for (MissingDeclarationFinding finding : outline.getMissing()) {
-            manager.addAxiom(pizza, manager.getOWLDataFactory().getOWLDeclarationAxiom(finding.getEntity()));
-        }
         SwingUtilities.invokeAndWait(() -> {
-            DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(
-                    new DefaultListCellRenderer(), outline, Collections.singletonList(pizza));
+            DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(new DefaultListCellRenderer(),
+                    DeclarationCheckReportPanel.rows(outline));
             MList list = findAll(panel, MList.class).get(0);
             for (int index : Arrays.asList(1, 2, 4)) {
                 Component rendered = list.getCellRenderer().getListCellRendererComponent(
@@ -150,7 +115,7 @@ public class DeclarationCheckReportPanel_TestCase {
                 JComponent content = (JComponent) ((Container) rendered).getComponent(0);
                 assertEquals(2, content.getInsets().top);
                 assertEquals(2, content.getInsets().bottom);
-                assertTrue(((JComponent) rendered).getInsets().left <= 1); // Only MList's transparent item inset.
+                assertTrue(((JComponent) rendered).getInsets().left <= 1);
             }
         });
     }
@@ -158,7 +123,7 @@ public class DeclarationCheckReportPanel_TestCase {
     @Test
     public void shouldKeepLongSuggestedTargetsAndUnknownRuleNamesOnOneScrollableLine() throws Exception {
         String longIri = "http://example.org/" + String.join("", Collections.nCopies(100, "long-module-name"));
-        MisplacedDeclarationFinding finding = MisplacedDeclarationFinding.get(
+        MisplacedDeclarationFinding finding = MisplacedDeclarationFinding.create(
                 OWLManager.getOWLDataFactory().getOWLClass(IRI.create("http://example.org/QuickBaking")),
                 new OWLOntologyID(IRI.create(longIri)),
                 Collections.singletonList(new OWLOntologyID(IRI.create("http://example.org/menu"))), "test-rule");
@@ -166,10 +131,10 @@ public class DeclarationCheckReportPanel_TestCase {
                 MissingDeclarationReport.get(Collections.emptyList()),
                 MisplacedDeclarationReport.get(Collections.singletonList(finding))));
         String expected = "Suggested: Move to " + longIri + " (based on: test-rule)";
-        assertEquals(Collections.singletonList(expected), findingRow(outline, Collections.emptyList(), 3).getDetail());
+        assertEquals(Collections.singletonList(expected), findingRow(outline, 3).getDetail());
         SwingUtilities.invokeAndWait(() -> {
-            DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(
-                    new DefaultListCellRenderer(), outline, Collections.emptyList());
+            DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(new DefaultListCellRenderer(),
+                    DeclarationCheckReportPanel.rows(outline));
             MList list = findAll(panel, MList.class).get(0);
             for (int width : Arrays.asList(800, 1000, 700, 800)) {
                 panel.setSize(width, 500);
@@ -201,7 +166,7 @@ public class DeclarationCheckReportPanel_TestCase {
     public void shouldFillViewportWithoutHorizontalScrollingWhenDetailsFit() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(new DefaultListCellRenderer(),
-                    DeclarationReportOutline.of(report(1, 1, 1)), Collections.emptyList());
+                    DeclarationCheckReportPanel.rows(DeclarationReportOutline.of(report(1, 1, 1))));
             for (int width : Arrays.asList(800, 1000, 800)) {
                 panel.setSize(width, 500);
                 for (int pass = 0; pass < 3; pass++) {
@@ -218,7 +183,7 @@ public class DeclarationCheckReportPanel_TestCase {
     public void shouldRestoreSelectionColorsWhenTheSharedRendererIsReused() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(new DefaultListCellRenderer(),
-                    DeclarationReportOutline.of(report(1, 1, 1)), Collections.emptyList());
+                    DeclarationCheckReportPanel.rows(DeclarationReportOutline.of(report(1, 1, 1))));
             MList list = findAll(panel, MList.class).get(0);
             Color foreground = new Color(240, 245, 250);
             Color background = new Color(30, 60, 90);
@@ -243,7 +208,7 @@ public class DeclarationCheckReportPanel_TestCase {
     public void shouldPaintSelectionToTheLeftEdgeWithoutClippingEitherLine() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             DeclarationCheckReportPanel panel = new DeclarationCheckReportPanel(new DefaultListCellRenderer(),
-                    DeclarationReportOutline.of(report(2, 0, 0)), Collections.emptyList());
+                    DeclarationCheckReportPanel.rows(DeclarationReportOutline.of(report(2, 0, 0))));
             MList list = findAll(panel, MList.class).get(0);
             Color selected = new Color(0, 70, 220);
             list.setSelectionBackground(selected);
@@ -274,9 +239,8 @@ public class DeclarationCheckReportPanel_TestCase {
                 MisplacedDeclarationReport.get(Collections.emptyList())));
     }
 
-    private static DeclarationCheckReportPanel.FindingRow findingRow(DeclarationReportOutline outline,
-            java.util.Collection<OWLOntology> ontologies, int index) {
-        return (DeclarationCheckReportPanel.FindingRow) DeclarationCheckReportPanel.rows(outline, ontologies).get(index);
+    private static DeclarationCheckReportPanel.FindingRow findingRow(DeclarationReportOutline outline, int index) {
+        return (DeclarationCheckReportPanel.FindingRow) DeclarationCheckReportPanel.rows(outline).get(index);
     }
 
     private static void layOut(Component component) {

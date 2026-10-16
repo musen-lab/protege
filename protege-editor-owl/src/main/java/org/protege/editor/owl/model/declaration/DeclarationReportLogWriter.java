@@ -74,7 +74,7 @@ public final class DeclarationReportLogWriter {
         logger.info(section.getHeading());
         for (MissingDeclarationFinding finding : shown(findings)) {
             logger.info("  {}  {}", finding.getEntityType().getPrintName(), finding.getEntity().toStringID());
-            logger.info("              used in: {}", OntologyIdFormat.formatAll(finding.getReferringOntologies()));
+            logger.info("              used in: {}", OntologyIdFormat.formatAll(finding.getMentioningOntologies()));
         }
         writeOmitted(logger, findings.size());
     }

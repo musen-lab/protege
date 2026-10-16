@@ -443,9 +443,27 @@ public class DeclarationResolutionActions_TestCase {
         assertTrue(batches.isEmpty());
     }
 
+    @Test
+    public void shouldShowTheRecordedPlacementAndRejectItIfItHasBecomeStale() throws Exception {
+        MissingDeclarationFinding original = DeclarationChecker.forcingAllChecks().check(root)
+                .getMissing().getFindings().get(0);
+        MissingDeclarationFinding stored = MissingDeclarationFinding.create(missing,
+                original.getMentioningOntologies(), Optional.of(owner.getOntologyID()));
+        DeclarationReportOutline outline = DeclarationReportOutline.of(DeclarationReport.get(
+                MissingDeclarationReport.get(Collections.singletonList(stored)),
+                MisplacedDeclarationReport.get(Collections.emptyList())));
+        SwingUtilities.invokeAndWait(() -> list.setListData(DeclarationCheckReportPanel.rows(outline).toArray()));
+        clickSelected(1);
+        assertEquals(Optional.of(owner.getOntologyID()), prompts.suggestions.get(missing));
+        assertEquals(1, prompts.choices);
+        assertNull(prompts.preview);
+        assertTrue(batches.isEmpty());
+        assertEquals(1, prompts.errors.size());
+    }
+
     private Object[] rows() {
         return DeclarationCheckReportPanel.rows(DeclarationReportOutline.of(
-                DeclarationChecker.forcingAllChecks().check(root)), root.getImportsClosure()).toArray();
+                DeclarationChecker.forcingAllChecks().check(root))).toArray();
     }
 
     private void clickSelected(int index) throws Exception {

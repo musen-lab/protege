@@ -25,6 +25,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * exempt: every other entity the closure uses must be declared somewhere within it, whoever
  * publishes the vocabulary it belongs to.
  *
+ * <p>Each finding also records an optional suggested placement using {@link FirstMentionStrategy}.
+ * The strategy shares the existing declaration index, so recording placements needs no additional
+ * ontology traversal.
+ *
  * <p>This check is read-only and does not modify the ontology.
  *
  * @author Josef Hardi
@@ -65,10 +69,14 @@ public class MissingDeclarationChecker {
     @Nonnull
     MissingDeclarationReport check(@Nonnull DeclarationIndex index) {
         checkNotNull(index);
+        FirstMentionStrategy placements = new FirstMentionStrategy(index);
         return MissingDeclarationReport.get(index.getEntities().stream()
                 .filter(entity -> !StandardVocabulary.contains(entity))
                 .filter(entity -> !index.isDeclared(entity))
-                .map(entity -> MissingDeclarationFinding.get(entity, index.getMentioningOntologies(entity)))
+                .map(entity -> MissingDeclarationFinding.create(
+                        entity,
+                        index.getMentioningOntologies(entity),
+                        placements.resolve(entity)))
                 .sorted(BY_NAME_THEN_KIND)
                 .collect(Collectors.toList()));
     }

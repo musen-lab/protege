@@ -8,7 +8,6 @@ import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import javax.annotation.Nonnull;
 import java.util.Comparator;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -113,7 +112,7 @@ public class MisplacedDeclarationChecker {
         if (foreignDeclarers.isEmpty()) {
             return Optional.empty();    // nothing is misplaced, the owner's family declared it or nothing did
         }
-        return Optional.of(MisplacedDeclarationFinding.get(entity,
+        return Optional.of(MisplacedDeclarationFinding.create(entity,
                 owningOntology,
                 foreignDeclarers,
                 owner.get().getRuleId()));

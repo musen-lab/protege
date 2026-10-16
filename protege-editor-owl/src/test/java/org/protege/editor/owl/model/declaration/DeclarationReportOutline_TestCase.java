@@ -22,7 +22,7 @@ public class DeclarationReportOutline_TestCase {
         String[] ids = {IriPrefixRule.ID, OboIdentifierRule.ID, FirstMentionRule.ID, "unknown-rule"};
         String[] names = {"IRI prefix", "OBO ID", "Import closure", "unknown-rule"};
         for (int i = 0; i < ids.length; i++) {
-            MisplacedDeclarationFinding finding = MisplacedDeclarationFinding.get(
+            MisplacedDeclarationFinding finding = MisplacedDeclarationFinding.create(
                     OWLManager.getOWLDataFactory().getOWLClass(IRI.create("urn:entity")), GO,
                     Collections.singleton(PIZZA), ids[i]);
             assertEquals(names[i], DeclarationReportOutline.shortRuleLabelOf(finding));
@@ -113,7 +113,7 @@ public class DeclarationReportOutline_TestCase {
 
     @Test
     public void shouldFallBackToTheRuleIdWhenNoRegisteredRuleHasIt() {
-        MisplacedDeclarationFinding finding = MisplacedDeclarationFinding.get(
+        MisplacedDeclarationFinding finding = MisplacedDeclarationFinding.create(
                 OWLManager.getOWLDataFactory().getOWLClass(IRI.create("http://example.org/x#A")),
                 GO, Collections.singleton(PIZZA), "retired-rule");
 

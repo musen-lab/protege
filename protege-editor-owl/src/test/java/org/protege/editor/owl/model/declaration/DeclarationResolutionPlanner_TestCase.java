@@ -295,6 +295,23 @@ public class DeclarationResolutionPlanner_TestCase {
         assertTrue(owner.getDeclarationAxioms(entity).isEmpty());
     }
 
+    @Test
+    public void shouldRejectAStoredPlacementAfterTheImportGraphChangesWithoutChangingMentions() throws Exception {
+        OWLOntology sibling = imported("http://example.org/sibling");
+        manager.addAxiom(owner, factory.getOWLSubClassOfAxiom(entity, factory.getOWLThing()));
+        manager.addAxiom(sibling, factory.getOWLSubClassOfAxiom(entity, factory.getOWLThing()));
+        MissingDeclarationFinding before = check().getMissing().getFindings().get(0);
+        assertFalse(before.getPlacementOntology().isPresent());
+        manager.applyChange(new AddImport(sibling, factory.getOWLImportsDeclaration(
+                owner.getOntologyID().getOntologyIRI().get())));
+        MissingDeclarationFinding after = check().getMissing().getFindings().get(0);
+        assertEquals(before.getMentioningOntologies(), after.getMentioningOntologies());
+        assertEquals(java.util.Optional.of(owner.getOntologyID()), after.getPlacementOntology());
+        assertThrows(IllegalStateException.class, () -> planner().plan(Collections.singletonList(before),
+                Collections.emptyList(), Collections.singletonMap(entity, owner)));
+        assertTrue(owner.getDeclarationAxioms(entity).isEmpty());
+    }
+
     private OWLOntology imported(String iri) throws Exception {
         OWLOntology ontology = manager.createOntology(IRI.create(iri));
         manager.applyChange(new AddImport(root, factory.getOWLImportsDeclaration(IRI.create(iri))));
