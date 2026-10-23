@@ -7,6 +7,7 @@ import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.*;
 
 import java.util.Collections;
+import java.util.Optional;
 
 import static org.junit.Assert.*;
 
@@ -33,15 +34,15 @@ public class MissingDeclarationReport_TestCase {
                 .createOntology(IRI.create("http://example.org/report"))
                 .getOntologyID();
 
-        errorClass = MissingDeclarationFinding.get(
+        errorClass = MissingDeclarationFinding.create(
                 DF.getOWLClass(IRI.create("http://example.org/mine#A")),
-                Collections.singleton(ontologyId));
-        warningIndividual = MissingDeclarationFinding.get(
+                Collections.singleton(ontologyId), Optional.of(ontologyId));
+        warningIndividual = MissingDeclarationFinding.create(
                 DF.getOWLNamedIndividual(IRI.create("http://example.org/mine#i")),
-                Collections.singleton(ontologyId));
-        errorAnnotationProperty = MissingDeclarationFinding.get(
+                Collections.singleton(ontologyId), Optional.of(ontologyId));
+        errorAnnotationProperty = MissingDeclarationFinding.create(
                 DF.getOWLAnnotationProperty(IRI.create("http://purl.org/dc/terms/title")),
-                Collections.singleton(ontologyId));
+                Collections.singleton(ontologyId), Optional.of(ontologyId));
 
         report = MissingDeclarationReport.get(
                 ImmutableList.of(errorClass, warningIndividual, errorAnnotationProperty));
@@ -83,19 +84,43 @@ public class MissingDeclarationReport_TestCase {
     }
 
     @Test
-    public void shouldExposeEntityTypeSeverityAndReferringOntologiesOnAFinding() throws Exception {
+    public void shouldRecordThatACheckWhichFoundNothingRan() {
+        assertEquals(DeclarationCheckStatus.EXECUTED,
+                MissingDeclarationReport.get(Collections.emptyList()).getStatus());
+        assertEquals(DeclarationCheckStatus.EXECUTED, report.getStatus());
+    }
+
+    @Test
+    public void shouldRecordWhyACheckDidNotRunAndHoldNoFindings() {
+        MissingDeclarationReport skipped = MissingDeclarationReport.skipped(
+                DeclarationCheckStatus.SKIPPED);
+
+        assertEquals(DeclarationCheckStatus.SKIPPED, skipped.getStatus());
+        assertTrue(skipped.isEmpty());
+        assertTrue(skipped.getFindings().isEmpty());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void shouldRefuseANotCheckedReportWithoutAReason() {
+        MissingDeclarationReport.skipped(DeclarationCheckStatus.EXECUTED);
+    }
+
+    @Test
+    public void shouldExposeEntityTypeSeverityAndMentioningOntologiesOnAFinding() throws Exception {
         OWLOntology ontology = OWLManager.createOWLOntologyManager()
                 .createOntology(IRI.create("http://example.org/one"));
         OWLClass term = DF.getOWLClass(IRI.create("http://example.org/one#A"));
 
         MissingDeclarationFinding finding =
-                MissingDeclarationFinding.get(term, Collections.singleton(ontology.getOntologyID()));
+                MissingDeclarationFinding.create(term, Collections.singleton(ontology.getOntologyID()),
+                        Optional.of(ontology.getOntologyID()));
 
+        assertEquals(Optional.of(ontology.getOntologyID()), finding.getPlacementOntology());
         assertEquals(term, finding.getEntity());
         assertEquals(EntityType.CLASS, finding.getEntityType());
         assertEquals(DeclarationSeverity.ERROR, finding.getSeverity());
         assertEquals(Collections.singleton(ontology.getOntologyID()),
-                finding.getReferringOntologies());
+                finding.getMentioningOntologies());
     }
 
     @Test
@@ -105,8 +130,15 @@ public class MissingDeclarationReport_TestCase {
                 .getOntologyID();
         OWLClass term = DF.getOWLClass(IRI.create("http://example.org/two#A"));
 
-        assertEquals(MissingDeclarationFinding.get(term, Collections.singleton(ontologyId)),
-                MissingDeclarationFinding.get(term, Collections.singleton(ontologyId)));
+        MissingDeclarationFinding first = MissingDeclarationFinding.create(term, Collections.singleton(ontologyId),
+                Optional.of(ontologyId));
+        assertEquals(first, MissingDeclarationFinding.create(term, Collections.singleton(ontologyId), Optional.of(ontologyId)));
+        assertEquals(first.hashCode(), MissingDeclarationFinding.create(term, Collections.singleton(ontologyId),
+                Optional.of(ontologyId)).hashCode());
+        MissingDeclarationFinding unresolved = MissingDeclarationFinding.create(term, Collections.singleton(ontologyId),
+                Optional.empty());
+        assertFalse(unresolved.getPlacementOntology().isPresent());
+        assertNotEquals(first, unresolved);
     }
 
     @Test

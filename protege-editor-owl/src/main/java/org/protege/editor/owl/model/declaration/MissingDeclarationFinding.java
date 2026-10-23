@@ -8,6 +8,7 @@ import org.semanticweb.owlapi.model.OWLOntologyID;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
+import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -23,17 +24,20 @@ public abstract class MissingDeclarationFinding {
      * Creates a finding for an undeclared entity.
      *
      * @param entity the undeclared entity
-     * @param referringOntologies the ontology identifiers that use the entity
+     * @param mentioningOntologies the ontologies that mention the entity
+     * @param placementOntology the ontology the declaration should be placed
      * @return a finding containing the entity, its severity, and the ontologies in which it is used
      */
     @Nonnull
-    public static MissingDeclarationFinding get(@Nonnull OWLEntity entity,
-                                                @Nonnull Collection<OWLOntologyID> referringOntologies) {
+    public static MissingDeclarationFinding create(@Nonnull OWLEntity entity,
+                                                   @Nonnull Collection<OWLOntologyID> mentioningOntologies,
+                                                   @Nonnull Optional<OWLOntologyID> placementOntology) {
         checkNotNull(entity);
-        checkNotNull(referringOntologies);
+        checkNotNull(mentioningOntologies);
         return new AutoValue_MissingDeclarationFinding(entity,
                 DeclarationSeverity.of(entity),
-                ImmutableSet.copyOf(referringOntologies));
+                ImmutableSet.copyOf(mentioningOntologies),
+                checkNotNull(placementOntology));
     }
 
     /**
@@ -53,12 +57,20 @@ public abstract class MissingDeclarationFinding {
     public abstract DeclarationSeverity getSeverity();
 
     /**
-     * Gets the ontology identifiers in which the undeclared entity is used.
+     * Gets the ontologies in which the undeclared entity is mentioned.
      *
-     * @return the ontology identifiers that use the entity
+     * @return the ontologies that mention the entity
      */
     @Nonnull
-    public abstract ImmutableSet<OWLOntologyID> getReferringOntologies();
+    public abstract ImmutableSet<OWLOntologyID> getMentioningOntologies();
+
+    /**
+     * Gets the ontology that the declaration should be placed.
+     *
+     * @return the ontologyr, or empty if none was determined
+     */
+    @Nonnull
+    public abstract Optional<OWLOntologyID> getPlacementOntology();
 
     /**
      * Gets the type of the undeclared entity.

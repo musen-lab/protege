@@ -50,3 +50,6 @@ included and left out.
 | `base#BaseOnly` | the import | saving does not copy declarations from an import |
 
 The test loads the imported ontology from the local `base.ttl` file. It does not use the network.
+
+`MissingDeclarationFixture_TestCase` also loads these files.
+It uses extra terms in `module.ttl` (`anInstance`, the `dcterms:title` property, and `Duo`); the comments in that file explain what each one tests.
