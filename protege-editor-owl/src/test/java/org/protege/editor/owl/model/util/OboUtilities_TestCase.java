@@ -88,4 +88,34 @@ public class OboUtilities_TestCase {
         Optional<String> id = OboUtilities.getOboIdFromIri(IRI.create("http://purl.obolibrary.org/obo/otherthing"));
         assertThat(id.isPresent(), is(false));
     }
+
+    @Test
+    public void shouldGetIdSpaceFromIri() {
+        Optional<String> idSpace = OboUtilities.getOboIdSpaceFromIri(IRI.create("http://purl.obolibrary.org/obo/GO_0001234"));
+        assertThat(idSpace, is(Optional.of("GO")));
+    }
+
+    @Test
+    public void shouldGetIdSpaceContainingAnUnderscore() {
+        Optional<String> idSpace = OboUtilities.getOboIdSpaceFromIri(IRI.create("http://purl.obolibrary.org/obo/APOLLO_SV_0000001"));
+        assertThat(idSpace, is(Optional.of("APOLLO_SV")));
+    }
+
+    @Test
+    public void shouldGetMixedCaseIdSpace() {
+        Optional<String> idSpace = OboUtilities.getOboIdSpaceFromIri(IRI.create("http://purl.obolibrary.org/obo/NCBITaxon_9606"));
+        assertThat(idSpace, is(Optional.of("NCBITaxon")));
+    }
+
+    @Test
+    public void shouldGetIdSpaceFromANonObolibraryHost() {
+        Optional<String> idSpace = OboUtilities.getOboIdSpaceFromIri(IRI.create("http://other.place.org/obo/MY_0001234"));
+        assertThat(idSpace, is(Optional.of("MY")));
+    }
+
+    @Test
+    public void shouldNotGetIdSpaceFromANonOboIri() {
+        Optional<String> idSpace = OboUtilities.getOboIdSpaceFromIri(OWLRDFVocabulary.RDFS_LABEL.getIRI());
+        assertThat(idSpace.isPresent(), is(false));
+    }
 }
