@@ -63,7 +63,7 @@ jobs:
       - name: Set up JDK/Maven
         uses: actions/setup-java@v4
         with:
-          java-version: '11'
+          java-version: '17'
           distribution: 'temurin'
           # Writes a settings.xml server entry named `ossrh`, which is the id used by
           # distributionManagement in the parent pom.

@@ -115,7 +115,8 @@
 				<enabled>true</enabled>
 			</releases>
 			<id>github</id>
-			<url>https://raw.github.com/protegeproject/mvn-repo/master/releases</url>
+			<!-- Restore the upstream URL after https://github.com/protegeproject/mvn-repo/pull/2 merges. -->
+			<url>https://raw.githubusercontent.com/mdorf/mvn-repo/ffff541c1f29b80c922bbfaf565310491e35d3aa/releases</url>
 		</repository>
 	</repositories>
 
@@ -133,6 +134,7 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<maven.compiler.release>17</maven.compiler.release>
 		<maven.javadoc.failOnError>false</maven.javadoc.failOnError>
 		<slf4j.version>1.7.36</slf4j.version>
 		<logback.version>1.2.13</logback.version>
@@ -351,7 +353,7 @@
 					<artifactId>maven-compiler-plugin</artifactId>
 					<version>3.14.0</version>
 					<configuration>
-						<release>11</release>
+						<release>${maven.compiler.release}</release>
 					</configuration>
 				</plugin>
 
@@ -469,6 +471,9 @@
 						</goals>
 						<configuration>
 							<rules>
+								<requireJavaVersion>
+									<version>[17,)</version>
+								</requireJavaVersion>
 								<requireMavenVersion>
 									<version>3.6.3</version>
 								</requireMavenVersion>

@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "master" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "feat/T6-*", "feat/T6_*" ]
   workflow_dispatch:
 
 jobs:
@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         profile: [ default, ide, release ]
-        java_version: [ '11', '21' ]
+        java_version: [ '17', '21' ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,3 +23,36 @@ jobs:
           distribution: 'temurin'
       - name: Run test suite
         run: mvn --batch-mode --activate-profiles ${{ matrix.profile }} --define release.signing.disabled=true clean verify
+
+  bundled-runtime:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            distribution: linux
+          - os: macos-latest
+            distribution: mac
+          - os: windows-latest
+            distribution: win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Build desktop distributions
+        run: mvn --batch-mode --define skipTests package
+      - name: Check bundled Java runtime
+        shell: python
+        run: |
+          import pathlib
+          import subprocess
+
+          distribution = next(pathlib.Path('protege-desktop/target').glob('protege-*-${{ matrix.distribution }}'))
+          executable = 'java.exe' if '${{ matrix.distribution }}' == 'win' else 'java'
+          java = next(distribution.rglob('jre/bin/' + executable))
+          result = subprocess.run([str(java.resolve()), '-XshowSettings:properties', '-version'],
+                                  check=True, capture_output=True, text=True)
+          print(result.stderr)
+          assert 'java.specification.version = 17' in result.stderr

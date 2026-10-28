@@ -15,3 +15,5 @@ The [Developer Documentation](https://github.com/protegeproject/protege/wiki/Dev
 Protege is released under the [BSD 2-clause license](https://raw.githubusercontent.com/protegeproject/protege/master/license.txt).
 
 Instructions for [building from source](https://github.com/protegeproject/protege/wiki/Building-from-Source) are available on the the wiki.
+
+Building this version requires JDK 17 or newer and Maven 3.6.3 or newer. Run `mvn clean verify` to build and test it. The platform-independent distribution requires Java 17 or newer to run.
