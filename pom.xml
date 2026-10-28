@@ -116,7 +116,7 @@
 			</releases>
 			<id>github</id>
 			<!-- Restore the upstream URL after https://github.com/protegeproject/mvn-repo/pull/2 merges. -->
-			<url>https://raw.githubusercontent.com/mdorf/mvn-repo/ffff541c1f29b80c922bbfaf565310491e35d3aa/releases</url>
+			<url>https://raw.githubusercontent.com/musen-lab/mvn-repo/ffff541c1f29b80c922bbfaf565310491e35d3aa/releases</url>
 		</repository>
 	</repositories>
 
