@@ -100,7 +100,6 @@ public class JsonLdPreferencesTest {
         prefs.setTermCollisionPolicy(TermCollisionPolicy.DISAMBIGUATE);
         prefs.setDocumentForm(DocumentForm.FLATTENED);
         prefs.setIndentSpaces(4);
-        prefs.setIncludeImportsClosure(true);
         prefs.save();
 
         JsonLdPreferences reloaded = new JsonLdPreferences(() -> store);
@@ -122,7 +121,6 @@ public class JsonLdPreferencesTest {
         assertFalse(reloaded.isUseRdfType());
         assertTrue(reloaded.isUseLanguageMaps());
         assertEquals(BlankNodeEmbedding.EMBED_ONCE, reloaded.getBlankNodeEmbedding());
-        assertTrue(reloaded.isIncludeImportsClosure());
     }
 
     @Test
@@ -196,6 +194,5 @@ public class JsonLdPreferencesTest {
         assertFalse(p.isUseRdfType());
         assertTrue(p.isUseLanguageMaps());
         assertEquals(BlankNodeEmbedding.EMBED_ONCE, p.getBlankNodeEmbedding());
-        assertFalse(p.isIncludeImportsClosure());
     }
 }

@@ -21,8 +21,7 @@ public class JsonLdPreferencesPanelTest {
             JsonLdPreferences.KEY_KEY_ORDERING, JsonLdPreferences.KEY_PRETTY_PRINT,
             JsonLdPreferences.KEY_INDENT_SPACES, JsonLdPreferences.KEY_USE_NATIVE_TYPES,
             JsonLdPreferences.KEY_TYPE_COERCION_MODE, JsonLdPreferences.KEY_USE_RDF_TYPE,
-            JsonLdPreferences.KEY_USE_LANGUAGE_MAPS, JsonLdPreferences.KEY_BLANK_NODE_EMBEDDING,
-            JsonLdPreferences.KEY_INCLUDE_IMPORTS_CLOSURE);
+            JsonLdPreferences.KEY_USE_LANGUAGE_MAPS, JsonLdPreferences.KEY_BLANK_NODE_EMBEDDING);
 
     private InMemoryPreferences store;
 
@@ -98,7 +97,7 @@ public class JsonLdPreferencesPanelTest {
     }
 
     @Test
-    public void showsAllSeventeenSettings() {
+    public void showsAllSixteenSettings() {
         for (String key : SETTING_KEYS) {
             assertNotNull(control(key));
         }
@@ -182,7 +181,7 @@ public class JsonLdPreferencesPanelTest {
         for (String key : Arrays.asList(
                 JsonLdPreferences.KEY_KEY_ORDERING, JsonLdPreferences.KEY_PRETTY_PRINT,
                 JsonLdPreferences.KEY_USE_NATIVE_TYPES, JsonLdPreferences.KEY_USE_RDF_TYPE,
-                JsonLdPreferences.KEY_BLANK_NODE_EMBEDDING, JsonLdPreferences.KEY_INCLUDE_IMPORTS_CLOSURE)) {
+                JsonLdPreferences.KEY_BLANK_NODE_EMBEDDING)) {
             assertTrue(key + " should stay available", control(key).isEnabled());
         }
 

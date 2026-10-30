@@ -84,12 +84,12 @@ public class JsonLdContextBuilder {
             });
         }
 
-        Imports imports = Imports.fromBoolean(prefs.isIncludeImportsClosure());
+        Imports imports = Imports.EXCLUDED;
         Set<String> objectProperties = iris(ontology.getObjectPropertiesInSignature(imports));
         Set<String> languageTagged = new HashSet<>();
         Set<String> otherValues = new HashSet<>();
         if (prefs.isUseLanguageMaps()) {
-            annotationValueKinds(ontology, imports, languageTagged, otherValues);
+            annotationValueKinds(ontology, languageTagged, otherValues);
         }
         Map<String, String> terms = shortNames(ontology, imports, prefixes.keySet());
 
@@ -280,21 +280,18 @@ public class JsonLdContextBuilder {
      * individual) into {@code otherValues}. Looks at annotation assertions, ontology annotations and annotations
      * on axioms and on other annotations.
      */
-    private static void annotationValueKinds(@Nonnull OWLOntology ontology, @Nonnull Imports imports,
+    private static void annotationValueKinds(@Nonnull OWLOntology ontology,
                                              @Nonnull Set<String> languageTagged, @Nonnull Set<String> otherValues) {
-        Collection<OWLOntology> ontologies = imports == Imports.INCLUDED ? ontology.getImportsClosure() : Collections.singleton(ontology);
-        for (OWLOntology o : ontologies) {
-            for (OWLAnnotation annotation : o.getAnnotations()) {
-                sortAnnotation(annotation, languageTagged, otherValues);
+        for (OWLAnnotation annotation : ontology.getAnnotations()) {
+            sortAnnotation(annotation, languageTagged, otherValues);
+        }
+        for (OWLAxiom ax : ontology.getAxioms()) {
+            if (ax instanceof OWLAnnotationAssertionAxiom) {
+                OWLAnnotationAssertionAxiom assertion = (OWLAnnotationAssertionAxiom) ax;
+                sortValue(assertion.getProperty(), assertion.getValue(), languageTagged, otherValues);
             }
-            for (OWLAxiom ax : o.getAxioms()) {
-                if (ax instanceof OWLAnnotationAssertionAxiom) {
-                    OWLAnnotationAssertionAxiom assertion = (OWLAnnotationAssertionAxiom) ax;
-                    sortValue(assertion.getProperty(), assertion.getValue(), languageTagged, otherValues);
-                }
-                for (OWLAnnotation annotation : ax.getAnnotations()) {
-                    sortAnnotation(annotation, languageTagged, otherValues);
-                }
+            for (OWLAnnotation annotation : ax.getAnnotations()) {
+                sortAnnotation(annotation, languageTagged, otherValues);
             }
         }
     }

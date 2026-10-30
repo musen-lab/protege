@@ -1,11 +1,9 @@
 package org.protege.editor.owl.model.io.jsonld;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.formats.RDFJsonLDDocumentFormat;
 import org.semanticweb.owlapi.io.StreamDocumentTarget;
 import org.semanticweb.owlapi.model.*;
-import org.semanticweb.owlapi.model.parameters.Imports;
 import org.semanticweb.owlapi.rio.RioJsonLDStorerFactory;
 import org.semanticweb.owlapi.util.AbstractOWLStorer;
 
@@ -70,8 +68,7 @@ public class ConfigurableJsonLdStorer extends AbstractOWLStorer {
 
     private JsonNode buildDocument(@Nonnull OWLOntology ontology,
                                    @Nonnull OWLDocumentFormat format) throws OWLOntologyStorageException {
-        OWLOntology toWrite = prefs.isIncludeImportsClosure() ? mergeImportsClosure(ontology) : ontology;
-        byte[] draft = writeDraft(toWrite, format);
+        byte[] draft = writeDraft(ontology, format);
         try {
             Object expanded = JsonLdPostProcessor.rebuild(draft, prefs);
             // Expanded files have no @context, so none is built (and a name clash can't stop the save)
@@ -102,23 +99,4 @@ public class ConfigurableJsonLdStorer extends AbstractOWLStorer {
         return buffer.toByteArray();
     }
 
-    /**
-     * A temporary copy holding the ontology and everything it imports, without the import declarations.
-     */
-    private static OWLOntology mergeImportsClosure(@Nonnull OWLOntology ontology) throws OWLOntologyStorageException {
-        if (ontology.getImports().isEmpty()) {
-            return ontology;
-        }
-        try {
-            OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
-            OWLOntology merged = manager.createOntology(ontology.getOntologyID());
-            manager.addAxioms(merged, ontology.getAxioms(Imports.INCLUDED));
-            for (OWLAnnotation annotation : ontology.getAnnotations()) {
-                manager.applyChange(new AddOntologyAnnotation(merged, annotation));
-            }
-            return merged;
-        } catch (OWLOntologyCreationException e) {
-            throw new OWLOntologyStorageException("Could not merge the imports closure", e);
-        }
-    }
 }

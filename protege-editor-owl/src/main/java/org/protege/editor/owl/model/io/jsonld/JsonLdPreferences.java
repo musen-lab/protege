@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 
 /**
  * Typed model for JSON-LD save settings: context generation, output shape, literal handling,
- * blank node embedding, and imports scope. The application instance is stored through Protégé's
+ * and blank node embedding. The application instance is stored through Protégé's
  * preferences under {@code org.protege.editor.owl.jsonld}; a new store can be supplied for tests.
  * Use {@link #getInstance()} for the settings Protégé saves with. Changes take effect for the next save;
  * call {@link #save()} to keep them across sessions. Defaults match {@link JsonLdPreset#WEB_FRIENDLY}.
@@ -41,7 +41,6 @@ public class JsonLdPreferences {
     public static final String KEY_USE_RDF_TYPE = "useRdfType";
     public static final String KEY_USE_LANGUAGE_MAPS = "useLanguageMaps";
     public static final String KEY_BLANK_NODE_EMBEDDING = "blankNodeEmbedding";
-    public static final String KEY_INCLUDE_IMPORTS_CLOSURE = "includeImportsClosure";
 
     // Defaults (the Web-friendly preset)
     public static final JsonLdPreset DEFAULT_ACTIVE_PRESET = JsonLdPreset.WEB_FRIENDLY;
@@ -63,7 +62,6 @@ public class JsonLdPreferences {
     public static final boolean DEFAULT_USE_RDF_TYPE = false;
     public static final boolean DEFAULT_USE_LANGUAGE_MAPS = true;
     public static final BlankNodeEmbedding DEFAULT_BLANK_NODE_EMBEDDING = BlankNodeEmbedding.EMBED_ONCE;
-    public static final boolean DEFAULT_INCLUDE_IMPORTS_CLOSURE = false;
 
     private static final JsonLdPreferences INSTANCE =
             new JsonLdPreferences(() -> PreferencesManager.getInstance().getApplicationPreferences(PREFERENCES_KEY));
@@ -95,9 +93,8 @@ public class JsonLdPreferences {
     private boolean useRdfType;
     private boolean useLanguageMaps;
 
-    // Structures & Scope
+    // Structures
     private BlankNodeEmbedding blankNodeEmbedding;
-    private boolean includeImportsClosure;
 
     /**
      * Creates settings backed by the given store and loads them from it.
@@ -160,7 +157,6 @@ public class JsonLdPreferences {
         this.useRdfType = prefs.getBoolean(KEY_USE_RDF_TYPE, DEFAULT_USE_RDF_TYPE);
         this.useLanguageMaps = prefs.getBoolean(KEY_USE_LANGUAGE_MAPS, DEFAULT_USE_LANGUAGE_MAPS);
         this.blankNodeEmbedding = loadEnum(prefs, KEY_BLANK_NODE_EMBEDDING, BlankNodeEmbedding.class, DEFAULT_BLANK_NODE_EMBEDDING);
-        this.includeImportsClosure = prefs.getBoolean(KEY_INCLUDE_IMPORTS_CLOSURE, DEFAULT_INCLUDE_IMPORTS_CLOSURE);
     }
 
     /**
@@ -185,7 +181,6 @@ public class JsonLdPreferences {
         prefs.putBoolean(KEY_USE_RDF_TYPE, useRdfType);
         prefs.putBoolean(KEY_USE_LANGUAGE_MAPS, useLanguageMaps);
         prefs.putString(KEY_BLANK_NODE_EMBEDDING, blankNodeEmbedding.name());
-        prefs.putBoolean(KEY_INCLUDE_IMPORTS_CLOSURE, includeImportsClosure);
     }
 
     /**
@@ -257,7 +252,6 @@ public class JsonLdPreferences {
         this.useRdfType = DEFAULT_USE_RDF_TYPE;
         this.useLanguageMaps = DEFAULT_USE_LANGUAGE_MAPS;
         this.blankNodeEmbedding = DEFAULT_BLANK_NODE_EMBEDDING;
-        this.includeImportsClosure = DEFAULT_INCLUDE_IMPORTS_CLOSURE;
     }
 
     private Supplier<Preferences> requireStore() {
@@ -339,6 +333,4 @@ public class JsonLdPreferences {
     public BlankNodeEmbedding getBlankNodeEmbedding() { return blankNodeEmbedding; }
     public void setBlankNodeEmbedding(BlankNodeEmbedding blankNodeEmbedding) { this.blankNodeEmbedding = blankNodeEmbedding; }
 
-    public boolean isIncludeImportsClosure() { return includeImportsClosure; }
-    public void setIncludeImportsClosure(boolean includeImportsClosure) { this.includeImportsClosure = includeImportsClosure; }
 }

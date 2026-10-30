@@ -214,7 +214,7 @@ public class ConfigurableJsonLdStorerTest {
     }
 
     @Test
-    public void importsAreWrittenOnlyWhenTurnedOn() throws Exception {
+    public void savesKeepImportDeclarationsWithoutMergingImportedAxioms() throws Exception {
         OWLOntology imported = manager.createOntology(IRI.create("http://example.org/imported"));
         OWLClass bird = df.getOWLClass(IRI.create(NS + "Bird"));
         OWLClass animal = df.getOWLClass(IRI.create(NS + "Animal"));
@@ -222,10 +222,19 @@ public class ConfigurableJsonLdStorerTest {
         manager.applyChange(new AddImport(ontology, df.getOWLImportsDeclaration(imported.getOntologyID().getOntologyIRI().get())));
         OWLAxiom importedAxiom = df.getOWLSubClassOfAxiom(bird, animal);
 
-        assertFalse(reload(save(ontology, formatWithPrefixes())).containsAxiom(importedAxiom));
-
-        prefs.setIncludeImportsClosure(true);
-        assertTrue(reload(save(ontology, formatWithPrefixes())).containsAxiom(importedAxiom));
+        // A preference saved by an earlier build must no longer enable merging.
+        InMemoryPreferences store = new InMemoryPreferences();
+        store.putBoolean("includeImportsClosure", true);
+        prefs = new JsonLdPreferences(() -> store);
+        for (JsonLdPreset preset : JsonLdPreset.values()) {
+            prefs.applyPreset(preset);
+            OWLOntology reopened = reload(save(ontology, formatWithPrefixes()));
+            assertEquals("Import declarations must survive " + preset,
+                    ontology.getImportsDeclarations(), reopened.getImportsDeclarations());
+            assertFalse("Imported axioms must stay in their own ontology for " + preset,
+                    reopened.containsAxiom(importedAxiom));
+            assertEquals("Local content must survive " + preset, content(ontology), content(reopened));
+        }
     }
 
     @Test

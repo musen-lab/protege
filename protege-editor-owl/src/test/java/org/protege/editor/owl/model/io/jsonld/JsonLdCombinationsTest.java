@@ -64,8 +64,7 @@ public class JsonLdCombinationsTest {
             new Setting("typeCoercionMode", Arrays.asList(TypeCoercionMode.values()), (p, v) -> p.setTypeCoercionMode((TypeCoercionMode) v)),
             new Setting("useRdfType", BOOLEANS, (p, v) -> p.setUseRdfType((Boolean) v)),
             new Setting("useLanguageMaps", BOOLEANS, (p, v) -> p.setUseLanguageMaps((Boolean) v)),
-            new Setting("blankNodeEmbedding", Arrays.asList(BlankNodeEmbedding.values()), (p, v) -> p.setBlankNodeEmbedding((BlankNodeEmbedding) v)),
-            new Setting("includeImportsClosure", BOOLEANS, (p, v) -> p.setIncludeImportsClosure((Boolean) v))
+            new Setting("blankNodeEmbedding", Arrays.asList(BlankNodeEmbedding.values()), (p, v) -> p.setBlankNodeEmbedding((BlankNodeEmbedding) v))
     );
 
     @BeforeClass
@@ -195,7 +194,7 @@ public class JsonLdCombinationsTest {
             return "not valid JSON-LD: " + e.getMessage();
         }
         try {
-            Set<OWLAxiom> expected = content(ontology, Imports.fromBoolean(prefs.isIncludeImportsClosure()));
+            Set<OWLAxiom> expected = content(ontology, Imports.EXCLUDED);
             Set<OWLAxiom> actual = content(reload(jsonLd), Imports.EXCLUDED);
             if (!expected.equals(actual)) {
                 Set<OWLAxiom> lost = new TreeSet<>(expected);

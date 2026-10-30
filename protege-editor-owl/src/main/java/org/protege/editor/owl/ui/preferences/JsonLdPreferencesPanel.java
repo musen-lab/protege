@@ -13,7 +13,7 @@ import java.util.Objects;
 
 /**
  * The JSON-LD tab in the Preferences window. Shows presets and settings for context generation,
- * document shape, literal handling, and scope. Controls edit a local UI state until
+ * document shape, literal handling, and blank nodes. Controls edit a local UI state until
  * {@link #applyChanges()} copies their values to {@link JsonLdPreferences} and persists them.
  */
 public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
@@ -47,9 +47,8 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
     private JCheckBox useRdfTypeCheckBox;
     private JCheckBox useLanguageMapsCheckBox;
 
-    // Structures & Scope
+    // Structures
     private EnumRadioButtons<BlankNodeEmbedding> blankNodeEmbeddingButtons;
-    private JCheckBox includeImportsClosureCheckBox;
 
     private boolean isUpdatingUI = false;
 
@@ -136,13 +135,11 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         panel.addGroupComponent(useRdfTypeCheckBox);
         panel.addGroupComponent(useLanguageMapsCheckBox);
 
-        // --- Structures & Scope ---
+        // --- Structures ---
         panel.addSeparator();
         blankNodeEmbeddingButtons = new EnumRadioButtons<>(BlankNodeEmbedding.values());
-        includeImportsClosureCheckBox = new JCheckBox("Also write imported ontologies into the file");
 
         addChoiceGroup(panel, "Blank nodes", blankNodeEmbeddingButtons);
-        panel.addGroupComponent(includeImportsClosureCheckBox);
 
         nameControls();
 
@@ -221,7 +218,6 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         useRdfTypeCheckBox.setName(JsonLdPreferences.KEY_USE_RDF_TYPE);
         useLanguageMapsCheckBox.setName(JsonLdPreferences.KEY_USE_LANGUAGE_MAPS);
         blankNodeEmbeddingButtons.setName(JsonLdPreferences.KEY_BLANK_NODE_EMBEDDING);
-        includeImportsClosureCheckBox.setName(JsonLdPreferences.KEY_INCLUDE_IMPORTS_CLOSURE);
     }
 
     private void attachListeners() {
@@ -263,7 +259,6 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         useNativeTypesCheckBox.addActionListener(e -> onModified.run());
         useRdfTypeCheckBox.addActionListener(e -> onModified.run());
         useLanguageMapsCheckBox.addActionListener(e -> onModified.run());
-        includeImportsClosureCheckBox.addActionListener(e -> onModified.run());
 
         // Spinner
         indentSpacesSpinner.addChangeListener(e -> onModified.run());
@@ -295,9 +290,8 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
             useRdfTypeCheckBox.setSelected(source.isUseRdfType());
             useLanguageMapsCheckBox.setSelected(source.isUseLanguageMaps());
 
-            // Structures & Scope
+            // Structures
             blankNodeEmbeddingButtons.setSelectedValue(source.getBlankNodeEmbedding());
-            includeImportsClosureCheckBox.setSelected(source.isIncludeImportsClosure());
 
             updateEnabledStates();
         } finally {
@@ -351,9 +345,8 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         prefs.setUseRdfType(useRdfTypeCheckBox.isSelected());
         prefs.setUseLanguageMaps(useLanguageMapsCheckBox.isSelected());
 
-        // Structures & Scope
+        // Structures
         prefs.setBlankNodeEmbedding(blankNodeEmbeddingButtons.getSelectedValue());
-        prefs.setIncludeImportsClosure(includeImportsClosureCheckBox.isSelected());
 
         prefs.save();
     }
