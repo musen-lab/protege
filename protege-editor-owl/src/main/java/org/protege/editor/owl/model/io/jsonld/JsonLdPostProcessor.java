@@ -15,8 +15,8 @@ import com.github.jsonldjava.core.JsonLdProcessor;
 import com.github.jsonldjava.utils.JsonUtils;
 
 import javax.annotation.Nonnull;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Writer;
 import java.util.*;
@@ -43,17 +43,17 @@ public final class JsonLdPostProcessor {
      * Turns the draft into triples and back into expanded JSON-LD, applying useNativeTypes and useRdfType.
      * RDF lists come out as JSON-LD lists.
      *
-     * @param draft JSON-LD bytes written by OWL API
+     * @param draft stream containing JSON-LD written by OWL API
      * @param prefs settings for native literal values and RDF type handling
      * @return the expanded JSON-LD representation
      * @throws IOException if the draft cannot be read or processed
      */
     @Nonnull
-    public static Object rebuild(@Nonnull byte[] draft, @Nonnull JsonLdPreferences prefs) throws IOException {
+    public static Object rebuild(@Nonnull InputStream draft, @Nonnull JsonLdPreferences prefs) throws IOException {
         try {
             JsonLdOptions toRdf = new JsonLdOptions();
             toRdf.format = JsonLdConsts.APPLICATION_NQUADS;
-            Object nquads = JsonLdProcessor.toRDF(JsonUtils.fromInputStream(new ByteArrayInputStream(draft)), toRdf);
+            Object nquads = JsonLdProcessor.toRDF(JsonUtils.fromInputStream(draft), toRdf);
             JsonLdOptions fromRdf = new JsonLdOptions();
             fromRdf.format = JsonLdConsts.APPLICATION_NQUADS;
             fromRdf.setUseNativeTypes(prefs.isUseNativeTypes());

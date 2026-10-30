@@ -14,8 +14,13 @@ import org.semanticweb.owlapi.rio.RioJsonLDStorerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.Assert.*;
 
@@ -234,6 +239,34 @@ public class ConfigurableJsonLdStorerTest {
             assertFalse("Imported axioms must stay in their own ontology for " + preset,
                     reopened.containsAxiom(importedAxiom));
             assertEquals("Local content must survive " + preset, content(ontology), content(reopened));
+        }
+    }
+
+    @Test
+    public void deletesTheTemporaryDraftAfterSaving() throws Exception {
+        Set<Path> before = temporaryDrafts();
+        save(ontology, formatWithPrefixes());
+        assertEquals(before, temporaryDrafts());
+    }
+
+    @Test
+    public void deletesTheTemporaryDraftWhenPostProcessingFails() throws Exception {
+        prefs.setTermCollisionPolicy(TermCollisionPolicy.ERROR);
+        manager.addAxiom(ontology, df.getOWLDeclarationAxiom(
+                df.getOWLDataProperty(IRI.create(OTHER_NS + "age"))));
+        Set<Path> before = temporaryDrafts();
+        try {
+            save(ontology, formatWithPrefixes());
+            fail("The short-name collision should stop the save");
+        } catch (OWLOntologyStorageException expected) {
+            assertEquals(before, temporaryDrafts());
+        }
+    }
+
+    private static Set<Path> temporaryDrafts() throws Exception {
+        try (Stream<Path> files = Files.list(Paths.get(System.getProperty("java.io.tmpdir")))) {
+            return files.filter(path -> path.getFileName().toString().startsWith("protege-jsonld-"))
+                    .collect(Collectors.toSet());
         }
     }
 
