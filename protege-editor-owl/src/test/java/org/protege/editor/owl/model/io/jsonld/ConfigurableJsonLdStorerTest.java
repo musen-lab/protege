@@ -10,6 +10,7 @@ import org.semanticweb.owlapi.io.StreamDocumentTarget;
 import org.semanticweb.owlapi.io.StringDocumentSource;
 import org.semanticweb.owlapi.io.StringDocumentTarget;
 import org.semanticweb.owlapi.model.*;
+import org.semanticweb.owlapi.rio.RioJsonLDStorerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -220,6 +221,34 @@ public class ConfigurableJsonLdStorerTest {
     public void storesPlainJsonLdFormatToo() throws Exception {
         assertTrue(new ConfigurableJsonLdStorer(prefs).canStoreOntology(new RDFJsonLDDocumentFormat()));
         assertEquals(content(ontology), content(reload(save(ontology, new RDFJsonLDDocumentFormat()))));
+    }
+
+    @Test
+    public void preservesAddMissingTypesWithoutRecreatingSuppressedDeclarations() throws Exception {
+        OWLOntology undeclared = manager.createOntology(IRI.create("http://example.org/undeclared"));
+        OWLDataProperty property = df.getOWLDataProperty(IRI.create(NS + "undeclaredProperty"));
+        OWLNamedIndividual individual = df.getOWLNamedIndividual(IRI.create(NS + "individual"));
+        OWLAxiom assertion = df.getOWLDataPropertyAssertionAxiom(property, individual, df.getOWLLiteral("value"));
+        OWLAxiom declaration = df.getOWLDeclarationAxiom(property);
+        manager.addAxiom(undeclared, assertion);
+
+        for (OWLDocumentFormat format : new OWLDocumentFormat[]{
+                new ConfigurableJsonLDDocumentFormat(), new RDFJsonLDDocumentFormat()}) {
+            for (boolean addMissingTypes : new boolean[]{false, true}) {
+                format.setAddMissingTypes(addMissingTypes);
+                RDFJsonLDDocumentFormat standardFormat = new RDFJsonLDDocumentFormat();
+                standardFormat.setAddMissingTypes(addMissingTypes);
+                StringDocumentTarget standardOutput = new StringDocumentTarget();
+                new RioJsonLDStorerFactory().createStorer()
+                        .storeOntology(undeclared, standardOutput, standardFormat);
+                OWLOntology reloaded = reload(save(undeclared, format));
+                // Without type triples, OWL API can interpret the property as an annotation property.
+                // Match its standard writer's round-trip behavior for the same flag.
+                assertEquals(reload(standardOutput.toString()).getAxioms(), reloaded.getAxioms());
+                assertEquals("The property declaration must follow addMissingTypes for " + format.getClass(),
+                        addMissingTypes, reloaded.containsAxiom(declaration));
+            }
+        }
     }
 
     @Test

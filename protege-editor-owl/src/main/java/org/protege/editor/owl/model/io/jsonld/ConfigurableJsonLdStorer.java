@@ -21,8 +21,9 @@ import java.util.Objects;
 /**
  * Saves ontologies as JSON-LD using the settings in {@link JsonLdPreferences}.
  * <p>
- * Saving happens in two steps. First, OWL API's own JSON-LD writer writes the ontology with its default
- * settings (full IRIs, no context) into memory. Then {@link JsonLdPostProcessor} rebuilds that document with
+ * Saving happens in two steps. First, OWL API's own JSON-LD writer writes the ontology into memory
+ * (full IRIs, no context), preserving the supplied format's add-missing-types setting.
+ * Then {@link JsonLdPostProcessor} rebuilds that document with
  * jsonld-java, and shapes it with the {@code @context} from {@link JsonLdContextBuilder} and the other settings.
  */
 public class ConfigurableJsonLdStorer extends AbstractOWLStorer {
@@ -70,7 +71,7 @@ public class ConfigurableJsonLdStorer extends AbstractOWLStorer {
     private JsonNode buildDocument(@Nonnull OWLOntology ontology,
                                    @Nonnull OWLDocumentFormat format) throws OWLOntologyStorageException {
         OWLOntology toWrite = prefs.isIncludeImportsClosure() ? mergeImportsClosure(ontology) : ontology;
-        byte[] draft = writeDraft(toWrite);
+        byte[] draft = writeDraft(toWrite, format);
         try {
             Object expanded = JsonLdPostProcessor.rebuild(draft, prefs);
             // Expanded files have no @context, so none is built (and a name clash can't stop the save)
@@ -85,13 +86,16 @@ public class ConfigurableJsonLdStorer extends AbstractOWLStorer {
     }
 
     /**
-     * Step 1: OWL API's standard JSON-LD writer, default settings, into memory.
+     * Step 1: OWL API's standard JSON-LD writer into memory, preserving addMissingTypes.
      */
-    private static byte[] writeDraft(@Nonnull OWLOntology ontology) throws OWLOntologyStorageException {
+    private static byte[] writeDraft(@Nonnull OWLOntology ontology,
+                                     @Nonnull OWLDocumentFormat format) throws OWLOntologyStorageException {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        RDFJsonLDDocumentFormat draftFormat = new RDFJsonLDDocumentFormat();
+        draftFormat.setAddMissingTypes(format.isAddMissingTypes());
         try {
             new RioJsonLDStorerFactory().createStorer()
-                    .storeOntology(ontology, new StreamDocumentTarget(buffer), new RDFJsonLDDocumentFormat());
+                    .storeOntology(ontology, new StreamDocumentTarget(buffer), draftFormat);
         } catch (IOException e) {
             throw new OWLOntologyStorageException("Error writing the JSON-LD draft", e);
         }
