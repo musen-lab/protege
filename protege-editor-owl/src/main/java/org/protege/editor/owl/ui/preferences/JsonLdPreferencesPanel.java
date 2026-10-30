@@ -90,7 +90,7 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         panel.addGroup("Context & Prefixes");
         includeOntologyPrefixesCheckBox = new JCheckBox("Include the ontology's prefixes in @context");
         pruneUnusedPrefixesCheckBox = new JCheckBox("Leave out prefixes that nothing in the file uses");
-        useVocabCheckBox = new JCheckBox("Add @vocab (the ontology IRI)");
+        useVocabCheckBox = new JCheckBox("Use the default prefix for @vocab and relative IRIs");
         generateTermsForButtons = new EnumRadioButtons<>(GenerateTermsFor.values());
         termNameSourceButtons = new EnumRadioButtons<>(TermNameSource.values());
         termCollisionPolicyButtons = new EnumRadioButtons<>(TermCollisionPolicy.values());

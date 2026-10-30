@@ -5,11 +5,13 @@ import org.semanticweb.owlapi.model.parameters.Imports;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.net.URI;
 import java.util.*;
 
 /**
  * Builds the JSON-LD {@code @context} for an ontology from its prefixes and
- * {@link JsonLdPreferences}. Definitions may include {@code @vocab}, short entity names,
+ * {@link JsonLdPreferences}. Definitions may include {@code @vocab} and {@code @base} derived from
+ * the format's default prefix, short entity names,
  * {@code @type: @id} for IRI-valued properties, and {@code @container: @language} for language maps.
  * Prefix names are kept separately so a later pass can remove declarations unused after compaction.
  */
@@ -70,7 +72,16 @@ public class JsonLdContextBuilder {
         context.putAll(prefixes);
 
         if (prefs.isUseVocab()) {
-            vocabIri(ontology).ifPresent(vocab -> context.put("@vocab", vocab));
+            defaultPrefix(format).ifPresent(vocab -> {
+                context.put("@vocab", vocab);
+                // Relative resolution needs a hierarchical base; opaque namespaces such as urn:
+                // can still supply @vocab, but their node identifiers should remain absolute.
+                URI namespace = URI.create(vocab);
+                if (namespace.isAbsolute() && !namespace.isOpaque()) {
+                    int fragment = vocab.indexOf('#');
+                    context.put("@base", fragment < 0 ? vocab : vocab.substring(0, fragment));
+                }
+            });
         }
 
         Imports imports = Imports.fromBoolean(prefs.isIncludeImportsClosure());
@@ -166,13 +177,12 @@ public class JsonLdContextBuilder {
         return false;
     }
 
-    private static Optional<String> vocabIri(@Nonnull OWLOntology ontology) {
-        com.google.common.base.Optional<IRI> ontologyIri = ontology.getOntologyID().getOntologyIRI();
-        if (!ontologyIri.isPresent()) {
+    private static Optional<String> defaultPrefix(@Nonnull OWLDocumentFormat format) {
+        if (!format.isPrefixOWLOntologyFormat()) {
             return Optional.empty();
         }
-        String iri = ontologyIri.get().toString();
-        return Optional.of(iri.endsWith("#") || iri.endsWith("/") ? iri : iri + "#");
+        return Optional.ofNullable(format.asPrefixOWLOntologyFormat().getDefaultPrefix())
+                .filter(prefix -> !prefix.isEmpty());
     }
 
     /**

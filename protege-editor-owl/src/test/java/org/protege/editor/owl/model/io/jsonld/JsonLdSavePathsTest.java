@@ -118,6 +118,54 @@ public class JsonLdSavePathsTest {
     }
 
     @Test
+    public void defaultPrefixControlsVocabAndRelativeIdsAcrossSaveAndReopen() throws Exception {
+        prefs.setUseVocab(true);
+        prefs.setIncludeOntologyPrefixes(false);
+        prefs.setGenerateTermsFor(GenerateTermsFor.ALL_PROPERTIES);
+        OWLDataFactory df = manager.getOWLDataFactory();
+        for (String namespace : new String[]{"http://example.org/entities/", "http://example.org/entities#"}) {
+            for (DocumentForm form : new DocumentForm[]{DocumentForm.COMPACTED, DocumentForm.FLATTENED}) {
+                prefs.setDocumentForm(form);
+                OWLOntology source = manager.createOntology();
+                OWLNamedIndividual a = df.getOWLNamedIndividual(IRI.create(namespace + "A"));
+                OWLNamedIndividual b = df.getOWLNamedIndividual(IRI.create(namespace + "B"));
+                OWLObjectProperty link = df.getOWLObjectProperty(IRI.create(namespace + "link"));
+                OWLAxiom assertion = df.getOWLObjectPropertyAssertionAxiom(link, a, b);
+                manager.addAxiom(source, assertion);
+                manager.addAxiom(source, df.getOWLDeclarationAxiom(link));
+                ConfigurableJsonLDDocumentFormat format = new ConfigurableJsonLDDocumentFormat();
+                format.setDefaultPrefix(namespace);
+                File file = folder.newFile();
+                source.saveOntology(format, IRI.create(file));
+
+                JsonNode root = mapper.readTree(file);
+                assertEquals(namespace, root.path("@context").path("@vocab").asText());
+                assertEquals(namespace.replace("#", ""), root.path("@context").path("@base").asText());
+                String relativeA = namespace.endsWith("#") ? "#A" : "A";
+                String relativeB = namespace.endsWith("#") ? "#B" : "B";
+                JsonNode nodeA = null;
+                for (JsonNode node : root.path("@graph")) {
+                    if (relativeA.equals(node.path("@id").asText())) {
+                        nodeA = node;
+                    }
+                }
+                assertNotNull("The subject should use a relative @id", nodeA);
+                // Coerced IRI values also resolve against @base.
+                assertEquals(relativeB, nodeA.path("link").asText());
+
+                OWLOntology reopened = open(file);
+                assertTrue(reopened.containsAxiom(assertion));
+                OWLDocumentFormat recovered = reopened.getOWLOntologyManager().getOntologyFormat(reopened);
+                assertEquals(namespace, recovered.asPrefixOWLOntologyFormat().getDefaultPrefix());
+                File savedAgain = folder.newFile();
+                reopened.saveOntology(recovered, IRI.create(savedAgain));
+                assertEquals(content(source), content(open(savedAgain)));
+                assertEquals(namespace, mapper.readTree(savedAgain).path("@context").path("@vocab").asText());
+            }
+        }
+    }
+
+    @Test
     public void oboStylePrefixesSurviveReopening() throws Exception {
         OWLDataFactory df = manager.getOWLDataFactory();
         OWLClass process = df.getOWLClass(IRI.create("http://purl.obolibrary.org/obo/GO_0008150"));

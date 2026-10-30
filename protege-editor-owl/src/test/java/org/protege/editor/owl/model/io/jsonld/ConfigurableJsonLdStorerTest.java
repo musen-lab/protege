@@ -148,7 +148,39 @@ public class ConfigurableJsonLdStorerTest {
         assertFalse(mapper.readTree(save(ontology, format)).get("@context").has("@vocab"));
 
         prefs.setUseVocab(true);
-        assertEquals("http://example.org/zoo#", mapper.readTree(save(ontology, format)).get("@context").get("@vocab").asText());
+        assertEquals(NS, mapper.readTree(save(ontology, format)).get("@context").get("@vocab").asText());
+    }
+
+    @Test
+    public void vocabUsesTheConfiguredPrefixInsteadOfTheOntologyIri() throws Exception {
+        prefs.setUseVocab(true);
+        ConfigurableJsonLDDocumentFormat format = formatWithPrefixes();
+        String namespace = "http://example.org/different/";
+        format.setDefaultPrefix(namespace);
+        JsonNode context = mapper.readTree(save(ontology, format)).path("@context");
+        assertEquals(namespace, context.path("@vocab").asText());
+        assertEquals(namespace, context.path("@base").asText());
+    }
+
+    @Test
+    public void noVocabOrBaseIsGuessedWithoutADefaultPrefix() throws Exception {
+        prefs.setUseVocab(true);
+        for (OWLDocumentFormat format : new OWLDocumentFormat[]{formatWithPrefixes(), new RDFJsonLDDocumentFormat()}) {
+            JsonNode context = mapper.readTree(save(ontology, format)).path("@context");
+            assertFalse(context.has("@vocab"));
+            assertFalse(context.has("@base"));
+        }
+    }
+
+    @Test
+    public void opaqueDefaultPrefixesSupplyVocabWithoutARelativeBase() throws Exception {
+        prefs.setUseVocab(true);
+        ConfigurableJsonLDDocumentFormat format = formatWithPrefixes();
+        format.setDefaultPrefix("urn:example:");
+        JsonNode context = mapper.readTree(save(ontology, format)).path("@context");
+        assertEquals("urn:example:", context.path("@vocab").asText());
+        assertFalse(context.has("@base"));
+        assertEquals(content(ontology), content(reload(save(ontology, format))));
     }
 
     @Test
