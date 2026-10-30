@@ -65,6 +65,30 @@ public class JsonLdPreferencesPanelTest {
         return control(name);
     }
 
+    private void selectChoice(String key, Enum<?> value) {
+        for (Component component : ((Container) control(key)).getComponents()) {
+            JRadioButton button = (JRadioButton) component;
+            if (value.name().equals(button.getActionCommand())) {
+                button.doClick(0);
+                return;
+            }
+        }
+        fail("No choice " + value + " for " + key);
+    }
+
+    private String selectedChoice(String key) {
+        String selected = null;
+        for (Component component : ((Container) control(key)).getComponents()) {
+            JRadioButton button = (JRadioButton) component;
+            if (button.isSelected()) {
+                assertNull("Only one choice should be selected", selected);
+                selected = button.getActionCommand();
+            }
+        }
+        assertNotNull("One choice should be selected", selected);
+        return selected;
+    }
+
     private JCheckBox checkBox(String name) {
         return control(name);
     }
@@ -85,7 +109,7 @@ public class JsonLdPreferencesPanelTest {
         prefs.setDocumentForm(DocumentForm.FLATTENED);
         prefs.setIndentSpaces(5);
         panel.initialise();
-        assertEquals(DocumentForm.FLATTENED, combo(JsonLdPreferences.KEY_DOCUMENT_FORM).getSelectedItem());
+        assertEquals(DocumentForm.FLATTENED.name(), selectedChoice(JsonLdPreferences.KEY_DOCUMENT_FORM));
         assertEquals(5, ((JSpinner) control(JsonLdPreferences.KEY_INDENT_SPACES)).getValue());
     }
 
@@ -93,7 +117,7 @@ public class JsonLdPreferencesPanelTest {
     public void choosingAPresetOnlyChangesTheScreen() {
         combo(JsonLdPreferences.KEY_ACTIVE_PRESET).setSelectedItem(JsonLdPreset.EXPANDED);
 
-        assertEquals(DocumentForm.EXPANDED, combo(JsonLdPreferences.KEY_DOCUMENT_FORM).getSelectedItem());
+        assertEquals(DocumentForm.EXPANDED.name(), selectedChoice(JsonLdPreferences.KEY_DOCUMENT_FORM));
         assertEquals(JsonLdPreset.EXPANDED, combo(JsonLdPreferences.KEY_ACTIVE_PRESET).getSelectedItem());
         // Cancel = applyChanges() is never called: the settings in use and in the store are unchanged
         assertEquals(DocumentForm.COMPACTED, prefs.getDocumentForm());
@@ -120,7 +144,7 @@ public class JsonLdPreferencesPanelTest {
         panel.initialise();
 
         ((JButton) control("reset")).doClick(0);
-        assertEquals(DocumentForm.COMPACTED, combo(JsonLdPreferences.KEY_DOCUMENT_FORM).getSelectedItem());
+        assertEquals(DocumentForm.COMPACTED.name(), selectedChoice(JsonLdPreferences.KEY_DOCUMENT_FORM));
         assertEquals(JsonLdPreset.WEB_FRIENDLY, combo(JsonLdPreferences.KEY_ACTIVE_PRESET).getSelectedItem());
         assertEquals("Not applied yet", DocumentForm.EXPANDED, prefs.getDocumentForm());
 
@@ -141,7 +165,7 @@ public class JsonLdPreferencesPanelTest {
 
     @Test
     public void expandedGreysOutEverythingThatNeedsAContext() {
-        combo(JsonLdPreferences.KEY_DOCUMENT_FORM).setSelectedItem(DocumentForm.EXPANDED);
+        selectChoice(JsonLdPreferences.KEY_DOCUMENT_FORM, DocumentForm.EXPANDED);
         for (String key : Arrays.asList(
                 JsonLdPreferences.KEY_INCLUDE_ONTOLOGY_PREFIXES, JsonLdPreferences.KEY_PRUNE_UNUSED_PREFIXES,
                 JsonLdPreferences.KEY_USE_VOCAB, JsonLdPreferences.KEY_GENERATE_TERMS_FOR,
@@ -149,6 +173,11 @@ public class JsonLdPreferencesPanelTest {
                 JsonLdPreferences.KEY_COMPACT_ARRAYS, JsonLdPreferences.KEY_TYPE_COERCION_MODE,
                 JsonLdPreferences.KEY_USE_LANGUAGE_MAPS)) {
             assertFalse(key + " should be greyed out", control(key).isEnabled());
+            if (control(key) instanceof JPanel) {
+                for (Component button : ((Container) control(key)).getComponents()) {
+                    assertFalse(key + " choice should be greyed out", button.isEnabled());
+                }
+            }
         }
         for (String key : Arrays.asList(
                 JsonLdPreferences.KEY_KEY_ORDERING, JsonLdPreferences.KEY_PRETTY_PRINT,
@@ -157,20 +186,44 @@ public class JsonLdPreferencesPanelTest {
             assertTrue(key + " should stay available", control(key).isEnabled());
         }
 
-        combo(JsonLdPreferences.KEY_DOCUMENT_FORM).setSelectedItem(DocumentForm.COMPACTED);
+        selectChoice(JsonLdPreferences.KEY_DOCUMENT_FORM, DocumentForm.COMPACTED);
         assertTrue(control(JsonLdPreferences.KEY_USE_LANGUAGE_MAPS).isEnabled());
     }
 
     @Test
+    public void radioChoicesAreExclusiveAndPersistOnApply() {
+        selectChoice(JsonLdPreferences.KEY_TERM_NAME_SOURCE, TermNameSource.RDFS_LABEL);
+        selectChoice(JsonLdPreferences.KEY_TERM_COLLISION_POLICY, TermCollisionPolicy.ERROR);
+        selectChoice(JsonLdPreferences.KEY_TYPE_COERCION_MODE, TypeCoercionMode.NONE);
+        selectChoice(JsonLdPreferences.KEY_BLANK_NODE_EMBEDDING, BlankNodeEmbedding.REFERENCE);
+        selectChoice(JsonLdPreferences.KEY_DOCUMENT_FORM, DocumentForm.FLATTENED);
+        selectChoice(JsonLdPreferences.KEY_GENERATE_TERMS_FOR, GenerateTermsFor.NONE);
+        selectChoice(JsonLdPreferences.KEY_KEY_ORDERING, KeyOrdering.NONE);
+        assertEquals(DocumentForm.FLATTENED.name(), selectedChoice(JsonLdPreferences.KEY_DOCUMENT_FORM));
+        assertEquals(GenerateTermsFor.NONE.name(), selectedChoice(JsonLdPreferences.KEY_GENERATE_TERMS_FOR));
+        assertEquals(JsonLdPreset.CUSTOM, combo(JsonLdPreferences.KEY_ACTIVE_PRESET).getSelectedItem());
+        assertEquals(DocumentForm.COMPACTED, reloadStore().getDocumentForm());
+
+        panel.applyChanges();
+        assertEquals(DocumentForm.FLATTENED, reloadStore().getDocumentForm());
+        assertEquals(GenerateTermsFor.NONE, reloadStore().getGenerateTermsFor());
+        assertEquals(KeyOrdering.NONE, reloadStore().getKeyOrdering());
+        assertEquals(TermNameSource.RDFS_LABEL, reloadStore().getTermNameSource());
+        assertEquals(TermCollisionPolicy.ERROR, reloadStore().getTermCollisionPolicy());
+        assertEquals(TypeCoercionMode.NONE, reloadStore().getTypeCoercionMode());
+        assertEquals(BlankNodeEmbedding.REFERENCE, reloadStore().getBlankNodeEmbedding());
+    }
+
+    @Test
     public void flattenedGreysOutNesting() {
-        combo(JsonLdPreferences.KEY_DOCUMENT_FORM).setSelectedItem(DocumentForm.FLATTENED);
+        selectChoice(JsonLdPreferences.KEY_DOCUMENT_FORM, DocumentForm.FLATTENED);
         assertFalse(control(JsonLdPreferences.KEY_BLANK_NODE_EMBEDDING).isEnabled());
         assertTrue(control(JsonLdPreferences.KEY_GENERATE_TERMS_FOR).isEnabled());
     }
 
     @Test
     public void noShortNamesGreysOutNameSettings() {
-        combo(JsonLdPreferences.KEY_GENERATE_TERMS_FOR).setSelectedItem(GenerateTermsFor.NONE);
+        selectChoice(JsonLdPreferences.KEY_GENERATE_TERMS_FOR, GenerateTermsFor.NONE);
         assertFalse(control(JsonLdPreferences.KEY_TERM_NAME_SOURCE).isEnabled());
         assertFalse(control(JsonLdPreferences.KEY_TERM_COLLISION_POLICY).isEnabled());
     }

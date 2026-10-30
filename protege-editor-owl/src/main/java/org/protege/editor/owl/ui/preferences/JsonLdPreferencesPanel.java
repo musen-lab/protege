@@ -7,6 +7,8 @@ import javax.annotation.Nonnull;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ItemEvent;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -28,25 +30,25 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
     private JCheckBox includeOntologyPrefixesCheckBox;
     private JCheckBox pruneUnusedPrefixesCheckBox;
     private JCheckBox useVocabCheckBox;
-    private JComboBox<GenerateTermsFor> generateTermsForComboBox;
-    private JComboBox<TermNameSource> termNameSourceComboBox;
-    private JComboBox<TermCollisionPolicy> termCollisionPolicyComboBox;
+    private EnumRadioButtons<GenerateTermsFor> generateTermsForButtons;
+    private EnumRadioButtons<TermNameSource> termNameSourceButtons;
+    private EnumRadioButtons<TermCollisionPolicy> termCollisionPolicyButtons;
 
     // Output Shape & Formatting
-    private JComboBox<DocumentForm> documentFormComboBox;
+    private EnumRadioButtons<DocumentForm> documentFormButtons;
     private JCheckBox compactArraysCheckBox;
-    private JComboBox<KeyOrdering> keyOrderingComboBox;
+    private EnumRadioButtons<KeyOrdering> keyOrderingButtons;
     private JCheckBox prettyPrintCheckBox;
     private JSpinner indentSpacesSpinner;
 
     // Literals & Types
     private JCheckBox useNativeTypesCheckBox;
-    private JComboBox<TypeCoercionMode> typeCoercionModeComboBox;
+    private EnumRadioButtons<TypeCoercionMode> typeCoercionModeButtons;
     private JCheckBox useRdfTypeCheckBox;
     private JCheckBox useLanguageMapsCheckBox;
 
     // Structures & Scope
-    private JComboBox<BlankNodeEmbedding> blankNodeEmbeddingComboBox;
+    private EnumRadioButtons<BlankNodeEmbedding> blankNodeEmbeddingButtons;
     private JCheckBox includeImportsClosureCheckBox;
 
     private boolean isUpdatingUI = false;
@@ -89,26 +91,22 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         includeOntologyPrefixesCheckBox = new JCheckBox("Include the ontology's prefixes in @context");
         pruneUnusedPrefixesCheckBox = new JCheckBox("Leave out prefixes that nothing in the file uses");
         useVocabCheckBox = new JCheckBox("Add @vocab (the ontology IRI)");
-        generateTermsForComboBox = new JComboBox<>(GenerateTermsFor.values());
-        termNameSourceComboBox = new JComboBox<>(TermNameSource.values());
-        termCollisionPolicyComboBox = new JComboBox<>(TermCollisionPolicy.values());
+        generateTermsForButtons = new EnumRadioButtons<>(GenerateTermsFor.values());
+        termNameSourceButtons = new EnumRadioButtons<>(TermNameSource.values());
+        termCollisionPolicyButtons = new EnumRadioButtons<>(TermCollisionPolicy.values());
 
         panel.addGroupComponent(includeOntologyPrefixesCheckBox);
         panel.addGroupComponent(pruneUnusedPrefixesCheckBox);
         panel.addGroupComponent(useVocabCheckBox);
-        panel.addGroupComponent(new JLabel("Short names for:"));
-        panel.addIndentedGroupComponent(generateTermsForComboBox);
-        panel.addGroupComponent(new JLabel("Take short names from:"));
-        panel.addIndentedGroupComponent(termNameSourceComboBox);
-        panel.addGroupComponent(new JLabel("When two entities want the same short name:"));
-        panel.addIndentedGroupComponent(termCollisionPolicyComboBox);
+        addChoiceGroup(panel, "Short names for", generateTermsForButtons);
+        addChoiceGroup(panel, "Short name source", termNameSourceButtons);
+        addChoiceGroup(panel, "Name collisions", termCollisionPolicyButtons);
 
         // --- Output Shape & Formatting ---
         panel.addSeparator();
-        panel.addGroup("Output Shape & Formatting");
-        documentFormComboBox = new JComboBox<>(DocumentForm.values());
+        documentFormButtons = new EnumRadioButtons<>(DocumentForm.values());
         compactArraysCheckBox = new JCheckBox("Write a single value without [ ]");
-        keyOrderingComboBox = new JComboBox<>(KeyOrdering.values());
+        keyOrderingButtons = new EnumRadioButtons<>(KeyOrdering.values());
         prettyPrintCheckBox = new JCheckBox("Pretty print (indented and readable)");
         indentSpacesSpinner = new JSpinner(new SpinnerNumberModel(JsonLdPreferences.DEFAULT_INDENT_SPACES,
                                                                   JsonLdPreferences.MIN_INDENT_SPACES,
@@ -119,11 +117,9 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         indentPanel.add(new JLabel("Spaces per indent level:"));
         indentPanel.add(indentSpacesSpinner);
 
-        panel.addGroupComponent(new JLabel("File shape:"));
-        panel.addIndentedGroupComponent(documentFormComboBox);
+        addChoiceGroup(panel, "File shape", documentFormButtons);
         panel.addGroupComponent(compactArraysCheckBox);
-        panel.addGroupComponent(new JLabel("Key ordering:"));
-        panel.addIndentedGroupComponent(keyOrderingComboBox);
+        addChoiceGroup(panel, "Key ordering", keyOrderingButtons);
         panel.addGroupComponent(prettyPrintCheckBox);
         panel.addIndentedGroupComponent(indentPanel);
 
@@ -131,29 +127,78 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         panel.addSeparator();
         panel.addGroup("Literals & Types");
         useNativeTypesCheckBox = new JCheckBox("Write numbers and true/false as plain JSON values");
-        typeCoercionModeComboBox = new JComboBox<>(TypeCoercionMode.values());
+        typeCoercionModeButtons = new EnumRadioButtons<>(TypeCoercionMode.values());
         useRdfTypeCheckBox = new JCheckBox("Write rdf:type as a normal property (instead of @type)");
         useLanguageMapsCheckBox = new JCheckBox("Group text by language (language maps)");
 
         panel.addGroupComponent(useNativeTypesCheckBox);
-        panel.addGroupComponent(new JLabel("Links as plain IRIs (\"@type\": \"@id\"):"));
-        panel.addIndentedGroupComponent(typeCoercionModeComboBox);
+        addChoiceGroup(panel, "IRI-valued links", typeCoercionModeButtons);
         panel.addGroupComponent(useRdfTypeCheckBox);
         panel.addGroupComponent(useLanguageMapsCheckBox);
 
         // --- Structures & Scope ---
         panel.addSeparator();
-        panel.addGroup("Structures & Scope");
-        blankNodeEmbeddingComboBox = new JComboBox<>(BlankNodeEmbedding.values());
+        blankNodeEmbeddingButtons = new EnumRadioButtons<>(BlankNodeEmbedding.values());
         includeImportsClosureCheckBox = new JCheckBox("Also write imported ontologies into the file");
 
-        panel.addGroupComponent(new JLabel("Blank nodes (for example restrictions):"));
-        panel.addIndentedGroupComponent(blankNodeEmbeddingComboBox);
+        addChoiceGroup(panel, "Blank nodes", blankNodeEmbeddingButtons);
         panel.addGroupComponent(includeImportsClosureCheckBox);
 
         nameControls();
 
         add(panel, BorderLayout.NORTH);
+    }
+
+    private static void addChoiceGroup(PreferencesLayoutPanel panel, String label, EnumRadioButtons<?> choices) {
+        panel.addVerticalPadding();
+        panel.addGroup(label);
+        choices.getAccessibleContext().setAccessibleName(label);
+        panel.addGroupComponent(choices);
+    }
+
+    /** Keeps each enum's choices exclusive and enables or disables every button together. */
+    private static final class EnumRadioButtons<E extends Enum<E>> extends JPanel {
+
+        private final Map<E, JRadioButton> buttons = new LinkedHashMap<>();
+
+        EnumRadioButtons(E[] values) {
+            setLayout(new GridLayout(0, 1));
+            ButtonGroup group = new ButtonGroup();
+            for (E value : values) {
+                JRadioButton button = new JRadioButton(value.toString());
+                button.setActionCommand(value.name());
+                group.add(button);
+                buttons.put(value, button);
+                add(button);
+            }
+        }
+
+        E getSelectedValue() {
+            return buttons.entrySet().stream().filter(entry -> entry.getValue().isSelected())
+                    .map(Map.Entry::getKey).findFirst().orElseThrow(IllegalStateException::new);
+        }
+
+        void setSelectedValue(E value) {
+            buttons.get(value).setSelected(true);
+        }
+
+        void onSelection(Runnable listener) {
+            buttons.values().forEach(button -> button.addActionListener(event -> listener.run()));
+        }
+
+        @Override
+        public int getBaseline(int width, int height) {
+            // Align the group label with the first choice, rather than the middle of the group.
+            return getComponent(0).getBaseline(width, height / getComponentCount());
+        }
+
+        @Override
+        public void setEnabled(boolean enabled) {
+            super.setEnabled(enabled);
+            for (Component button : getComponents()) {
+                button.setEnabled(enabled);
+            }
+        }
     }
 
     /** Names each control after its setting key, so tests can find them. */
@@ -163,19 +208,19 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         includeOntologyPrefixesCheckBox.setName(JsonLdPreferences.KEY_INCLUDE_ONTOLOGY_PREFIXES);
         pruneUnusedPrefixesCheckBox.setName(JsonLdPreferences.KEY_PRUNE_UNUSED_PREFIXES);
         useVocabCheckBox.setName(JsonLdPreferences.KEY_USE_VOCAB);
-        generateTermsForComboBox.setName(JsonLdPreferences.KEY_GENERATE_TERMS_FOR);
-        termNameSourceComboBox.setName(JsonLdPreferences.KEY_TERM_NAME_SOURCE);
-        termCollisionPolicyComboBox.setName(JsonLdPreferences.KEY_TERM_COLLISION_POLICY);
-        documentFormComboBox.setName(JsonLdPreferences.KEY_DOCUMENT_FORM);
+        generateTermsForButtons.setName(JsonLdPreferences.KEY_GENERATE_TERMS_FOR);
+        termNameSourceButtons.setName(JsonLdPreferences.KEY_TERM_NAME_SOURCE);
+        termCollisionPolicyButtons.setName(JsonLdPreferences.KEY_TERM_COLLISION_POLICY);
+        documentFormButtons.setName(JsonLdPreferences.KEY_DOCUMENT_FORM);
         compactArraysCheckBox.setName(JsonLdPreferences.KEY_COMPACT_ARRAYS);
-        keyOrderingComboBox.setName(JsonLdPreferences.KEY_KEY_ORDERING);
+        keyOrderingButtons.setName(JsonLdPreferences.KEY_KEY_ORDERING);
         prettyPrintCheckBox.setName(JsonLdPreferences.KEY_PRETTY_PRINT);
         indentSpacesSpinner.setName(JsonLdPreferences.KEY_INDENT_SPACES);
         useNativeTypesCheckBox.setName(JsonLdPreferences.KEY_USE_NATIVE_TYPES);
-        typeCoercionModeComboBox.setName(JsonLdPreferences.KEY_TYPE_COERCION_MODE);
+        typeCoercionModeButtons.setName(JsonLdPreferences.KEY_TYPE_COERCION_MODE);
         useRdfTypeCheckBox.setName(JsonLdPreferences.KEY_USE_RDF_TYPE);
         useLanguageMapsCheckBox.setName(JsonLdPreferences.KEY_USE_LANGUAGE_MAPS);
-        blankNodeEmbeddingComboBox.setName(JsonLdPreferences.KEY_BLANK_NODE_EMBEDDING);
+        blankNodeEmbeddingButtons.setName(JsonLdPreferences.KEY_BLANK_NODE_EMBEDDING);
         includeImportsClosureCheckBox.setName(JsonLdPreferences.KEY_INCLUDE_IMPORTS_CLOSURE);
     }
 
@@ -200,14 +245,14 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
             }
         };
 
-        // Combos
-        generateTermsForComboBox.addItemListener(e -> onModified.run());
-        termNameSourceComboBox.addItemListener(e -> onModified.run());
-        termCollisionPolicyComboBox.addItemListener(e -> onModified.run());
-        documentFormComboBox.addItemListener(e -> onModified.run());
-        keyOrderingComboBox.addItemListener(e -> onModified.run());
-        typeCoercionModeComboBox.addItemListener(e -> onModified.run());
-        blankNodeEmbeddingComboBox.addItemListener(e -> onModified.run());
+        // Radio-button groups
+        generateTermsForButtons.onSelection(onModified);
+        termNameSourceButtons.onSelection(onModified);
+        termCollisionPolicyButtons.onSelection(onModified);
+        documentFormButtons.onSelection(onModified);
+        keyOrderingButtons.onSelection(onModified);
+        typeCoercionModeButtons.onSelection(onModified);
+        blankNodeEmbeddingButtons.onSelection(onModified);
 
         // Checkboxes
         includeOntologyPrefixesCheckBox.addActionListener(e -> onModified.run());
@@ -233,25 +278,25 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
             includeOntologyPrefixesCheckBox.setSelected(source.isIncludeOntologyPrefixes());
             pruneUnusedPrefixesCheckBox.setSelected(source.isPruneUnusedPrefixes());
             useVocabCheckBox.setSelected(source.isUseVocab());
-            generateTermsForComboBox.setSelectedItem(source.getGenerateTermsFor());
-            termNameSourceComboBox.setSelectedItem(source.getTermNameSource());
-            termCollisionPolicyComboBox.setSelectedItem(source.getTermCollisionPolicy());
+            generateTermsForButtons.setSelectedValue(source.getGenerateTermsFor());
+            termNameSourceButtons.setSelectedValue(source.getTermNameSource());
+            termCollisionPolicyButtons.setSelectedValue(source.getTermCollisionPolicy());
 
             // Output Shape & Formatting
-            documentFormComboBox.setSelectedItem(source.getDocumentForm());
+            documentFormButtons.setSelectedValue(source.getDocumentForm());
             compactArraysCheckBox.setSelected(source.isCompactArrays());
-            keyOrderingComboBox.setSelectedItem(source.getKeyOrdering());
+            keyOrderingButtons.setSelectedValue(source.getKeyOrdering());
             prettyPrintCheckBox.setSelected(source.isPrettyPrint());
             indentSpacesSpinner.setValue(source.getIndentSpaces());
 
             // Literals & Types
             useNativeTypesCheckBox.setSelected(source.isUseNativeTypes());
-            typeCoercionModeComboBox.setSelectedItem(source.getTypeCoercionMode());
+            typeCoercionModeButtons.setSelectedValue(source.getTypeCoercionMode());
             useRdfTypeCheckBox.setSelected(source.isUseRdfType());
             useLanguageMapsCheckBox.setSelected(source.isUseLanguageMaps());
 
             // Structures & Scope
-            blankNodeEmbeddingComboBox.setSelectedItem(source.getBlankNodeEmbedding());
+            blankNodeEmbeddingButtons.setSelectedValue(source.getBlankNodeEmbedding());
             includeImportsClosureCheckBox.setSelected(source.isIncludeImportsClosure());
 
             updateEnabledStates();
@@ -261,24 +306,24 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
     }
 
     private void updateEnabledStates() {
-        DocumentForm form = (DocumentForm) documentFormComboBox.getSelectedItem();
+        DocumentForm form = documentFormButtons.getSelectedValue();
         // Expanded files have no @context, so nothing that goes into the context has an effect
         boolean hasContext = form != DocumentForm.EXPANDED;
-        boolean hasTerms = hasContext && generateTermsForComboBox.getSelectedItem() != GenerateTermsFor.NONE;
+        boolean hasTerms = hasContext && generateTermsForButtons.getSelectedValue() != GenerateTermsFor.NONE;
 
         includeOntologyPrefixesCheckBox.setEnabled(hasContext);
         pruneUnusedPrefixesCheckBox.setEnabled(hasContext);
         useVocabCheckBox.setEnabled(hasContext);
-        generateTermsForComboBox.setEnabled(hasContext);
-        termNameSourceComboBox.setEnabled(hasTerms);
-        termCollisionPolicyComboBox.setEnabled(hasTerms);
+        generateTermsForButtons.setEnabled(hasContext);
+        termNameSourceButtons.setEnabled(hasTerms);
+        termCollisionPolicyButtons.setEnabled(hasTerms);
         compactArraysCheckBox.setEnabled(hasContext);
-        typeCoercionModeComboBox.setEnabled(hasContext);
+        typeCoercionModeButtons.setEnabled(hasContext);
         useLanguageMapsCheckBox.setEnabled(hasContext);
 
         indentSpacesSpinner.setEnabled(prettyPrintCheckBox.isSelected());
         // Flattened files are never nested
-        blankNodeEmbeddingComboBox.setEnabled(form != DocumentForm.FLATTENED);
+        blankNodeEmbeddingButtons.setEnabled(form != DocumentForm.FLATTENED);
     }
 
     @Override
@@ -289,25 +334,25 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         prefs.setIncludeOntologyPrefixes(includeOntologyPrefixesCheckBox.isSelected());
         prefs.setPruneUnusedPrefixes(pruneUnusedPrefixesCheckBox.isSelected());
         prefs.setUseVocab(useVocabCheckBox.isSelected());
-        prefs.setGenerateTermsFor((GenerateTermsFor) generateTermsForComboBox.getSelectedItem());
-        prefs.setTermNameSource((TermNameSource) termNameSourceComboBox.getSelectedItem());
-        prefs.setTermCollisionPolicy((TermCollisionPolicy) termCollisionPolicyComboBox.getSelectedItem());
+        prefs.setGenerateTermsFor(generateTermsForButtons.getSelectedValue());
+        prefs.setTermNameSource(termNameSourceButtons.getSelectedValue());
+        prefs.setTermCollisionPolicy(termCollisionPolicyButtons.getSelectedValue());
 
         // Output Shape & Formatting
-        prefs.setDocumentForm((DocumentForm) documentFormComboBox.getSelectedItem());
+        prefs.setDocumentForm(documentFormButtons.getSelectedValue());
         prefs.setCompactArrays(compactArraysCheckBox.isSelected());
-        prefs.setKeyOrdering((KeyOrdering) keyOrderingComboBox.getSelectedItem());
+        prefs.setKeyOrdering(keyOrderingButtons.getSelectedValue());
         prefs.setPrettyPrint(prettyPrintCheckBox.isSelected());
         prefs.setIndentSpaces((Integer) indentSpacesSpinner.getValue());
 
         // Literals & Types
         prefs.setUseNativeTypes(useNativeTypesCheckBox.isSelected());
-        prefs.setTypeCoercionMode((TypeCoercionMode) typeCoercionModeComboBox.getSelectedItem());
+        prefs.setTypeCoercionMode(typeCoercionModeButtons.getSelectedValue());
         prefs.setUseRdfType(useRdfTypeCheckBox.isSelected());
         prefs.setUseLanguageMaps(useLanguageMapsCheckBox.isSelected());
 
         // Structures & Scope
-        prefs.setBlankNodeEmbedding((BlankNodeEmbedding) blankNodeEmbeddingComboBox.getSelectedItem());
+        prefs.setBlankNodeEmbedding(blankNodeEmbeddingButtons.getSelectedValue());
         prefs.setIncludeImportsClosure(includeImportsClosureCheckBox.isSelected());
 
         prefs.save();
