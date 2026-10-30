@@ -153,11 +153,7 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
 
         nameControls();
 
-        JScrollPane scrollPane = new JScrollPane(panel);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        add(scrollPane, BorderLayout.CENTER);
+        add(panel, BorderLayout.NORTH);
     }
 
     /** Names each control after its setting key, so tests can find them. */
