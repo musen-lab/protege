@@ -1,6 +1,7 @@
 package org.protege.editor.owl.model.io.jsonld;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonGenerator;
 import org.semanticweb.owlapi.formats.RDFJsonLDDocumentFormat;
 import org.semanticweb.owlapi.io.StreamDocumentTarget;
 import org.semanticweb.owlapi.model.*;
@@ -22,7 +23,9 @@ import java.util.Objects;
 /**
  * Saves ontologies as JSON-LD using the settings in {@link JsonLdPreferences}.
  * <p>
- * Saving happens in two steps. First, OWL API's own JSON-LD writer writes the ontology to a temporary file
+ * Compatible expanded output uses {@link StreamingJsonLdWriter} to sort statements on disk and
+ * write nodes incrementally. Other configurations use two steps. OWL API's own JSON-LD writer
+ * writes the ontology to a temporary file
  * (full IRIs, no context), preserving the supplied format's add-missing-types setting.
  * Then {@link JsonLdPostProcessor} rebuilds that document with
  * jsonld-java, and shapes it with the {@code @context} from {@link JsonLdContextBuilder} and the other settings.
@@ -52,7 +55,14 @@ public class ConfigurableJsonLdStorer extends AbstractOWLStorer {
                                  @Nonnull Writer writer,
                                  @Nonnull OWLDocumentFormat format) throws OWLOntologyStorageException {
         try {
-            JsonLdPostProcessor.write(buildDocument(ontology, format), prefs, writer);
+            if (StreamingJsonLdWriter.supports(prefs)) {
+                try (StreamingJsonLdWriter streaming = new StreamingJsonLdWriter();
+                     JsonGenerator generator = JsonLdPostProcessor.generator(prefs, writer)) {
+                    streaming.render(ontology, format, generator);
+                }
+            } else {
+                JsonLdPostProcessor.write(buildDocument(ontology, format), prefs, writer);
+            }
         } catch (IOException e) {
             throw new OWLOntologyStorageException("Error writing JSON-LD", e);
         }
@@ -63,7 +73,14 @@ public class ConfigurableJsonLdStorer extends AbstractOWLStorer {
                                  @Nonnull OutputStream os,
                                  @Nonnull OWLDocumentFormat format) throws OWLOntologyStorageException {
         try {
-            JsonLdPostProcessor.write(buildDocument(ontology, format), prefs, os);
+            if (StreamingJsonLdWriter.supports(prefs)) {
+                try (StreamingJsonLdWriter streaming = new StreamingJsonLdWriter();
+                     JsonGenerator generator = JsonLdPostProcessor.generator(prefs, os)) {
+                    streaming.render(ontology, format, generator);
+                }
+            } else {
+                JsonLdPostProcessor.write(buildDocument(ontology, format), prefs, os);
+            }
         } catch (IOException e) {
             throw new OWLOntologyStorageException("Error writing JSON-LD", e);
         }

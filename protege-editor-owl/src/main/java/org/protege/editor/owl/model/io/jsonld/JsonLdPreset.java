@@ -11,8 +11,8 @@ public enum JsonLdPreset {
     ROUND_TRIP_SAFE("Round-trip safe", "Closest to the raw RDF; every value keeps its exact spelling"),
     /** Favor stable, compact diffs for version control. */
     DIFF_FRIENDLY("Diff-friendly", "Small, stable changes in version control"),
-    /** Use full IRIs and omit the context for inspection. */
-    EXPANDED("Expanded (Debug)", "Full IRIs and no @context"),
+    /** Stream full IRIs and typed literals with separate blank nodes and RDF list links. */
+    EXPANDED("Expanded (low memory)", "Full IRIs, exact typed literals, separate blank nodes and RDF list links"),
     /** Keep values chosen individually in the preferences panel. */
     CUSTOM("Custom", "Customized configuration");
 

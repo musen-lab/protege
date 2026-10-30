@@ -561,12 +561,32 @@ public final class JsonLdPostProcessor {
         if (!prefs.isPrettyPrint()) {
             return MAPPER.writer();
         }
+        return MAPPER.writer(prettyPrinter(prefs));
+    }
+
+    static JsonGenerator generator(JsonLdPreferences prefs, Writer out) throws IOException {
+        return configure(MAPPER.getFactory().createGenerator(out), prefs);
+    }
+
+    static JsonGenerator generator(JsonLdPreferences prefs, OutputStream out) throws IOException {
+        return configure(MAPPER.getFactory().createGenerator(out), prefs);
+    }
+
+    private static JsonGenerator configure(JsonGenerator generator, JsonLdPreferences prefs) {
+        generator.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
+        if (prefs.isPrettyPrint()) {
+            generator.setPrettyPrinter(prettyPrinter(prefs));
+        }
+        return generator;
+    }
+
+    private static DefaultPrettyPrinter prettyPrinter(JsonLdPreferences prefs) {
         char[] spaces = new char[prefs.getIndentSpaces()];
         Arrays.fill(spaces, ' ');
         DefaultPrettyPrinter.Indenter indenter = new DefaultIndenter(new String(spaces), "\n");
         DefaultPrettyPrinter printer = new DefaultPrettyPrinter();
         printer.indentObjectsWith(indenter);
         printer.indentArraysWith(indenter);
-        return MAPPER.writer(printer);
+        return printer;
     }
 }

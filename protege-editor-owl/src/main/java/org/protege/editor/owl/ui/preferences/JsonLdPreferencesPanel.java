@@ -224,6 +224,9 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         presetComboBox.addItemListener(e -> {
             if (e.getStateChange() == ItemEvent.SELECTED && !isUpdatingUI) {
                 JsonLdPreset selected = (JsonLdPreset) presetComboBox.getSelectedItem();
+                if (selected != null) {
+                    presetComboBox.setToolTipText(selected.getDescription());
+                }
                 if (selected != null && selected != JsonLdPreset.CUSTOM) {
                     // Only the screen changes; the settings change when the user clicks Apply or OK
                     updateUIFromPreferences(JsonLdPreferences.ofPreset(selected));
@@ -268,6 +271,7 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         isUpdatingUI = true;
         try {
             presetComboBox.setSelectedItem(source.getActivePreset());
+            presetComboBox.setToolTipText(source.getActivePreset().getDescription());
 
             // Context & Prefixes
             includeOntologyPrefixesCheckBox.setSelected(source.isIncludeOntologyPrefixes());
