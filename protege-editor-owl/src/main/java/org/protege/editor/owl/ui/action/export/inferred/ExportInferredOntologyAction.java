@@ -6,6 +6,7 @@ import org.protege.editor.owl.model.inference.ReasonerStatus;
 import org.protege.editor.owl.model.inference.ReasonerUtilities;
 import org.protege.editor.owl.model.inference.VacuousAxiomVisitor;
 import org.protege.editor.owl.ui.action.ProtegeOWLAction;
+import org.protege.editor.owl.model.OntologyManagerFactory;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.*;
 import org.semanticweb.owlapi.reasoner.InferenceType;
@@ -76,6 +77,7 @@ public class ExportInferredOntologyAction extends ProtegeOWLAction {
     		this.wizard = wizard;
 			inferredAxiomGenerators = wizard.getInferredAxiomGenerators();
 			outputManager = OWLManager.createOWLOntologyManager();
+			OntologyManagerFactory.addJsonLdSupport(outputManager);
 			inferredOntologyGenerator = new InferredOntologyGenerator(getOWLModelManager().getReasoner(), inferredAxiomGenerators);
 			exportedOntology = outputManager.createOntology(wizard.getOntologyID());
 

@@ -41,7 +41,7 @@ public class OntologyFormatPanel extends JPanel {
         formats.add(new OBODocumentFormat());
         formats.add(new LatexDocumentFormat());
 
-        formats.add(new RDFJsonLDDocumentFormat());
+        formats.add(new org.protege.editor.owl.model.io.jsonld.ConfigurableJsonLDDocumentFormat());
 
         formatComboBox = new JComboBox<>(formats.toArray(new OWLDocumentFormat [formats.size()]));
         setLayout(new BorderLayout(12, 12));
@@ -55,7 +55,9 @@ public class OntologyFormatPanel extends JPanel {
             formatComboBox.setSelectedIndex(0);
         }
         for (int i = 0; i < formatComboBox.getModel().getSize(); i++) {
-            if (formatComboBox.getModel().getElementAt(i).equals(format)) {
+            OWLDocumentFormat item = formatComboBox.getModel().getElementAt(i);
+            if (item.equals(format)
+                || (format instanceof RDFJsonLDDocumentFormat && item instanceof org.protege.editor.owl.model.io.jsonld.ConfigurableJsonLDDocumentFormat)) {
                 formatComboBox.setSelectedIndex(i);
                 return;
             }
