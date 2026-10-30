@@ -8,10 +8,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.github.jsonldjava.core.JsonLdConsts;
 import com.github.jsonldjava.core.JsonLdError;
 import com.github.jsonldjava.core.JsonLdOptions;
 import com.github.jsonldjava.core.JsonLdProcessor;
+import com.github.jsonldjava.core.RDFDataset;
 import com.github.jsonldjava.utils.JsonUtils;
 
 import javax.annotation.Nonnull;
@@ -41,7 +41,8 @@ public final class JsonLdPostProcessor {
 
     /**
      * Turns the draft into triples and back into expanded JSON-LD, applying useNativeTypes and useRdfType.
-     * RDF lists come out as JSON-LD lists.
+     * Passes the RDF dataset directly between conversions, avoiding a complete N-Quads string and
+     * its reparse. RDF lists come out as JSON-LD lists.
      *
      * @param draft stream containing JSON-LD written by OWL API
      * @param prefs settings for native literal values and RDF type handling
@@ -52,13 +53,12 @@ public final class JsonLdPostProcessor {
     public static Object rebuild(@Nonnull InputStream draft, @Nonnull JsonLdPreferences prefs) throws IOException {
         try {
             JsonLdOptions toRdf = new JsonLdOptions();
-            toRdf.format = JsonLdConsts.APPLICATION_NQUADS;
-            Object nquads = JsonLdProcessor.toRDF(JsonUtils.fromInputStream(draft), toRdf);
+            RDFDataset dataset = (RDFDataset) JsonLdProcessor.toRDF(JsonUtils.fromInputStream(draft), toRdf);
             JsonLdOptions fromRdf = new JsonLdOptions();
-            fromRdf.format = JsonLdConsts.APPLICATION_NQUADS;
             fromRdf.setUseNativeTypes(prefs.isUseNativeTypes());
             fromRdf.setUseRdfType(prefs.isUseRdfType());
-            Object expanded = JsonLdProcessor.fromRDF(nquads, fromRdf);
+            // The parser overload accepts an existing dataset instead of selecting a text parser.
+            Object expanded = JsonLdProcessor.fromRDF(dataset, fromRdf, RDFDataset.class::cast);
             if (!prefs.isUseRdfType()) {
                 moveRdfTypeIntoTypeKeyword(expanded);
             }
