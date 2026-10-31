@@ -2,9 +2,9 @@ name: CI check
 
 on:
   push:
-    branches: [ "master", "protege-6" ]
+    branches: [ "master", "protege-6", "feat/T6*" ]
   pull_request:
-    branches: [ "master", "protege-6" ]
+    branches: [ "master", "protege-6", "feat/T6*" ]
   workflow_dispatch:
 
 jobs:
@@ -12,14 +12,13 @@ jobs:
     strategy:
       matrix:
         profile: [ default, ide, release ]
-        java_version: [ '11', '21' ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK/Maven
         uses: actions/setup-java@v4
         with:
-          java-version: ${{ matrix.java_version }}
+          java-version: '25'
           distribution: 'temurin'
       - name: Run test suite
         run: mvn --batch-mode --activate-profiles ${{ matrix.profile }} --define release.signing.disabled=true clean verify
