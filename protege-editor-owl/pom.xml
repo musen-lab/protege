@@ -253,6 +253,12 @@
 		  <configuration>
 		   <source>11</source>
 		   <target>11</target>
+		   <annotationProcessorPaths>
+		    <path>
+		     <groupId>com.google.auto.value</groupId>
+		     <artifactId>auto-value</artifactId>
+		    </path>
+		   </annotationProcessorPaths>
 		  </configuration>
 		 </plugin>
 		</plugins>
