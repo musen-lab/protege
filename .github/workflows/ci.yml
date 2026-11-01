@@ -22,3 +22,42 @@ jobs:
           distribution: 'temurin'
       - name: Run test suite
         run: mvn --batch-mode --activate-profiles ${{ matrix.profile }} --define release.signing.disabled=true clean verify
+
+  bundled-startup:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build distributions
+        run: mvn --batch-mode --define skipTests --define release.signing.disabled=true clean package
+      - name: Install virtual display
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes xvfb
+      - name: Start Linux distribution and load Pizza
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum python .github/scripts/check-bundled-startup.py linux
+      - name: Start Windows distribution and load Pizza
+        if: runner.os == 'Windows'
+        run: python .github/scripts/check-bundled-startup.py win
+      - name: Upload startup logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundled-startup-${{ matrix.platform }}
+          path: protege-desktop/target/startup-check/*.log
+          if-no-files-found: warn

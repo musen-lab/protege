@@ -115,7 +115,8 @@
 				<enabled>true</enabled>
 			</releases>
 			<id>github</id>
-			<url>https://raw.github.com/protegeproject/mvn-repo/master/releases</url>
+			<!-- Use the pinned team fork while Java 25 runtimes await upstream publication. -->
+			<url>https://raw.githubusercontent.com/musen-lab/mvn-repo/629a099316c777d7c04f54d38e0fb1bce10f9be1/releases</url>
 		</repository>
 	</repositories>
 
