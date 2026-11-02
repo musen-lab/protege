@@ -11,6 +11,7 @@ import org.protege.editor.owl.OWLEditorKit;
 public final class AgentToolPluginImpl extends AbstractProtegePlugin<AgentTool> implements AgentToolPlugin {
 
     private final OWLEditorKit editorKit;
+    private AgentToolFactory factory;
 
     public AgentToolPluginImpl(IExtension extension, OWLEditorKit editorKit) {
         super(extension);
@@ -19,13 +20,27 @@ public final class AgentToolPluginImpl extends AbstractProtegePlugin<AgentTool> 
 
     @Override
     public AgentToolDescription getDescription() {
-        return new AgentToolDescription(getPluginProperty("name"), getPluginProperty("description"),
-                getPluginProperty("inputSchema"), getPluginProperty("resultFormat"));
+        try {
+            return getFactory().getDescription();
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Could not instantiate tool factory", e);
+        }
     }
 
     @Override
     public AgentTool newInstance() throws ClassNotFoundException, IllegalAccessException, InstantiationException {
-        AgentToolFactory factory = new ExtensionInstantiator<AgentToolFactory>(extension).instantiate();
-        return factory.createTool(editorKit);
+        return getFactory().createTool(editorKit);
+    }
+
+    private synchronized AgentToolFactory getFactory()
+            throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+        if (factory == null) {
+            String className = getPluginProperty("class");
+            if (className == null || className.isBlank()) {
+                throw new IllegalArgumentException("Tool factory class must not be blank");
+            }
+            factory = new ExtensionInstantiator<AgentToolFactory>(extension).instantiate();
+        }
+        return factory;
     }
 }

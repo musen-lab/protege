@@ -27,7 +27,7 @@ public class OntologyCountsToolTest {
         AgentToolSource source = new AgentToolSource() {
             public String getId() { return "example.OntologyCounts"; }
             public AgentToolDescription getDescription() {
-                return new AgentToolDescription("example_ontology_counts", "Counts", "{\"type\":\"object\"}", "application/json");
+                return new OntologyCountsToolFactory().getDescription();
             }
             public AgentTool newInstance() { return new OntologyCountsTool(active::get); }
         };

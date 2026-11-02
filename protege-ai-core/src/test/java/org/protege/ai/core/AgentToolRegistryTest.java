@@ -21,9 +21,13 @@ public class AgentToolRegistryTest {
             new AgentToolDescription("test_tool", "Test tool", "{\"type\":\"object\"}", "application/json");
 
     private AgentToolSource source(String id, AgentTool tool) {
+        return source(id, DESCRIPTION, tool);
+    }
+
+    private AgentToolSource source(String id, AgentToolDescription description, AgentTool tool) {
         return new AgentToolSource() {
             public String getId() { return id; }
-            public AgentToolDescription getDescription() { return DESCRIPTION; }
+            public AgentToolDescription getDescription() { return description; }
             public AgentTool newInstance() { return tool; }
         };
     }
@@ -97,9 +101,47 @@ public class AgentToolRegistryTest {
             public void dispose() { disposed.incrementAndGet(); }
         };
         AgentToolRegistry registry = new AgentToolRegistry(List.of(
-                source("broken", broken), source("working", input -> "{}")));
+                source("broken", broken), source("working",
+                new AgentToolDescription("other_tool", "Other tool", "{}", "application/json"), input -> "{}")));
         assertEquals(1, disposed.get());
-        assertEquals(SUCCESS, registry.execute("test_tool", "{}").status());
+        assertEquals(NO_SUCH_TOOL, registry.execute("test_tool", "{}").status());
+        assertEquals(SUCCESS, registry.execute("other_tool", "{}").status());
+    }
+
+    @Test
+    public void failedSourceStillClaimsItsNameAndLogsBothSources() {
+        Logger logger = (Logger) LoggerFactory.getLogger(AgentToolRegistry.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            AgentTool broken = new AgentTool() {
+                public void initialise() { throw new IllegalStateException("Cannot initialize"); }
+                public String execute(String input) { throw new AssertionError(); }
+            };
+            AgentToolRegistry registry = new AgentToolRegistry(List.of(source("plugin.broken", broken)));
+            AgentToolSource duplicate = new AgentToolSource() {
+                public String getId() { return "plugin.duplicate"; }
+                public AgentToolDescription getDescription() { return DESCRIPTION; }
+                public AgentTool newInstance() { throw new AssertionError("Must not construct duplicate"); }
+            };
+            assertFalse(registry.register(duplicate));
+            assertTrue(registry.listTools().isEmpty());
+            assertTrue(appender.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .anyMatch(message -> message.contains("plugin.broken") && message.contains("plugin.duplicate")));
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
+    @Test
+    public void nullInputIsRejectedBeforeCallingTool() {
+        AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", input -> {
+            throw new AssertionError("Must not execute with null input");
+        })));
+        assertEquals(INVALID_INPUT, registry.execute("test_tool", null).status());
+        assertEquals("Tool input must not be null", registry.execute("test_tool", null).content());
     }
 
     @Test
@@ -111,7 +153,17 @@ public class AgentToolRegistryTest {
             return input;
         })));
         assertEquals(EXECUTION_ERROR, registry.execute("test_tool", "fail").status());
+        assertEquals("Tool execution failed: test_tool: Failure details", registry.execute("test_tool", "fail").content());
         assertEquals(SUCCESS, registry.execute("test_tool", "{}").status());
+    }
+
+    @Test
+    public void failureWithoutMessageIncludesExceptionType() {
+        AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", input -> {
+            throw new IllegalStateException();
+        })));
+        assertEquals("Tool execution failed: test_tool: IllegalStateException",
+                registry.execute("test_tool", "{}").content());
     }
 
     @Test

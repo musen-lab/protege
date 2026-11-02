@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schema targetNamespace="org.protege.ai.core" xmlns="http://www.w3.org/2001/XMLSchema">
-    <annotation><documentation>
-        Declare a tool factory, its unique tool name, description, JSON Schema and result media type.
-        The class must implement org.protege.ai.api.AgentToolFactory and have a public zero-argument constructor.
-    </documentation></annotation>
+    <annotation>
+        <appInfo><meta.schema plugin="org.protege.ai.core" id="AgentTool" name="Agent tool"/></appInfo>
+        <documentation>
+            Declare a tool factory that supplies the tool description and creates a tool for each window.
+            The class must implement org.protege.ai.api.AgentToolFactory and have a public zero-argument constructor.
+        </documentation>
+    </annotation>
     <element name="extension">
         <complexType>
             <sequence>
                 <element ref="class"/>
-                <element ref="name"/>
-                <element ref="description"/>
-                <element ref="inputSchema"/>
-                <element ref="resultFormat"/>
             </sequence>
             <attribute name="point" type="string" use="required"/>
             <attribute name="id" type="string" use="required"/>
@@ -19,8 +18,4 @@
         </complexType>
     </element>
     <element name="class"><complexType><attribute name="value" type="string" use="required"/></complexType></element>
-    <element name="name"><complexType><attribute name="value" type="string" use="required"/></complexType></element>
-    <element name="description"><complexType><attribute name="value" type="string" use="required"/></complexType></element>
-    <element name="inputSchema"><complexType><attribute name="value" type="string" use="required"/></complexType></element>
-    <element name="resultFormat"><complexType><attribute name="value" type="string" use="required"/></complexType></element>
 </schema>

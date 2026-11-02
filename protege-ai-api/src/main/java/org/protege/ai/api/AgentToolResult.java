@@ -2,11 +2,11 @@ package org.protege.ai.api;
 
 import java.util.Objects;
 
-/** Content is the declared result format on success, or a human-readable error message. */
+/** Content follows the tool's result description on success, or explains an error. */
 public record AgentToolResult(Status status, String content) {
 
     public enum Status {
-        SUCCESS, NO_SUCH_TOOL, EXECUTION_ERROR, REGISTRY_CLOSED
+        SUCCESS, NO_SUCH_TOOL, INVALID_INPUT, EXECUTION_ERROR, REGISTRY_CLOSED
     }
 
     public AgentToolResult {

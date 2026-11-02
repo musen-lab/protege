@@ -1,13 +1,13 @@
 package org.protege.ai.api;
 
-/** Metadata available without constructing a tool. inputSchema is a JSON Schema document. */
-public record AgentToolDescription(String name, String description, String inputSchema, String resultFormat) {
+/** inputSchema is JSON Schema; resultDescription explains the output's encoding, fields and meaning. */
+public record AgentToolDescription(String name, String description, String inputSchema, String resultDescription) {
 
     public AgentToolDescription {
         requireText(name, "name");
         requireText(description, "description");
         requireText(inputSchema, "inputSchema");
-        requireText(resultFormat, "resultFormat");
+        requireText(resultDescription, "resultDescription");
     }
 
     private static void requireText(String value, String field) {
