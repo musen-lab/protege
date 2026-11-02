@@ -32,6 +32,8 @@ import java.util.PriorityQueue;
  * Statements are sorted and deduplicated using temporary disk runs. Blank nodes, including
  * RDF list cells, remain separate nodes; literals retain their RDF lexical forms.
  * The renderer and the already-loaded ontology can still allocate memory independently.
+ * Temporary disk usage can reach several gigabytes: Base64 expands records and merge passes
+ * temporarily retain input and output runs; a full disk is reported as a normal save error.
  */
 final class StreamingJsonLdWriter implements Closeable {
 
@@ -60,11 +62,7 @@ final class StreamingJsonLdWriter implements Closeable {
     }
 
     static boolean supports(JsonLdPreferences prefs) {
-        return prefs.getDocumentForm() == DocumentForm.EXPANDED
-                && prefs.getBlankNodeEmbedding() == BlankNodeEmbedding.REFERENCE
-                && prefs.getKeyOrdering() == KeyOrdering.NONE
-                && !prefs.isUseNativeTypes()
-                && prefs.isUseRdfType();
+        return prefs.isLowMemorySavingSupported();
     }
 
     void render(OWLOntology ontology, OWLDocumentFormat format, JsonGenerator output) throws IOException {
@@ -77,20 +75,20 @@ final class StreamingJsonLdWriter implements Closeable {
         RDFNode object = triple.getObject();
         if (object instanceof RDFLiteral) {
             RDFLiteral literal = (RDFLiteral) object;
-            statement("", id(triple.getSubject()), triple.getPredicate().getIRI().toString(), "L",
+            statement(id(triple.getSubject()), triple.getPredicate().getIRI().toString(), "L",
                     literal.getLexicalValue(), literal.isPlainLiteral() ? XSD_STRING : literal.getDatatype().toString(),
                     literal.getLang());
         } else {
-            statement("", id(triple.getSubject()), triple.getPredicate().getIRI().toString(), "I",
+            statement(id(triple.getSubject()), triple.getPredicate().getIRI().toString(), "I",
                     id((RDFResource) object), "", "");
         }
     }
 
-    /** Receives a single RDF statement; graph identifiers are empty for OWL API ontology rendering. */
-    void statement(String graph, String subject, String predicate, String kind, String value,
+    /** Receives a single RDF statement from OWL API ontology rendering (the default graph). */
+    void statement(String subject, String predicate, String kind, String value,
                    String datatype, String language) throws IOException {
         checkCancelled();
-        String line = encode(graph) + '\t' + encode(subject) + '\t' + encode(predicate) + '\t'
+        String line = encode(subject) + '\t' + encode(predicate) + '\t'
                 + kind + '\t' + encode(value) + '\t' + encode(datatype) + '\t' + encode(language);
         buffer.add(line);
         // Account for per-string overhead as well as characters. One RDF term can exceed the budget.
@@ -224,34 +222,14 @@ final class StreamingJsonLdWriter implements Closeable {
         output.writeStartArray();
         if (sorted != null) {
             try (BufferedReader reader = Files.newBufferedReader(sorted, StandardCharsets.UTF_8)) {
-                String graph = null;
                 String subject = null;
                 String predicate = null;
                 String line;
                 while ((line = reader.readLine()) != null) {
                     checkCancelled();
                     String[] fields = line.split("\t", -1);
-                    String nextGraph = decode(fields[0]);
-                    String nextSubject = decode(fields[1]);
-                    String nextPredicate = decode(fields[2]);
-                    if (!nextGraph.equals(graph)) {
-                        if (subject != null) {
-                            output.writeEndArray();
-                            output.writeEndObject();
-                        }
-                        if (graph != null && !graph.isEmpty()) {
-                            output.writeEndArray();
-                            output.writeEndObject();
-                        }
-                        graph = nextGraph;
-                        subject = null;
-                        predicate = null;
-                        if (!graph.isEmpty()) {
-                            output.writeStartObject();
-                            output.writeStringField("@id", graph);
-                            output.writeArrayFieldStart("@graph");
-                        }
-                    }
+                    String nextSubject = decode(fields[0]);
+                    String nextPredicate = decode(fields[1]);
                     if (!nextSubject.equals(subject)) {
                         if (subject != null) {
                             output.writeEndArray();
@@ -270,12 +248,12 @@ final class StreamingJsonLdWriter implements Closeable {
                         output.writeArrayFieldStart(predicate);
                     }
                     output.writeStartObject();
-                    if ("I".equals(fields[3])) {
-                        output.writeStringField("@id", decode(fields[4]));
+                    if ("I".equals(fields[2])) {
+                        output.writeStringField("@id", decode(fields[3]));
                     } else {
-                        output.writeStringField("@value", decode(fields[4]));
-                        String language = decode(fields[6]);
-                        String datatype = decode(fields[5]);
+                        output.writeStringField("@value", decode(fields[3]));
+                        String language = decode(fields[5]);
+                        String datatype = decode(fields[4]);
                         if (!language.isEmpty()) {
                             output.writeStringField("@language", language);
                         } else if (!XSD_STRING.equals(datatype)) {
@@ -285,10 +263,6 @@ final class StreamingJsonLdWriter implements Closeable {
                     output.writeEndObject();
                 }
                 if (subject != null) {
-                    output.writeEndArray();
-                    output.writeEndObject();
-                }
-                if (graph != null && !graph.isEmpty()) {
                     output.writeEndArray();
                     output.writeEndObject();
                 }

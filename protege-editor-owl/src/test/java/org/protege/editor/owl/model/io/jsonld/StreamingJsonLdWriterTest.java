@@ -52,7 +52,7 @@ public class StreamingJsonLdWriterTest {
     }
 
     @Test
-    public void externalMergePreservesGraphsListsCyclesLiteralsAndDeduplicatesAcrossChunks() throws Exception {
+    public void externalMergePreservesListsCyclesLiteralsAndDeduplicatesAcrossChunks() throws Exception {
         List<Statement> statements = new ArrayList<>();
         IRI subject = vf.createIRI("urn:subject");
         IRI predicate = vf.createIRI("urn:values");
@@ -73,9 +73,6 @@ public class StreamingJsonLdWriterTest {
                 vf.createIRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#nil")));
         statements.add(vf.createStatement(vf.createBNode("a"), predicate, vf.createBNode("b")));
         statements.add(vf.createStatement(vf.createBNode("b"), predicate, vf.createBNode("a")));
-        statements.add(vf.createStatement(subject, predicate, vf.createLiteral("named"), vf.createIRI("urn:graph1")));
-        statements.add(vf.createStatement(subject, predicate, vf.createLiteral("other"), vf.createIRI("urn:graph2")));
-        statements.add(vf.createStatement(subject, predicate, vf.createLiteral("blank graph"), vf.createBNode("graph")));
         Collections.reverse(statements);
 
         StringWriter output = new StringWriter();
@@ -247,8 +244,7 @@ public class StreamingJsonLdWriterTest {
         org.eclipse.rdf4j.model.Value value = statement.getObject();
         org.eclipse.rdf4j.model.Literal literal = value instanceof org.eclipse.rdf4j.model.Literal
                 ? (org.eclipse.rdf4j.model.Literal) value : null;
-        writer.statement(statement.getContext() == null ? "" : id(statement.getContext()),
-                id(statement.getSubject()), statement.getPredicate().stringValue(), literal == null ? "I" : "L",
+        writer.statement(id(statement.getSubject()), statement.getPredicate().stringValue(), literal == null ? "I" : "L",
                 literal == null ? id(value) : literal.getLabel(),
                 literal == null ? "" : literal.getDatatype().stringValue(),
                 literal == null ? "" : literal.getLanguage().orElse(""));

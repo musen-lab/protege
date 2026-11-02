@@ -136,6 +136,21 @@ public class JsonLdPreferences {
     }
 
     /**
+     * Whether these settings allow incremental expanded output instead of whole-document processing.
+     * Context-only options and pretty printing do not affect this choice.
+     *
+     * @return true for expanded form, referenced blank nodes, no key ordering, exact typed values,
+     *         and rdf:type as a normal property
+     */
+    public boolean isLowMemorySavingSupported() {
+        return getDocumentForm() == DocumentForm.EXPANDED
+                && getBlankNodeEmbedding() == BlankNodeEmbedding.REFERENCE
+                && getKeyOrdering() == KeyOrdering.NONE
+                && !isUseNativeTypes()
+                && isUseRdfType();
+    }
+
+    /**
      * Loads the settings from the store. Missing or no longer valid values fall back to the defaults.
      */
     public synchronized void load() {

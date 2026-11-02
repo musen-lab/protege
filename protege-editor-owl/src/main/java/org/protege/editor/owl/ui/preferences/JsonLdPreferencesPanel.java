@@ -25,6 +25,7 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
     // Preset & Actions
     private JComboBox<JsonLdPreset> presetComboBox;
     private JButton resetButton;
+    private JLabel lowMemoryStatus;
 
     // Context & Prefixes
     private JCheckBox includeOntologyPrefixesCheckBox;
@@ -83,6 +84,14 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         presetPanel.add(presetComboBox);
         presetPanel.add(resetButton);
         panel.addGroupComponent(presetPanel);
+        panel.addGroupComponent(new JLabel("<html>Large ontologies: use Expanded (low memory).<br>"
+                + "Other presets process the whole document in memory; memory needs grow with ontology size.</html>"));
+        lowMemoryStatus = new JLabel();
+        lowMemoryStatus.setName("lowMemoryStatus");
+        panel.addGroupComponent(lowMemoryStatus);
+        panel.addGroupComponent(new JLabel("<html>Low-memory saving requires: Expanded; blank nodes Reference; key ordering None;<br>"
+                + "native numbers/booleans off; rdf:type as a normal property on.</html>"));
+
 
         // --- Context & Prefixes ---
         panel.addSeparator();
@@ -322,6 +331,18 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         indentSpacesSpinner.setEnabled(prettyPrintCheckBox.isSelected());
         // Flattened files are never nested
         blankNodeEmbeddingButtons.setEnabled(form != DocumentForm.FLATTENED);
+
+        JsonLdPreferences selected = JsonLdPreferences.ofPreset(JsonLdPreset.CUSTOM);
+        selected.setDocumentForm(form);
+        selected.setBlankNodeEmbedding(blankNodeEmbeddingButtons.getSelectedValue());
+        selected.setKeyOrdering(keyOrderingButtons.getSelectedValue());
+        selected.setUseNativeTypes(useNativeTypesCheckBox.isSelected());
+        selected.setUseRdfType(useRdfTypeCheckBox.isSelected());
+        lowMemoryStatus.setText(selected.isLowMemorySavingSupported()
+                ? "<html>Low-memory saving enabled. RDF lists use rdf:first/rdf:rest links.</html>"
+                : "<html>Low-memory saving disabled. The whole document is processed in memory;<br>"
+                        + "RDF lists use @list.</html>");
+
     }
 
     @Override

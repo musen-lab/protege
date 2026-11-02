@@ -97,6 +97,37 @@ public class JsonLdPreferencesPanelTest {
     }
 
     @Test
+    public void lowMemoryStatusTracksEveryCompatibilitySettingBeforeApply() {
+        Runnable[] incompatibleChanges = {
+                () -> selectChoice(JsonLdPreferences.KEY_DOCUMENT_FORM, DocumentForm.COMPACTED),
+                () -> selectChoice(JsonLdPreferences.KEY_BLANK_NODE_EMBEDDING, BlankNodeEmbedding.EMBED_ONCE),
+                () -> selectChoice(JsonLdPreferences.KEY_KEY_ORDERING, KeyOrdering.KEYWORDS_FIRST),
+                () -> checkBox(JsonLdPreferences.KEY_USE_NATIVE_TYPES).doClick(0),
+                () -> checkBox(JsonLdPreferences.KEY_USE_RDF_TYPE).doClick(0)
+        };
+        JLabel status = control("lowMemoryStatus");
+        for (Runnable change : incompatibleChanges) {
+            combo(JsonLdPreferences.KEY_ACTIVE_PRESET).setSelectedItem(JsonLdPreset.EXPANDED);
+            assertTrue(status.getText().contains("Low-memory saving enabled"));
+            assertTrue(status.getText().contains("rdf:first/rdf:rest"));
+            change.run();
+            assertTrue(status.getText().contains("Low-memory saving disabled"));
+            assertTrue(status.getText().contains("@list"));
+            assertEquals("Editing the panel must not apply settings", DocumentForm.COMPACTED, prefs.getDocumentForm());
+        }
+    }
+
+    @Test
+    public void formattingChangesKeepLowMemorySavingEnabled() {
+        combo(JsonLdPreferences.KEY_ACTIVE_PRESET).setSelectedItem(JsonLdPreset.EXPANDED);
+        checkBox(JsonLdPreferences.KEY_PRETTY_PRINT).doClick(0);
+        assertTrue(((JLabel) control("lowMemoryStatus")).getText().contains("Low-memory saving enabled"));
+        checkBox(JsonLdPreferences.KEY_PRETTY_PRINT).doClick(0);
+        ((JSpinner) control(JsonLdPreferences.KEY_INDENT_SPACES)).setValue(4);
+        assertTrue(((JLabel) control("lowMemoryStatus")).getText().contains("Low-memory saving enabled"));
+    }
+
+    @Test
     public void showsAllSixteenSettings() {
         for (String key : SETTING_KEYS) {
             assertNotNull(control(key));
