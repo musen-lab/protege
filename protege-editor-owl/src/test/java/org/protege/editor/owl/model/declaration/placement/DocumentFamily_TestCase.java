@@ -59,7 +59,6 @@ public class DocumentFamily_TestCase {
     }
 
     private static OWLOntologyID id(String iri) {
-        return new OWLOntologyID(com.google.common.base.Optional.of(IRI.create(iri)),
-                com.google.common.base.Optional.absent());
+        return new OWLOntologyID(IRI.create(iri));
     }
 }

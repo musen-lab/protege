@@ -153,8 +153,8 @@ public class MisplacedHeuristic_TestCase {
         OWLOntologyManager m = OWLManager.createOWLOntologyManager();
         OWLDataFactory df = m.getOWLDataFactory();
         OWLOntology o = m.createOntology(new OWLOntologyID(
-                com.google.common.base.Optional.of(IRI.create("http://example.org/versioned")),
-                com.google.common.base.Optional.of(IRI.create("http://example.org/versioned/2026-09-09"))));
+                IRI.create("http://example.org/versioned"),
+                IRI.create("http://example.org/versioned/2026-09-09")));
         OWLClass a = df.getOWLClass(IRI.create("http://example.org/versioned#A"));
         m.addAxiom(o, df.getOWLDeclarationAxiom(a));
 

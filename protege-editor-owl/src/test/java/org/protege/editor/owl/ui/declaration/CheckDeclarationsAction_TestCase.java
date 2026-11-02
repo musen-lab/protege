@@ -227,11 +227,7 @@ public class CheckDeclarationsAction_TestCase {
     private void fireContent(OWLOntologyChange change) throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             ontologies.applyChange(change);
-            try {
-                contentListener.ontologiesChanged(Collections.singletonList(change));
-            } catch (OWLException ex) {
-                throw new AssertionError(ex);
-            }
+            contentListener.ontologiesChanged(Collections.singletonList(change));
         });
     }
 
