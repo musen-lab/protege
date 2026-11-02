@@ -69,6 +69,44 @@ public class OboUtilities {
         return IRI.create(OBO_LIBRARY_IRI_BASE + matchResult.group(ID_SPACE_GROUP) + "_" + matchResult.group(LOCAL_ID_GROUP));
     }
 
+    /**
+     * Gets the ID space from an OBO IRI. For example, the ID space in
+     * {@code http://purl.obolibrary.org/obo/GO_0001234} is {@code GO}.
+     *
+     * @param iri the IRI to read
+     * @return the ID space, or an empty value if the IRI does not end with an OBO ID
+     */
+    @Nonnull
+    public static Optional<String> getOboIdSpaceFromIri(@Nonnull IRI iri) {
+        String iriString = checkNotNull(iri).toString();
+        if(!endsWithLocalId(iriString)) {
+            return Optional.empty();
+        }
+        Matcher matcher = OBO_ID_IRI_PATTERN.matcher(iriString);
+        if(!matcher.find()) {
+            return Optional.empty();
+        }
+        return Optional.of(matcher.group(ID_SPACE_GROUP));
+    }
+
+    private static boolean endsWithLocalId(String value) {
+        int firstDigit = value.length();
+        while(firstDigit > 0 && isAsciiDigit(value.charAt(firstDigit - 1))) {
+            firstDigit--;
+        }
+        return firstDigit < value.length() && firstDigit > 0 && value.charAt(firstDigit - 1) == '_';
+    }
+
+    private static boolean isAsciiDigit(char c) {
+        return c >= '0' && c <= '9';
+    }
+
+    /**
+     * Gets the OBO ID from an IRI.
+     *
+     * @param iri the IRI to read
+     * @return the OBO ID, or an empty value if the IRI does not end with an OBO ID
+     */
     @Nonnull
     public static Optional<String> getOboIdFromIri(@Nonnull IRI iri) {
         String iriString = iri.toString();

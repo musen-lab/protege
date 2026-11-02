@@ -1,0 +1,9 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ex: <http://import-test.invalid/formats/> .
+
+ex:x rdfs:label """text \"""
+<http://evil.example/x> a owl:Ontology .
+""" .
+
+<http://import-test.invalid/formats/escaped-quote> a owl:Ontology .

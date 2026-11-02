@@ -1,0 +1,6 @@
+Prefix(owl:=<http://www.w3.org/2002/07/owl#>)
+Ontology(<http://import-test.invalid/versioned/ofn>
+<http://import-test.invalid/versioned/ofn/1.0>
+
+Declaration(Class(<http://import-test.invalid/versioned/ofn#C>))
+)
