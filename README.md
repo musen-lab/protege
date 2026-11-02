@@ -6,6 +6,8 @@ The `protege-6` branch contains development work for Protégé 6. It is under ac
 
 Maintainers should follow the [Protégé 6 release guide](RELEASING.md) when publishing Maven artifacts and creating a release.
 
+Building this branch requires JDK 25 or newer and Maven 3.8.1 or newer. Set `JAVA_HOME` to the JDK installation before running Maven.
+
 [Protégé](https://protege.stanford.edu) is a free, open-source ontology editor that supports the latest [OWL 2.0 standard](http://www.w3.org/TR/owl2-overview/). Protégé has a pluggable architecture, and many [plugins](https://protegewiki.stanford.edu/wiki/Protege_Plugin_Library) for different functionalities are available.
 
 To read more about **Protégé's features**, please visit the Protégé [home page](https://protege.stanford.edu).
