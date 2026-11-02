@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.0"?>
+<plugin>
+    <extension id="OntologyCounts" point="org.protege.ai.core.AgentTool">
+        <class value="org.protege.ai.example.OntologyCountsToolFactory"/>
+        <name value="example_ontology_counts"/>
+        <description value="Count asserted classes and axioms in the active ontology, excluding imports."/>
+        <inputSchema value="{&quot;type&quot;:&quot;object&quot;,&quot;properties&quot;:{},&quot;additionalProperties&quot;:false}"/>
+        <resultFormat value="application/json"/>
+    </extension>
+</plugin>

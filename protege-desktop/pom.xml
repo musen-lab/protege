@@ -26,6 +26,12 @@
 		
 		<!-- edu.stanford.protege dependency list -->
 
+        <dependency>
+            <groupId>edu.stanford.protege</groupId>
+            <artifactId>protege-ai-core</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+
 		<dependency>
 			<groupId>edu.stanford.protege</groupId>
 			<artifactId>protege-common</artifactId>
