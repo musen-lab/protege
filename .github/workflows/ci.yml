@@ -48,16 +48,22 @@ jobs:
       - name: Install virtual display
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --yes xvfb
-      - name: Start Linux distribution and load Pizza
+      - name: Start Linux distribution through run.sh and load Pizza
         if: runner.os == 'Linux'
         run: xvfb-run --auto-servernum python .github/scripts/check-bundled-startup.py linux
-      - name: Start Windows distribution and load Pizza
+      - name: Start Windows distribution through run.bat and load Pizza
         if: runner.os == 'Windows'
         run: python .github/scripts/check-bundled-startup.py win
+      - name: Start native Linux launcher and load Pizza
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum python .github/scripts/check-bundled-startup.py linux --launcher native
+      - name: Start native Windows launcher and load Pizza
+        if: runner.os == 'Windows'
+        run: python .github/scripts/check-bundled-startup.py win --launcher native
       - name: Upload startup logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: bundled-startup-${{ matrix.platform }}
-          path: protege-desktop/target/startup-check/*.log
+          path: protege-desktop/target/startup-check/*/*.log
           if-no-files-found: warn

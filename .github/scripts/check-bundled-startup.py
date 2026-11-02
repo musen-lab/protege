@@ -23,6 +23,7 @@ def read_log(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("platform", choices=("linux", "win"))
+    parser.add_argument("--launcher", choices=("script", "native"), default="script")
     args = parser.parse_args()
     windows = args.platform == "win"
     if windows != (os.name == "nt"):
@@ -34,8 +35,8 @@ def main():
     archives = list(target.glob(f"protege-*-{args.platform}.{extension}"))
     if len(archives) != 1:
         raise RuntimeError(f"Expected one distribution archive, found {archives}")
-    output = target / "startup-check"
-    output.mkdir(exist_ok=True)
+    output = target / "startup-check" / args.launcher
+    output.mkdir(parents=True, exist_ok=True)
     # Refuse to reuse a previous extraction or preference directory.
     extracted = output / "distribution"
     extracted.mkdir()
@@ -45,7 +46,10 @@ def main():
     else:
         with tarfile.open(archives[0]) as archive:
             archive.extractall(extracted, filter="data")
-    launcher_name = "run.bat" if windows else "run.sh"
+    if args.launcher == "native":
+        launcher_name = "Protege.exe" if windows else "protege"
+    else:
+        launcher_name = "run.bat" if windows else "run.sh"
     launchers = list(extracted.glob(f"*/{launcher_name}"))
     if len(launchers) != 1:
         raise RuntimeError(f"Expected one packaged launcher, found {launchers}")
@@ -70,7 +74,11 @@ def main():
     # the ontology this way so paths with spaces do not depend on shell quoting.
     env["JAVA_TOOL_OPTIONS"] = (f'-Duser.home="{test_home.as_posix()}" '
                                 f'-Dcommand.line.arg.0="{ontology.as_posix()}"')
-    command = ["cmd.exe", "/d", "/c", launcher_name] if windows else ["./run.sh"]
+    if windows and args.launcher == "script":
+        command = ["cmd.exe", "/d", "/c", launcher_name]
+    else:
+        command = [str(launchers[0])]
+    print(f"Checking packaged launcher: {launchers[0]}", flush=True)
     console_log = output / "console.log"
     application_log = test_home / ".Protege/logs/protege.log"
     ready_since = None
@@ -94,7 +102,8 @@ def main():
                 if ready and ready_since is None:
                     ready_since = time.monotonic()
                 if ready_since is not None and time.monotonic() - ready_since >= 10:
-                    print("PASS: packaged Java 25 started, loaded Pizza, and remained running for 10 seconds")
+                    print(f"PASS: {launcher_name} started packaged Java 25, loaded Pizza, "
+                          "and remained running for 10 seconds")
                     return
                 time.sleep(1)
             raise TimeoutError("Pizza did not finish loading within 120 seconds")
