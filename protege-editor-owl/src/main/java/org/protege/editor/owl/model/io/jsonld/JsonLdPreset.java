@@ -12,7 +12,11 @@ public enum JsonLdPreset {
     /** Favor stable, compact diffs for version control. */
     DIFF_FRIENDLY("Diff-friendly", "Small, stable changes in version control"),
     /** Stream full IRIs and typed literals with separate blank nodes and RDF list links. */
-    EXPANDED("Expanded (low memory)", "Full IRIs, exact typed literals, separate blank nodes and RDF list links"),
+    EXPANDED("Expanded (low memory)", "<html>Uses temporary disk files to reduce additional save memory.<br>"
+            + "Full IRIs, exact typed literals, separate blank nodes and RDF list links.<br>"
+            + "Requires Expanded, referenced blank nodes, no key ordering,<br>"
+            + "native values off and rdf:type as a normal property.<br>"
+            + "The loaded ontology still needs memory; other settings may require whole-document processing.</html>"),
     /** Keep values chosen individually in the preferences panel. */
     CUSTOM("Custom", "Customized configuration");
 
