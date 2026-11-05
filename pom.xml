@@ -88,6 +88,9 @@
 		<module>protege-common</module>
 		<module>protege-editor-core</module>
 		<module>protege-editor-owl</module>
+		<module>protege-ai-api</module>
+		<module>protege-ai-core</module>
+		<module>protege-ai-example</module>
 		<module>protege-desktop</module>
 	</modules>
 	

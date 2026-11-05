@@ -1,5 +1,6 @@
 package org.protege.editor.owl.model.declaration;
 
+import com.google.common.collect.ArrayListMultimap;
 import org.junit.Test;
 import org.semanticweb.owlapi.formats.FunctionalSyntaxDocumentFormat;
 import org.semanticweb.owlapi.formats.LatexDocumentFormat;
@@ -13,11 +14,13 @@ import org.semanticweb.owlapi.formats.RioTurtleDocumentFormat;
 import org.semanticweb.owlapi.formats.TurtleDocumentFormat;
 import org.semanticweb.owlapi.io.OWLOntologyLoaderMetaData;
 import org.semanticweb.owlapi.io.RDFParserMetaData;
+import org.semanticweb.owlapi.io.RDFOntologyHeaderStatus;
 import org.semanticweb.owlapi.model.OWLDocumentFormat;
 import org.semanticweb.owlapi.util.StringComparator;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -117,7 +120,7 @@ public class SaveFormatResolver_TestCase {
             source.setPrefix("ex:", "http://example.invalid/ex#");
 
             PrefixDocumentFormat copy = SUPPRESSING_DECLARATIONS.getSaveFormat(source)
-                    .asPrefixOWLOntologyFormat();
+                    .asPrefixOWLDocumentFormat();
             assertThat(copy.getPrefix("ex:"), is("http://example.invalid/ex#"));
         }
     }
@@ -129,7 +132,7 @@ public class SaveFormatResolver_TestCase {
             source.setDefaultPrefix("http://example.invalid/default#");
 
             PrefixDocumentFormat copy = SUPPRESSING_DECLARATIONS.getSaveFormat(source)
-                    .asPrefixOWLOntologyFormat();
+                    .asPrefixOWLDocumentFormat();
             assertThat(copy.getDefaultPrefix(), is("http://example.invalid/default#"));
         }
     }
@@ -141,7 +144,7 @@ public class SaveFormatResolver_TestCase {
             source.setPrefixComparator(reverseOrder);
 
             PrefixDocumentFormat copy = SUPPRESSING_DECLARATIONS.getSaveFormat(source)
-                    .asPrefixOWLOntologyFormat();
+                    .asPrefixOWLDocumentFormat();
             assertThat(copy.getPrefixComparator(), is(sameInstance(reverseOrder)));
         }
     }
@@ -168,13 +171,14 @@ public class SaveFormatResolver_TestCase {
 
     @Test
     public void shouldCopyTheOntologyLoaderMetaData() {
-        OWLOntologyLoaderMetaData metaData = new RDFParserMetaData();
+        OWLOntologyLoaderMetaData metaData = new RDFParserMetaData(
+                RDFOntologyHeaderStatus.PARSED_ONE_HEADER, 0, Collections.emptySet(), ArrayListMultimap.create());
         for (OWLDocumentFormat format : supportedFormats()) {
             format.setOntologyLoaderMetaData(metaData);
 
             OWLDocumentFormat copy = SUPPRESSING_DECLARATIONS.getSaveFormat(format);
             assertThat(format.getClass().getSimpleName(),
-                    copy.getOntologyLoaderMetaData(), is(sameInstance(metaData)));
+                    copy.getOntologyLoaderMetaData().orElseThrow(), is(sameInstance(metaData)));
         }
     }
 
@@ -219,8 +223,8 @@ public class SaveFormatResolver_TestCase {
     private static List<PrefixDocumentFormat> prefixFormats() {
         List<PrefixDocumentFormat> prefixFormats = new ArrayList<>();
         for (OWLDocumentFormat format : supportedFormats()) {
-            if (format.isPrefixOWLOntologyFormat()) {
-                prefixFormats.add(format.asPrefixOWLOntologyFormat());
+            if (format.isPrefixOWLDocumentFormat()) {
+                prefixFormats.add(format.asPrefixOWLDocumentFormat());
             }
         }
         return prefixFormats;

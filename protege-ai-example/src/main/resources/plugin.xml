@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.0"?>
+<plugin>
+    <extension id="OntologyCounts" point="org.protege.ai.core.AgentTool">
+        <class value="org.protege.ai.example.OntologyCountsToolFactory"/>
+    </extension>
+</plugin>
