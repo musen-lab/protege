@@ -48,7 +48,13 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
         sources.forEach(this::register);
     }
 
-    /** Also works from another editor-kit hook, whose initialization order is unspecified. */
+    /**
+     * Returns the window's registry, creating it if necessary.
+     * Call on the Swing thread, normally from an editor-kit hook's {@code initialise()},
+     * and keep the returned reference for later use.
+     * The editor kit forwards put/get to the model manager's unsynchronized map,
+     * which Protégé writes on the Swing thread.
+     */
     public static AgentToolRegistry getRegistry(OWLEditorKit editorKit) {
         Objects.requireNonNull(editorKit);
         synchronized (REGISTRY_CREATION_LOCK) {
@@ -127,7 +133,9 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
             Thread.currentThread().interrupt();
             logger.warn("Tool '{}' from '{}' interrupted", name, entry.sourceId, e);
             return executionError("Tool interrupted: " + name, e);
-        } catch (Exception | LinkageError e) {
+        } catch (VirtualMachineError e) {
+            throw e;
+        } catch (Throwable e) {
             logger.warn("Tool '{}' from '{}' failed", name, entry.sourceId, e);
             return executionError("Tool execution failed: " + name, e);
         } finally {

@@ -9,6 +9,11 @@ The editor modules do not depend on these AI modules.
 
 ## Calling tools
 
+Call `getRegistry` on the Swing thread, normally from an editor-kit hook's
+`initialise()`, and keep the returned reference for later calls.
+The editor kit forwards put/get to the model manager's unsynchronized map, which
+Protégé writes on the Swing thread.
+
 ```java
 ToolRegistry registry = AgentToolRegistry.getRegistry(editorKit);
 List<AgentToolDescription> tools = registry.listTools();
@@ -54,9 +59,10 @@ cleanup. A call that never returns delays its tool's cleanup indefinitely. Closi
 does not cancel work or keep the editor kit and ontology context alive.
 
 Unknown names return `NO_SUCH_TOOL`; null input returns `INVALID_INPUT` without
-invoking a tool. Tool exceptions return `EXECUTION_ERROR` with their message (or
-exception type when no message exists); stack traces stay in the log. Interrupted
-calls preserve the thread's interrupt flag.
+invoking a tool. Tool failures return `EXECUTION_ERROR` with their message (or
+failure type when no message exists), except `VirtualMachineError`, which is
+rethrown. Stack traces stay in the log. Interrupted calls preserve the thread's
+interrupt flag.
 
 Input schemas are metadata in this first implementation. Shared schema validation,
 thread scheduling, timeouts, and cancellation belong to #56. There is no rollback

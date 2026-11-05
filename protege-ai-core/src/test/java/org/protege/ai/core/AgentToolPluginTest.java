@@ -81,6 +81,7 @@ public class AgentToolPluginTest {
         TestFactory.tools.set(0);
         TestFactory.disposed.set(0);
         var extension = TestPluginRuntime.extension("test.lifecycle", TestFactory.class.getName());
+        // Stands in for the model manager's object map, to which the real OWLEditorKit forwards put/get.
         Map<Object, Disposable> objects = new HashMap<>();
         OWLEditorKit kit = mock(OWLEditorKit.class);
         when(kit.get(any())).thenAnswer(call -> objects.get(call.getArgument(0)));

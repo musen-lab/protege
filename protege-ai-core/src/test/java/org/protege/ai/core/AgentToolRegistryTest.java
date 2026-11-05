@@ -158,6 +158,35 @@ public class AgentToolRegistryTest {
     }
 
     @Test
+    public void assertionErrorReturnsAnErrorAndReleasesTheCall() {
+        AtomicInteger disposed = new AtomicInteger();
+        AgentTool tool = new AgentTool() {
+            public String execute(String input) { throw new AssertionError("Broken tool assumption"); }
+            public void dispose() { disposed.incrementAndGet(); }
+        };
+        AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", tool)));
+        var result = registry.execute("test_tool", "{}");
+        assertEquals(EXECUTION_ERROR, result.status());
+        assertEquals("Tool execution failed: test_tool: Broken tool assumption", result.content());
+        registry.dispose();
+        assertEquals(1, disposed.get());
+    }
+
+    @Test
+    public void virtualMachineErrorPropagatesAndReleasesTheCall() {
+        VirtualMachineError failure = new InternalError("Simulated VM failure");
+        AtomicInteger disposed = new AtomicInteger();
+        AgentTool tool = new AgentTool() {
+            public String execute(String input) { throw failure; }
+            public void dispose() { disposed.incrementAndGet(); }
+        };
+        AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", tool)));
+        assertSame(failure, assertThrows(VirtualMachineError.class, () -> registry.execute("test_tool", "{}")));
+        registry.dispose();
+        assertEquals(1, disposed.get());
+    }
+
+    @Test
     public void failureWithoutMessageIncludesExceptionType() {
         AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", input -> {
             throw new IllegalStateException();

@@ -30,6 +30,8 @@ To add your own tool, depend on `protege-ai-api`, implement `AgentToolFactory`, 
 declare an extension following this plugin's `src/main/resources/plugin.xml`.
 Keep the name, input schema, and result description in the factory's
 `getDescription()` method; the XML only identifies the factory class.
+Each extension gets a new factory instance per window, so factory instance fields
+are separate while static fields are shared across windows.
 The factory receives an editor kit and can inject a model manager or an ontology
 supplier into the tool. The tool implements `AgentTool`; listener setup and cleanup
 belong in `initialise` and `dispose`.
