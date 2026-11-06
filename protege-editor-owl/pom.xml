@@ -90,6 +90,33 @@
 			<scope>provided</scope>
 		</dependency>
 
+		<!-- JSON-LD processing for the configurable JSON-LD storer. Same version as bundled inside the OWL API,
+		     which does not export it. Jackson, HttpClient and slf4j come from this module / Protégé instead. -->
+		<dependency>
+			<groupId>com.github.jsonld-java</groupId>
+			<artifactId>jsonld-java</artifactId>
+			<version>0.13.6</version>
+			<scope>provided</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.apache.httpcomponents</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.slf4j</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>commons-io</groupId>
+					<artifactId>commons-io</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
 		<dependency>
 		    <groupId>com.googlecode.mdock</groupId>
 		    <artifactId>mdock</artifactId>
@@ -115,6 +142,14 @@
 		<dependency>
 			<groupId>org.apache.httpcomponents</groupId>
 			<artifactId>httpclient</artifactId>
+			<version>4.5.14</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<!-- Needed by jsonld-java: its default document loader refers to these classes as soon as it is used. -->
+		<dependency>
+			<groupId>org.apache.httpcomponents</groupId>
+			<artifactId>httpclient-cache</artifactId>
 			<version>4.5.14</version>
 			<scope>provided</scope>
 		</dependency>
@@ -213,6 +248,17 @@
 						<Import-Package>
 							org.eclipse.core.runtime;registry=split,
 							javax.inject.*;version=1.0,
+							<!-- Optional cache back ends of httpclient-cache; jsonld-java uses neither. -->
+							net.sf.ehcache;resolution:=optional,
+							net.spy.memcached;resolution:=optional,
+							<!-- Platform probes inside the Guava copy that jsonld-java shades. -->
+							android.os;resolution:=optional,
+							com.google.appengine.api;resolution:=optional,
+							com.google.appengine.api.utils;resolution:=optional,
+							com.google.apphosting.api;resolution:=optional,
+							com.google.errorprone.annotations;resolution:=optional,
+							com.google.errorprone.annotations.concurrent;resolution:=optional,
+							sun.misc;resolution:=optional,
 							*
 						</Import-Package>
 					</instructions>

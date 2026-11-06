@@ -1,5 +1,6 @@
 package org.protege.editor.owl.model.library.folder;
 
+import org.protege.editor.owl.model.OntologyManagerFactory;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.*;
 
@@ -16,6 +17,7 @@ public class OntologyNameAlgorithm implements Algorithm {
 		try {
 			final IRI iri = IRI.create(f);
 			OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
+			OntologyManagerFactory.addJsonLdSupport(manager);
 			manager.addIRIMapper(ontologyIRI -> {
                 if (ontologyIRI.equals(iri)) {
                     return IRI.create(f);
