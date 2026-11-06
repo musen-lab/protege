@@ -5,9 +5,9 @@ package org.protege.editor.owl.model.io.jsonld;
  */
 public enum TermNameSource {
     /** Use the final component of the entity IRI. */
-    LOCAL_NAME("IRI Local Name (Deterministic)"),
+    LOCAL_NAME("IRI local name"),
     /** Prefer an English or untagged {@code rdfs:label}, falling back to the IRI local name. */
-    RDFS_LABEL("rdfs:label (Prefers English or default language)");
+    RDFS_LABEL("rdfs:label (prefers English or untagged labels)");
 
     private final String description;
 

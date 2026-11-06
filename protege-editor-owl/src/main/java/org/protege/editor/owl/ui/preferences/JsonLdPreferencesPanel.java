@@ -88,7 +88,7 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         panel.addSeparator();
         panel.addGroup("Context & Prefixes");
         includeOntologyPrefixesCheckBox = new JCheckBox("Include the ontology's prefixes in @context");
-        pruneUnusedPrefixesCheckBox = new JCheckBox("Leave out prefixes that nothing in the file uses");
+        pruneUnusedPrefixesCheckBox = new JCheckBox("Omit unused prefixes");
         useVocabCheckBox = new JCheckBox("Use the default prefix for @vocab and relative IRIs");
         generateTermsForButtons = new EnumRadioButtons<>(GenerateTermsFor.values());
         termNameSourceButtons = new EnumRadioButtons<>(TermNameSource.values());
@@ -97,9 +97,14 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         panel.addGroupComponent(includeOntologyPrefixesCheckBox);
         panel.addGroupComponent(pruneUnusedPrefixesCheckBox);
         panel.addGroupComponent(useVocabCheckBox);
+        panel.addHelpText("<html>Use the ontology’s default prefix as the vocabulary namespace and, where possible,<br>"
+                + "write IRIs relative to it.</html>");
         addChoiceGroup(panel, "Short names for", generateTermsForButtons);
+        panel.addHelpText("<html>Generate names in @context so selected entities can use short names instead of<br>"
+                + "full or prefixed IRIs.</html>");
         addChoiceGroup(panel, "Short name source", termNameSourceButtons);
         addChoiceGroup(panel, "Name collisions", termCollisionPolicyButtons);
+        panel.addHelpText("Choose what happens when multiple entities have the same short name.");
 
         // --- Output Shape & Formatting ---
         panel.addSeparator();
@@ -117,8 +122,12 @@ public class JsonLdPreferencesPanel extends OWLPreferencesPanel {
         indentPanel.add(indentSpacesSpinner);
 
         addChoiceGroup(panel, "File shape", documentFormButtons);
+        // The empty row adds 8 px of layout insets to the group's existing 4 px gap.
+        panel.addGroupComponent((JComponent) Box.createVerticalStrut(0));
         panel.addGroupComponent(compactArraysCheckBox);
         addChoiceGroup(panel, "Key ordering", keyOrderingButtons);
+        // The empty row adds 8 px of layout insets to the group's existing 4 px gap.
+        panel.addGroupComponent((JComponent) Box.createVerticalStrut(0));
         panel.addGroupComponent(prettyPrintCheckBox);
         panel.addIndentedGroupComponent(indentPanel);
 

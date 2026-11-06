@@ -6,9 +6,9 @@ package org.protege.editor.owl.model.io.jsonld;
  */
 public enum TypeCoercionMode {
     /** Keep link values as JSON-LD objects containing {@code @id}. */
-    NONE("Off: links are written as {\"@id\": ...}"),
+    NONE("Objects: {\"@id\": \"…\"}"),
     /** Write links as IRI strings under terms with {@code @type: @id}. */
-    ID("On: object properties and OWL links are plain IRI strings");
+    ID("IRI strings: \"…\"");
 
     private final String description;
 

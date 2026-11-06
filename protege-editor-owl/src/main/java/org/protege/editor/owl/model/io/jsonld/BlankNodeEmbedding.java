@@ -5,7 +5,7 @@ package org.protege.editor.owl.model.io.jsonld;
  */
 public enum BlankNodeEmbedding {
     /** Inline a blank node when it has a single reference and doing so would not create a cycle. */
-    EMBED_ONCE("Put inside the thing that uses them"),
+    EMBED_ONCE("Embed where used"),
     /** Keep blank nodes as separate graph nodes with identifier references. */
     REFERENCE("Keep as separate nodes");
 
