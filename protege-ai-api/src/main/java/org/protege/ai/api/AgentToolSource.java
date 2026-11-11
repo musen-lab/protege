@@ -1,11 +1,11 @@
 package org.protege.ai.api;
 
-/** Supplies a description and a fresh instance. Tests can supply this without a plugin runtime. */
-public interface AgentToolSource {
+/** Supplies a definition and a fresh instance. Tests can supply this without a plugin runtime. */
+public interface AgentToolSource<I, O> {
 
     String getId();
 
-    AgentToolDescription getDescription();
+    AgentToolDefinition<I, O> getDefinition();
 
-    AgentTool newInstance() throws Exception;
+    AgentTool<I, O> newInstance() throws Exception;
 }

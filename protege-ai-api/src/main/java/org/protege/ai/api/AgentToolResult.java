@@ -2,7 +2,7 @@ package org.protege.ai.api;
 
 import java.util.Objects;
 
-/** Content follows the tool's result description on success, or explains an error. */
+/** Content is the serialized JSON result on success, or explains an error. */
 public record AgentToolResult(Status status, String content) {
 
     public enum Status {

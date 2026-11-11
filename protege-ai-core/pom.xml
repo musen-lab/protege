@@ -15,6 +15,21 @@
             <artifactId>protege-ai-api</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <dependency><groupId>junit</groupId><artifactId>junit</artifactId><scope>test</scope></dependency>
         <dependency><groupId>org.mockito</groupId><artifactId>mockito-core</artifactId><scope>test</scope></dependency>
     </dependencies>
@@ -27,7 +42,9 @@
                 <configuration>
                     <instructions>
                         <Bundle-SymbolicName>org.protege.ai.core;singleton:=true</Bundle-SymbolicName>
+                        <Embed-Dependency>*;scope=provided;inline=!*module-info.class</Embed-Dependency>
                         <Export-Package>org.protege.ai.core.*</Export-Package>
+                        <_exportcontents>com.fasterxml.jackson.annotation</_exportcontents>
                         <Import-Package>org.eclipse.core.runtime;registry="split",*</Import-Package>
                     </instructions>
                 </configuration>

@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 /** A small read-only example, counting asserted content in the active ontology only. */
-public final class OntologyCountsTool implements AgentTool {
+public final class OntologyCountsTool implements AgentTool<OntologyCountsArguments, OntologyCountsResult> {
 
     private final Supplier<OWLOntology> activeOntology;
 
@@ -17,10 +17,10 @@ public final class OntologyCountsTool implements AgentTool {
     }
 
     @Override
-    public String execute(String input) {
+    public OntologyCountsResult execute(OntologyCountsArguments arguments) {
         // Resolve once per call, so changing the active ontology does not leave a stale reference.
         OWLOntology ontology = Objects.requireNonNull(activeOntology.get(), "No active ontology");
-        return "{\"classCount\":" + ontology.getClassesInSignature(Imports.EXCLUDED).size()
-                + ",\"axiomCount\":" + ontology.getAxiomCount(Imports.EXCLUDED) + "}";
+        return new OntologyCountsResult(ontology.getClassesInSignature(Imports.EXCLUDED).size(),
+                ontology.getAxiomCount(Imports.EXCLUDED));
     }
 }

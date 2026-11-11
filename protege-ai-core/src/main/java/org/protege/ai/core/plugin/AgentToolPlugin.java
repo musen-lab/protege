@@ -5,7 +5,7 @@ import org.protege.ai.api.AgentToolSource;
 import org.protege.editor.core.plugin.ProtegePlugin;
 
 /** A plugin descriptor, not an instantiated tool. */
-public interface AgentToolPlugin extends AgentToolSource, ProtegePlugin<AgentTool> {
+public interface AgentToolPlugin<I, O> extends AgentToolSource<I, O>, ProtegePlugin<AgentTool<I, O>> {
     String PLUGIN_ID = "org.protege.ai.core";
     String EXTENSION_POINT_ID = "AgentTool";
 }

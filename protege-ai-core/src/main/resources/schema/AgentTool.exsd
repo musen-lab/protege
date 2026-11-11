@@ -3,7 +3,7 @@
     <annotation>
         <appInfo><meta.schema plugin="org.protege.ai.core" id="AgentTool" name="Agent tool"/></appInfo>
         <documentation>
-            Declare a tool factory that supplies the tool description and creates a tool for each window.
+            Declare a tool factory that declares the tool name, description, and Java argument/result types and creates a tool for each window.
             The class must implement org.protege.ai.api.AgentToolFactory and have a public zero-argument constructor.
         </documentation>
     </annotation>

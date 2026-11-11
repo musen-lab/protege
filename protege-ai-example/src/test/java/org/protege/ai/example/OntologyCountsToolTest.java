@@ -2,7 +2,7 @@ package org.protege.ai.example;
 
 import org.junit.Test;
 import org.protege.ai.api.AgentTool;
-import org.protege.ai.api.AgentToolDescription;
+import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolSource;
 import org.protege.ai.core.AgentToolRegistry;
 import org.semanticweb.owlapi.apibinding.OWLManager;
@@ -24,12 +24,12 @@ public class OntologyCountsToolTest {
             pizza = manager.loadOntologyFromOntologyDocument(stream);
         }
         var active = new AtomicReference<>(pizza);
-        AgentToolSource source = new AgentToolSource() {
+        AgentToolSource<OntologyCountsArguments, OntologyCountsResult> source = new AgentToolSource<>() {
             public String getId() { return "example.OntologyCounts"; }
-            public AgentToolDescription getDescription() {
-                return new OntologyCountsToolFactory().getDescription();
+            public AgentToolDefinition<OntologyCountsArguments, OntologyCountsResult> getDefinition() {
+                return new OntologyCountsToolFactory().getDefinition();
             }
-            public AgentTool newInstance() { return new OntologyCountsTool(active::get); }
+            public AgentTool<OntologyCountsArguments, OntologyCountsResult> newInstance() { return new OntologyCountsTool(active::get); }
         };
         var registry = new AgentToolRegistry(List.of(source));
         var result = registry.execute("example_ontology_counts", "{}");

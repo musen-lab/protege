@@ -1,7 +1,7 @@
 package org.protege.ai.core;
 
 import org.protege.ai.api.AgentTool;
-import org.protege.ai.api.AgentToolDescription;
+import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolResult;
 import org.protege.ai.api.AgentToolSource;
 import org.protege.ai.api.ToolRegistry;
@@ -27,24 +27,27 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
     private static final String KEY = "org.protege.ai.core.AgentToolRegistry";
     private static final Object REGISTRY_CREATION_LOCK = new Object();
 
-    private static final class Entry {
+    private static final class Entry<I, O> {
         final String sourceId;
-        final AgentToolDescription description;
-        final AgentTool tool;
+        final AgentToolDefinition<I, O> definition;
+        final AgentTool<I, O> tool;
+        final ToolJsonCodec<I, O> codec;
         int inFlight;
 
-        Entry(String sourceId, AgentToolDescription description, AgentTool tool) {
+        Entry(String sourceId, AgentToolDefinition<I, O> definition, AgentTool<I, O> tool,
+              ToolJsonCodec<I, O> codec) {
             this.sourceId = sourceId;
-            this.description = description;
+            this.definition = definition;
             this.tool = tool;
+            this.codec = codec;
         }
     }
 
-    private final Map<String, Entry> tools = new LinkedHashMap<>();
+    private final Map<String, Entry<?, ?>> tools = new LinkedHashMap<>();
     private final Map<String, String> claimedNames = new LinkedHashMap<>();
     private boolean disposed;
 
-    public AgentToolRegistry(Iterable<? extends AgentToolSource> sources) {
+    public AgentToolRegistry(Iterable<? extends AgentToolSource<?, ?>> sources) {
         sources.forEach(this::register);
     }
 
@@ -72,24 +75,25 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
     }
 
     /** Rejects duplicate names before constructing the second tool. */
-    public synchronized boolean register(AgentToolSource source) {
+    public synchronized <I, O> boolean register(AgentToolSource<I, O> source) {
         if (disposed) {
             throw new IllegalStateException("Tool registry is closed");
         }
-        AgentTool tool = null;
+        AgentTool<I, O> tool = null;
         String sourceId = "<unknown>";
         try {
             sourceId = Objects.requireNonNull(source.getId());
-            AgentToolDescription description = Objects.requireNonNull(source.getDescription());
-            String previous = claimedNames.putIfAbsent(description.name(), sourceId);
+            AgentToolDefinition<I, O> definition = Objects.requireNonNull(source.getDefinition());
+            String previous = claimedNames.putIfAbsent(definition.name(), sourceId);
             if (previous != null) {
                 logger.warn("Rejecting tool '{}' from '{}': already claimed by '{}'",
-                        description.name(), sourceId, previous);
+                        definition.name(), sourceId, previous);
                 return false;
             }
+            ToolJsonCodec<I, O> codec = new ToolJsonCodec<>(definition);
             tool = Objects.requireNonNull(source.newInstance(), "Tool factory returned null");
             tool.initialise();
-            tools.put(description.name(), new Entry(sourceId, description, tool));
+            tools.put(definition.name(), new Entry<>(sourceId, definition, tool, codec));
             return true;
         } catch (Exception | LinkageError e) {
             logger.warn("Could not load tool from '{}'", sourceId, e);
@@ -101,13 +105,13 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
     }
 
     @Override
-    public synchronized List<AgentToolDescription> listTools() {
-        return tools.values().stream().map(entry -> entry.description).toList();
+    public synchronized List<AgentToolDefinition<?, ?>> listTools() {
+        return tools.values().stream().<AgentToolDefinition<?, ?>>map(entry -> entry.definition).toList();
     }
 
     @Override
-    public synchronized Optional<AgentToolDescription> findTool(String name) {
-        return Optional.ofNullable(tools.get(name)).map(entry -> entry.description);
+    public synchronized Optional<AgentToolDefinition<?, ?>> findTool(String name) {
+        return Optional.ofNullable(tools.get(name)).map(entry -> entry.definition);
     }
 
     /** No worker, schema validation, timeout, cancellation or rollback is implied by this call. */
@@ -116,7 +120,7 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
         if (input == null) {
             return new AgentToolResult(INVALID_INPUT, "Tool input must not be null");
         }
-        Entry entry;
+        Entry<?, ?> entry;
         synchronized (this) {
             if (disposed) {
                 return new AgentToolResult(REGISTRY_CLOSED, "Tool registry is closed");
@@ -128,7 +132,9 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
             entry.inFlight++;
         }
         try {
-            return new AgentToolResult(SUCCESS, entry.tool.execute(input));
+            return invoke(entry, input);
+        } catch (ToolJsonCodec.InvalidInputException e) {
+            return new AgentToolResult(INVALID_INPUT, e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             logger.warn("Tool '{}' from '{}' interrupted", name, entry.sourceId, e);
@@ -153,13 +159,13 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
     /** Does not wait for running calls; each busy tool is disposed by its last returning call. */
     @Override
     public void dispose() {
-        List<Entry> idle = new ArrayList<>();
+        List<Entry<?, ?>> idle = new ArrayList<>();
         synchronized (this) {
             if (disposed) {
                 return;
             }
             disposed = true;
-            for (Entry entry : tools.values()) {
+            for (Entry<?, ?> entry : tools.values()) {
                 if (entry.inFlight == 0) {
                     idle.add(entry);
                 }
@@ -167,9 +173,15 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
             tools.clear();
             claimedNames.clear();
         }
-        for (Entry entry : idle.reversed()) {
+        for (Entry<?, ?> entry : idle.reversed()) {
             disposeTool(entry.tool, entry.sourceId);
         }
+    }
+
+    private static <I, O> AgentToolResult invoke(Entry<I, O> entry, String input) throws Exception {
+        I arguments = entry.codec.readArguments(input);
+        O result = entry.tool.execute(arguments);
+        return new AgentToolResult(SUCCESS, entry.codec.writeResult(result));
     }
 
     private static AgentToolResult executionError(String summary, Throwable cause) {
@@ -178,7 +190,7 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
         return new AgentToolResult(EXECUTION_ERROR, summary + ": " + detail);
     }
 
-    private static void disposeTool(AgentTool tool, String sourceId) {
+    private static void disposeTool(AgentTool<?, ?> tool, String sourceId) {
         try {
             tool.dispose();
         } catch (Exception | LinkageError e) {

@@ -1,24 +1,21 @@
 package org.protege.ai.example;
 
 import org.protege.ai.api.AgentTool;
-import org.protege.ai.api.AgentToolDescription;
+import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolFactory;
 import org.protege.editor.owl.OWLEditorKit;
 
-public final class OntologyCountsToolFactory implements AgentToolFactory {
+public final class OntologyCountsToolFactory implements AgentToolFactory<OntologyCountsArguments, OntologyCountsResult> {
 
     @Override
-    public AgentToolDescription getDescription() {
-        return new AgentToolDescription("example_ontology_counts",
+    public AgentToolDefinition<OntologyCountsArguments, OntologyCountsResult> getDefinition() {
+        return new AgentToolDefinition<>("example_ontology_counts",
                 "Count asserted classes and axioms in the active ontology, excluding imports.",
-                """
-                {"type":"object","properties":{},"additionalProperties":false}
-                """.strip(),
-                "JSON object with integer classCount and axiomCount fields, excluding imported ontologies.");
+                OntologyCountsArguments.class, OntologyCountsResult.class);
     }
 
     @Override
-    public AgentTool createTool(OWLEditorKit editorKit) {
+    public AgentTool<OntologyCountsArguments, OntologyCountsResult> createTool(OWLEditorKit editorKit) {
         return new OntologyCountsTool(editorKit.getOWLModelManager()::getActiveOntology);
     }
 }

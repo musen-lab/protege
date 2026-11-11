@@ -6,10 +6,13 @@ import java.util.Optional;
 /** The discovery and invocation boundary used by agents and adapters. */
 public interface ToolRegistry {
 
-    List<AgentToolDescription> listTools();
+    List<AgentToolDefinition<?, ?>> listTools();
 
-    Optional<AgentToolDescription> findTool(String name);
+    Optional<AgentToolDefinition<?, ?>> findTool(String name);
 
-    /** Runs on the caller's thread. Concurrent calls are allowed; scheduling belongs to the caller. */
+    /**
+     * Accepts JSON arguments and returns JSON content on success.
+     * Runs on the caller's thread. Concurrent calls are allowed; scheduling belongs to the caller.
+     */
     AgentToolResult execute(String name, String input);
 }

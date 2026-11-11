@@ -5,7 +5,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import org.junit.Test;
 import org.protege.ai.api.AgentTool;
-import org.protege.ai.api.AgentToolDescription;
+import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolFactory;
 import org.protege.ai.core.plugin.AgentToolPluginImpl;
 import org.protege.editor.core.Disposable;
@@ -24,50 +24,50 @@ import static org.protege.ai.api.AgentToolResult.Status.*;
 
 public class AgentToolPluginTest {
 
-    private static final AgentToolDescription DESCRIPTION =
-            new AgentToolDescription("test_tool", "Test tool", "{\"type\":\"object\"}", "The input text unchanged.");
+    private static final AgentToolDefinition<String, String> DEFINITION =
+            new AgentToolDefinition<String, String>("test_tool", "Test tool", String.class, String.class);
 
-    public static class TestFactory implements AgentToolFactory {
+    public static class TestFactory implements AgentToolFactory<String, String> {
         static final AtomicInteger factories = new AtomicInteger();
         static final AtomicInteger tools = new AtomicInteger();
         static final AtomicInteger disposed = new AtomicInteger();
         static OWLEditorKit receivedKit;
 
         public TestFactory() { factories.incrementAndGet(); }
-        public AgentToolDescription getDescription() { return DESCRIPTION; }
-        public AgentTool createTool(OWLEditorKit kit) {
+        public AgentToolDefinition<String, String> getDefinition() { return DEFINITION; }
+        public AgentTool<String, String> createTool(OWLEditorKit kit) {
             receivedKit = kit;
             tools.incrementAndGet();
-            return new AgentTool() {
+            return new AgentTool<String, String>() {
                 public String execute(String input) { return input; }
                 public void dispose() { disposed.incrementAndGet(); }
             };
         }
     }
 
-    public static class BlankNameFactory implements AgentToolFactory {
-        public AgentToolDescription getDescription() {
-            return new AgentToolDescription(" ", "Invalid", "{}", "Text");
+    public static class BlankNameFactory implements AgentToolFactory<String, String> {
+        public AgentToolDefinition<String, String> getDefinition() {
+            return new AgentToolDefinition<String, String>(" ", "Invalid", String.class, String.class);
         }
-        public AgentTool createTool(OWLEditorKit kit) {
+        public AgentTool<String, String> createTool(OWLEditorKit kit) {
             throw new AssertionError("Must not create a tool with invalid metadata");
         }
     }
 
     @Test
-    public void descriptionComesFromFactoryBeforeToolConstruction() throws Exception {
+    public void definitionComesFromFactoryBeforeToolConstruction() throws Exception {
         TestFactory.factories.set(0);
         TestFactory.tools.set(0);
         var extension = TestPluginRuntime.extension("test.mapping", TestFactory.class.getName());
         var kit = mock(OWLEditorKit.class);
         try (var runtime = new TestPluginRuntime(extension)) {
-            var plugin = new AgentToolPluginImpl(extension, kit);
+            var plugin = new AgentToolPluginImpl<String, String>(extension, kit);
             assertEquals("test.mapping", plugin.getId());
-            assertEquals(DESCRIPTION, plugin.getDescription());
+            assertEquals(DEFINITION, plugin.getDefinition());
             assertEquals(1, TestFactory.factories.get());
             assertEquals(0, TestFactory.tools.get());
-            assertEquals(DESCRIPTION, plugin.getDescription());
-            AgentTool tool = plugin.newInstance();
+            assertEquals(DEFINITION, plugin.getDefinition());
+            AgentTool<String, String> tool = plugin.newInstance();
             assertEquals(1, TestFactory.factories.get());
             assertEquals(1, TestFactory.tools.get());
             assertSame(kit, TestFactory.receivedKit);
@@ -111,7 +111,7 @@ public class AgentToolPluginTest {
             assertEquals(0, TestFactory.disposed.get());
             kit.dispose();
             assertEquals(1, TestFactory.disposed.get());
-            assertEquals(REGISTRY_CLOSED, registry.execute("test_tool", "{}").status());
+            assertEquals(REGISTRY_CLOSED, registry.execute("test_tool", "\"{}\"").status());
             registry.dispose();
             assertEquals(1, TestFactory.disposed.get());
         }
@@ -128,7 +128,7 @@ public class AgentToolPluginTest {
         logger.addAppender(appender);
         try (var runtime = new TestPluginRuntime(blankName, blankClass, valid)) {
             var registry = AgentToolRegistry.getRegistry(mock(OWLEditorKit.class));
-            assertEquals(java.util.List.of(DESCRIPTION), registry.listTools());
+            assertEquals(java.util.List.of(DEFINITION), registry.listTools());
             assertTrue(appender.list.stream().map(ILoggingEvent::getFormattedMessage)
                     .anyMatch(message -> message.contains("test.blankName")));
             assertTrue(appender.list.stream().map(ILoggingEvent::getFormattedMessage)

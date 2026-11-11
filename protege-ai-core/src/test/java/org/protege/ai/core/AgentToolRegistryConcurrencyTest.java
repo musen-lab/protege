@@ -2,7 +2,7 @@ package org.protege.ai.core;
 
 import org.junit.Test;
 import org.protege.ai.api.AgentTool;
-import org.protege.ai.api.AgentToolDescription;
+import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolSource;
 
 import javax.swing.SwingUtilities;
@@ -20,13 +20,13 @@ import static org.protege.ai.api.AgentToolResult.Status.*;
 
 public class AgentToolRegistryConcurrencyTest {
 
-    private AgentToolSource source(String name, AgentTool tool) {
-        return new AgentToolSource() {
+    private AgentToolSource<String, String> source(String name, AgentTool<String, String> tool) {
+        return new AgentToolSource<String, String>() {
             public String getId() { return name; }
-            public AgentToolDescription getDescription() {
-                return new AgentToolDescription(name, "Test tool", "{}", "text/plain");
+            public AgentToolDefinition<String, String> getDefinition() {
+                return new AgentToolDefinition<String, String>(name, "Test tool", String.class, String.class);
             }
-            public AgentTool newInstance() { return tool; }
+            public AgentTool<String, String> newInstance() { return tool; }
         };
     }
 
@@ -36,7 +36,7 @@ public class AgentToolRegistryConcurrencyTest {
         CountDownLatch release = new CountDownLatch(1);
         AtomicInteger busyDisposed = new AtomicInteger();
         AtomicInteger idleDisposed = new AtomicInteger();
-        AgentTool busy = new AgentTool() {
+        AgentTool<String, String> busy = new AgentTool<String, String>() {
             public String execute(String input) throws InterruptedException {
                 started.countDown();
                 release.await();
@@ -44,14 +44,14 @@ public class AgentToolRegistryConcurrencyTest {
             }
             public void dispose() { busyDisposed.incrementAndGet(); }
         };
-        AgentTool idle = new AgentTool() {
+        AgentTool<String, String> idle = new AgentTool<String, String>() {
             public String execute(String input) { return input; }
             public void dispose() { idleDisposed.incrementAndGet(); }
         };
         AgentToolRegistry registry = new AgentToolRegistry(List.of(source("busy", busy), source("idle", idle)));
         var worker = Executors.newSingleThreadExecutor();
         try {
-            var call = worker.submit(() -> registry.execute("busy", "{}"));
+            var call = worker.submit(() -> registry.execute("busy", "\"{}\""));
             assertTrue(started.await(5, SECONDS));
             CompletableFuture<Void> closed = new CompletableFuture<>();
             SwingUtilities.invokeLater(() -> {
@@ -61,7 +61,7 @@ public class AgentToolRegistryConcurrencyTest {
                     registry.dispose();
                     registry.dispose();
                     assertTrue(registry.listTools().isEmpty());
-                    assertEquals(REGISTRY_CLOSED, registry.execute("busy", "{}").status());
+                    assertEquals(REGISTRY_CLOSED, registry.execute("busy", "\"{}\"").status());
                     closed.complete(null);
                 } catch (Throwable e) {
                     closed.completeExceptionally(e);
@@ -72,7 +72,7 @@ public class AgentToolRegistryConcurrencyTest {
             assertEquals(1, idleDisposed.get());
             assertEquals(0, busyDisposed.get());
             release.countDown();
-            assertEquals("finished", call.get(5, SECONDS).content());
+            assertEquals("\"finished\"", call.get(5, SECONDS).content());
             assertEquals(1, busyDisposed.get());
         } finally {
             release.countDown();
@@ -88,7 +88,7 @@ public class AgentToolRegistryConcurrencyTest {
         CountDownLatch releaseFirst = new CountDownLatch(1);
         CountDownLatch releaseSecond = new CountDownLatch(1);
         AtomicInteger disposed = new AtomicInteger();
-        AgentTool tool = new AgentTool() {
+        AgentTool<String, String> tool = new AgentTool<String, String>() {
             public String execute(String input) throws InterruptedException {
                 started.countDown();
                 if (input.equals("first")) {
@@ -103,8 +103,8 @@ public class AgentToolRegistryConcurrencyTest {
         AgentToolRegistry registry = new AgentToolRegistry(List.of(source("parallel", tool)));
         var workers = Executors.newFixedThreadPool(2);
         try {
-            var first = workers.submit(() -> registry.execute("parallel", "first"));
-            var second = workers.submit(() -> registry.execute("parallel", "second"));
+            var first = workers.submit(() -> registry.execute("parallel", "\"first\""));
+            var second = workers.submit(() -> registry.execute("parallel", "\"second\""));
             assertTrue(started.await(5, SECONDS));
             registry.dispose();
             releaseFirst.countDown();
@@ -129,7 +129,7 @@ public class AgentToolRegistryConcurrencyTest {
         AtomicReference<Thread> runningThread = new AtomicReference<>();
         AtomicBoolean interrupted = new AtomicBoolean();
         AtomicInteger disposed = new AtomicInteger();
-        AgentTool tool = new AgentTool() {
+        AgentTool<String, String> tool = new AgentTool<String, String>() {
             public String execute(String input) throws InterruptedException {
                 runningThread.set(Thread.currentThread());
                 started.countDown();
@@ -142,7 +142,7 @@ public class AgentToolRegistryConcurrencyTest {
         var worker = Executors.newSingleThreadExecutor();
         try {
             var call = worker.submit(() -> {
-                var result = registry.execute("interruptible", "{}");
+                var result = registry.execute("interruptible", "\"{}\"");
                 interrupted.set(Thread.currentThread().isInterrupted());
                 return result;
             });

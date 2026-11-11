@@ -1,6 +1,6 @@
 # Agent tools
 
-`protege-ai-api` defines tool descriptions, factories, lifecycle, results, and the
+`protege-ai-api` defines typed tool contracts, factories, lifecycle, results, and the
 `ToolRegistry` interface used by agents and adapters.
 `protege-ai-core` discovers extensions and owns a registry for each `OWLEditorKit`.
 Neither module depends on an AI framework. The API depends on Protégé's editor
@@ -16,7 +16,7 @@ Protégé writes on the Swing thread.
 
 ```java
 ToolRegistry registry = AgentToolRegistry.getRegistry(editorKit);
-List<AgentToolDescription> tools = registry.listTools();
+List<AgentToolDefinition<?, ?>> tools = registry.listTools();
 AgentToolResult result = registry.execute("example_ontology_counts", "{}");
 ```
 
@@ -58,32 +58,45 @@ last call. Tool disposal must be quick and must arrange any necessary Swing-thre
 cleanup. A call that never returns delays its tool's cleanup indefinitely. Closing
 does not cancel work or keep the editor kit and ontology context alive.
 
-Unknown names return `NO_SUCH_TOOL`; null input returns `INVALID_INPUT` without
-invoking a tool. Tool failures return `EXECUTION_ERROR` with their message (or
-failure type when no message exists), except `VirtualMachineError`, which is
-rethrown. Stack traces stay in the log. Interrupted calls preserve the thread's
-interrupt flag.
+The registry accepts JSON text, binds it to the definition's argument class, and
+serializes the tool's returned Java object as JSON. Tools do not parse or write
+JSON themselves. Unknown names return `NO_SUCH_TOOL`. Null input, malformed JSON,
+and binding failures return `INVALID_INPUT` without invoking a tool. Tool failures
+return `EXECUTION_ERROR` with their message (or failure type when no message exists),
+except `VirtualMachineError`, which is rethrown. Stack traces stay in the log.
+Interrupted calls preserve the thread's interrupt flag.
 
-Input schemas are metadata in this first implementation. Shared schema validation,
-thread scheduling, timeouts, and cancellation belong to #56. There is no rollback
-or ontology-editing support. These responsibilities remain independent of any
-agent framework and can be introduced behind the registry's invocation boundary.
+Binding currently supports ordinary Jackson-bindable Java types, including records,
+enums, and nested collections. Record constructor arguments are required and must
+not be null; unknown fields, trailing JSON, and scalar coercions are rejected.
+Successful results must not be null. This is binding, not JSON Schema validation:
+there are no generated schemas, input defaults, OWL-type conversions, or checks
+for null collection elements. These require the shared validation layer.
+
+Thread scheduling, timeouts, and cancellation belong to the caller or a separate
+execution layer. There is no rollback or ontology-editing support.
 
 ## Contributing a tool
 
 See [the separate example plugin](../protege-ai-example/README.md). Its factory has
-a public zero-argument constructor and implements `AgentToolFactory`. Each
+a public zero-argument constructor and implements `AgentToolFactory<I, O>`. Each
 `org.protege.ai.core.AgentTool` extension supplies its factory's `class`.
-The factory's `getDescription()` supplies `name`, `description`, `inputSchema`
-(JSON Schema), and `resultDescription` (output encoding, fields, and meaning).
+The factory's `getDefinition()` supplies `AgentToolDefinition<I, O>` with the tool's
+`name`, `description`, `Class<I> argumentType`, and `Class<O> resultType`.
+`createTool(editorKit)` returns an `AgentTool<I, O>` with the same types. The
+registry exposes these definitions through `listTools` and `findTool`.
 Reading metadata constructs the factory, but does not create a tool or need an
 editor kit. Keep factory construction and metadata access quick and free of
 ontology access.
 
+Jackson binding stays inside core. Its mapper and JSON tree types are not part of
+the tool API. Core exports Jackson annotations so plugins can import the same
+annotation classes used by its mapper, for example `@JsonProperty` for a field name.
+
 Build dependencies once, then run just the registry and example tests:
 
 ```sh
-mvn -pl protege-ai-core,protege-ai-example -am -Dmaven.test.skip=true install
+mvn -pl protege-ai-core,protege-ai-example -am -Dmaven.test.skip=true clean install
 mvn -pl protege-ai-core,protege-ai-example test
 ```
 

@@ -8,7 +8,7 @@ imports. It has no agent or chat of its own.
 Build with Java 25:
 
 ```sh
-mvn -pl protege-ai-example -am -Dmaven.test.skip=true install
+mvn -pl protege-ai-example -am -Dmaven.test.skip=true clean install
 ```
 
 Copy `target/protege-ai-example-6.0.0-alpha-1.jar` into the `plugins` directory of a
@@ -26,12 +26,16 @@ A successful result contains JSON such as `{"classCount":98,"axiomCount":945}`;
 the values depend on the ontology. Opening another window creates another tool
 instance, and changing the active ontology changes the next invocation's target.
 
-To add your own tool, depend on `protege-ai-api`, implement `AgentToolFactory`, and
+To add your own tool, depend on `protege-ai-api`, implement `AgentToolFactory<I, O>`, and
 declare an extension following this plugin's `src/main/resources/plugin.xml`.
-Keep the name, input schema, and result description in the factory's
-`getDescription()` method; the XML only identifies the factory class.
+Keep the name, description, and argument/result classes in the factory's
+`getDefinition()` method; the XML only identifies the factory class.
+For this example, `OntologyCountsArguments` is an empty record and
+`OntologyCountsResult` contains `classCount` and `axiomCount`. The tool returns that
+record; the registry converts it to JSON. No handwritten schema or JSON is needed
+in the factory or tool.
 Each extension gets a new factory instance per window, so factory instance fields
 are separate while static fields are shared across windows.
 The factory receives an editor kit and can inject a model manager or an ontology
-supplier into the tool. The tool implements `AgentTool`; listener setup and cleanup
+supplier into the tool. The tool implements `AgentTool<I, O>`; listener setup and cleanup
 belong in `initialise` and `dispose`.

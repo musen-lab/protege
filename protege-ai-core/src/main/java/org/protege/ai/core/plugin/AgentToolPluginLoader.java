@@ -4,7 +4,7 @@ import org.eclipse.core.runtime.IExtension;
 import org.protege.editor.core.plugin.AbstractPluginLoader;
 import org.protege.editor.owl.OWLEditorKit;
 
-public final class AgentToolPluginLoader extends AbstractPluginLoader<AgentToolPlugin> {
+public final class AgentToolPluginLoader extends AbstractPluginLoader<AgentToolPlugin<?, ?>> {
 
     private final OWLEditorKit editorKit;
 
@@ -14,7 +14,7 @@ public final class AgentToolPluginLoader extends AbstractPluginLoader<AgentToolP
     }
 
     @Override
-    protected AgentToolPlugin createInstance(IExtension extension) {
-        return new AgentToolPluginImpl(extension, editorKit);
+    protected AgentToolPlugin<?, ?> createInstance(IExtension extension) {
+        return new AgentToolPluginImpl<>(extension, editorKit);
     }
 }

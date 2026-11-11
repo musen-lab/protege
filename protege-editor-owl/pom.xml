@@ -194,7 +194,8 @@
 					<instructions>
 						<Bundle-Activator>org.protege.editor.owl.ProtegeOWL</Bundle-Activator>
 						<Bundle-SymbolicName>org.protege.editor.owl;singleton:=true</Bundle-SymbolicName>
-						<Embed-Dependency>*;scope=provided;inline=true</Embed-Dependency>
+						<!-- Dependency module descriptors do not describe this OSGi bundle. -->
+						<Embed-Dependency>*;scope=provided;inline=!*module-info.class</Embed-Dependency>
 						<Export-Package>
 							org.protege.editor.owl.*;version=${project.version},
 							org.protege.owlapi.inference.*;version=${project.version}
