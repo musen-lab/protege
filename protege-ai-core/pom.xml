@@ -9,6 +9,9 @@
     </parent>
     <artifactId>protege-ai-core</artifactId>
     <packaging>bundle</packaging>
+    <properties>
+        <jsonschema-generator.version>4.38.0</jsonschema-generator.version>
+    </properties>
     <dependencies>
         <dependency>
             <groupId>edu.stanford.protege</groupId>
@@ -30,6 +33,27 @@
             <artifactId>jackson-databind</artifactId>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>com.github.victools</groupId>
+            <artifactId>jsonschema-generator</artifactId>
+            <version>${jsonschema-generator.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.victools</groupId>
+            <artifactId>jsonschema-module-jackson</artifactId>
+            <version>${jsonschema-generator.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml</groupId>
+            <artifactId>classmate</artifactId>
+            <version>1.7.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>1.5.9</version>
+            <scope>test</scope>
+        </dependency>
         <dependency><groupId>junit</groupId><artifactId>junit</artifactId><scope>test</scope></dependency>
         <dependency><groupId>org.mockito</groupId><artifactId>mockito-core</artifactId><scope>test</scope></dependency>
     </dependencies>
@@ -42,7 +66,10 @@
                 <configuration>
                     <instructions>
                         <Bundle-SymbolicName>org.protege.ai.core;singleton:=true</Bundle-SymbolicName>
-                        <Embed-Dependency>*;scope=provided;inline=!*module-info.class</Embed-Dependency>
+                        <Embed-Dependency>
+                            *;scope=provided;inline=!*module-info.class,
+                            *;groupId=com.github.victools|com.fasterxml;inline=!*module-info.class
+                        </Embed-Dependency>
                         <Export-Package>org.protege.ai.core.*</Export-Package>
                         <_exportcontents>com.fasterxml.jackson.annotation</_exportcontents>
                         <Import-Package>org.eclipse.core.runtime;registry="split",*</Import-Package>

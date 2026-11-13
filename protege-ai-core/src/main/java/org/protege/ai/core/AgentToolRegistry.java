@@ -3,6 +3,7 @@ package org.protege.ai.core;
 import org.protege.ai.api.AgentTool;
 import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolResult;
+import org.protege.ai.api.AgentToolSchemas;
 import org.protege.ai.api.AgentToolSource;
 import org.protege.ai.api.ToolRegistry;
 import org.protege.ai.core.plugin.AgentToolPluginLoader;
@@ -112,6 +113,11 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
     @Override
     public synchronized Optional<AgentToolDefinition<?, ?>> findTool(String name) {
         return Optional.ofNullable(tools.get(name)).map(entry -> entry.definition);
+    }
+
+    @Override
+    public synchronized Optional<AgentToolSchemas> findSchemas(String name) {
+        return Optional.ofNullable(tools.get(name)).map(entry -> entry.codec.schemas());
     }
 
     /** No worker, schema validation, timeout, cancellation or rollback is implied by this call. */

@@ -19,6 +19,7 @@ For the editor kit of an open ontology window:
 
 ```java
 AgentToolRegistry registry = AgentToolRegistry.getRegistry(editorKit);
+AgentToolSchemas schemas = registry.findSchemas("example_ontology_counts").orElseThrow();
 AgentToolResult result = registry.execute("example_ontology_counts", "{}");
 ```
 
@@ -34,6 +35,9 @@ For this example, `OntologyCountsArguments` is an empty record and
 `OntologyCountsResult` contains `classCount` and `axiomCount`. The tool returns that
 record; the registry converts it to JSON. No handwritten schema or JSON is needed
 in the factory or tool.
+The registry generates and caches both schemas during registration. The input
+schema describes an empty object; the output schema requires the two integer
+counts. Schema validation during invocation is not implemented yet.
 Each extension gets a new factory instance per window, so factory instance fields
 are separate while static fields are shared across windows.
 The factory receives an editor kit and can inject a model manager or an ontology

@@ -17,6 +17,7 @@ Protégé writes on the Swing thread.
 ```java
 ToolRegistry registry = AgentToolRegistry.getRegistry(editorKit);
 List<AgentToolDefinition<?, ?>> tools = registry.listTools();
+AgentToolSchemas schemas = registry.findSchemas("example_ontology_counts").orElseThrow();
 AgentToolResult result = registry.execute("example_ontology_counts", "{}");
 ```
 
@@ -66,12 +67,11 @@ return `EXECUTION_ERROR` with their message (or failure type when no message exi
 except `VirtualMachineError`, which is rethrown. Stack traces stay in the log.
 Interrupted calls preserve the thread's interrupt flag.
 
-Binding currently supports ordinary Jackson-bindable Java types, including records,
-enums, and nested collections. Record constructor arguments are required and must
-not be null; unknown fields, trailing JSON, and scalar coercions are rejected.
-Successful results must not be null. This is binding, not JSON Schema validation:
-there are no generated schemas, input defaults, OWL-type conversions, or checks
-for null collection elements. These require the shared validation layer.
+Binding rejects missing or null record constructor arguments, unknown fields,
+trailing JSON, and scalar coercions. Successful results must not be null.
+Schemas are available for discovery, but invocation does not yet validate against
+them. In particular, required bean properties and null collection elements still
+need schema validation. Input defaults and OWL-type conversions are not implemented.
 
 Thread scheduling, timeouts, and cancellation belong to the caller or a separate
 execution layer. There is no rollback or ontology-editing support.
@@ -92,6 +92,32 @@ ontology access.
 Jackson binding stays inside core. Its mapper and JSON tree types are not part of
 the tool API. Core exports Jackson annotations so plugins can import the same
 annotation classes used by its mapper, for example `@JsonProperty` for a field name.
+
+## Generated schemas
+
+Registration generates input and output JSON Schemas (draft 2020-12) before
+constructing the tool. `findSchemas(name)` returns the cached documents as JSON
+strings, so agents need no schema-library dependency. Unsupported contracts are
+rejected with their source ID and the reason in the log.
+
+Supported types are records and Java beans, strings, booleans, numeric primitives
+and wrappers, `BigInteger`, `BigDecimal`, enums, typed `List` values, and arrays
+other than `byte[]` and `char[]`. Nested and recursive records are supported.
+Use wrapper classes for scalar root arguments or results; primitives are supported
+inside records, beans, and arrays.
+Schemas require every property and exclude nulls (including list elements) and
+unknown properties. Empty lists are valid. Maps, untyped values, OWL objects, and
+custom Jackson representations are not supported yet.
+
+`@JsonProperty` supplies property and enum names. `@JsonPropertyDescription` and
+`@JsonClassDescription` supply descriptions. Other Jackson annotations, property
+defaults, and read/write access overrides are rejected rather than advertised
+without matching execution support. Optional fields, defaults, and explicit
+nullability will be added together with invocation validation.
+
+Schema generation uses VicTools internally with the invocation mapper. Its
+libraries are embedded in core and are not exported as OSGi packages. Tests use
+an independent draft 2020-12 validator to check schemas and invocation examples.
 
 Build dependencies once, then run just the registry and example tests:
 
