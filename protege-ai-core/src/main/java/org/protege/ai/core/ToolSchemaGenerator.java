@@ -43,12 +43,22 @@ final class ToolSchemaGenerator {
                 .with(new JacksonModule())
                 .with(Option.GETTER_METHODS, Option.NONSTATIC_NONVOID_NONGETTER_METHODS,
                         Option.FIELDS_DERIVED_FROM_ARGUMENTFREE_METHODS,
+                        Option.NULLABLE_ARRAY_ITEMS_ALLOWED,
                         Option.FORBIDDEN_ADDITIONAL_PROPERTIES_BY_DEFAULT);
-        config.forFields().withRequiredCheck(field -> true);
-        config.forMethods().withRequiredCheck(method -> true)
+        config.forFields().withRequiredCheck(ToolPropertyRules::required)
+                .withCustomDefinitionProvider(ToolPropertyRules::collectionSchema)
+                .withNullableCheck(ToolPropertyRules::nullable)
+                .withDefaultResolver(field -> ToolPropertyRules.defaultValue(field, mapper));
+        config.forMethods().withRequiredCheck(ToolPropertyRules::required)
+                .withCustomDefinitionProvider(ToolPropertyRules::collectionSchema)
+                .withNullableCheck(ToolPropertyRules::nullable)
+                .withDefaultResolver(method -> ToolPropertyRules.defaultValue(method, mapper))
                 .withIgnoreCheck(method -> getterProperty(method).isEmpty())
                 .withPropertyNameOverrideResolver(method -> getterProperty(method)
                         .map(BeanPropertyDefinition::getName).orElse(null));
+        config.forTypesInGeneral()
+                .withNumberInclusiveMinimumResolver(type -> lowerBound(type.getType().getErasedType()))
+                .withNumberInclusiveMaximumResolver(type -> upperBound(type.getType().getErasedType()));
         // Use the mapper's enum names, including individually renamed constants.
         config.forTypesInGeneral().withCustomDefinitionProvider((type, context) -> {
             Object[] constants = type.getErasedType().getEnumConstants();
@@ -79,6 +89,25 @@ final class ToolSchemaGenerator {
                 .filter(property -> property.hasGetter()
                         && property.getGetter().getMember().equals(method.getRawMember()))
                 .findFirst();
+    }
+
+    private static BigDecimal upperBound(Class<?> type) {
+        if (type == byte.class || type == Byte.class) return BigDecimal.valueOf(Byte.MAX_VALUE);
+        if (type == short.class || type == Short.class) return BigDecimal.valueOf(Short.MAX_VALUE);
+        if (type == int.class || type == Integer.class) return BigDecimal.valueOf(Integer.MAX_VALUE);
+        if (type == long.class || type == Long.class) return BigDecimal.valueOf(Long.MAX_VALUE);
+        if (type == float.class || type == Float.class) return new BigDecimal(Float.toString(Float.MAX_VALUE));
+        if (type == double.class || type == Double.class) return BigDecimal.valueOf(Double.MAX_VALUE);
+        return null;
+    }
+
+    private static BigDecimal lowerBound(Class<?> type) {
+        BigDecimal upper = upperBound(type);
+        if (upper == null) return null;
+        if (type == float.class || type == Float.class || type == double.class || type == Double.class) {
+            return upper.negate();
+        }
+        return upper.negate().subtract(BigDecimal.ONE);
     }
 
     String generate(Class<?> type) {
@@ -142,8 +171,8 @@ final class ToolSchemaGenerator {
             }
             if (type == JsonProperty.class) {
                 var property = (JsonProperty) annotation;
-                if (!property.defaultValue().isEmpty() || property.access() != JsonProperty.Access.AUTO) {
-                    throw unsupported("@JsonProperty defaults or access rules on " + element);
+                if (property.access() != JsonProperty.Access.AUTO) {
+                    throw unsupported("@JsonProperty access rules on " + element);
                 }
             } else if (type != JsonPropertyDescription.class && type != JsonClassDescription.class) {
                 throw unsupported("annotation @" + type.getSimpleName() + " on " + element);

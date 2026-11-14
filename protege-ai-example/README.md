@@ -37,7 +37,11 @@ record; the registry converts it to JSON. No handwritten schema or JSON is neede
 in the factory or tool.
 The registry generates and caches both schemas during registration. The input
 schema describes an empty object; the output schema requires the two integer
-counts. Schema validation during invocation is not implemented yet.
+counts. The registry validates both the arguments and the serialized result.
+This example has no optional arguments. Other tools can use
+`@JsonProperty(isRequired = OptBoolean.FALSE, defaultValue = "42")` for an omitted
+integer argument that should become 42, and `@ToolNullable` to permit null.
+An optional argument without a default must explicitly permit null.
 Each extension gets a new factory instance per window, so factory instance fields
 are separate while static fields are shared across windows.
 The factory receives an editor kit and can inject a model manager or an ontology

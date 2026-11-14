@@ -52,7 +52,22 @@
             <groupId>com.networknt</groupId>
             <artifactId>json-schema-validator</artifactId>
             <version>1.5.9</version>
-            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.ethlo.time</groupId>
+            <artifactId>itu</artifactId>
+            <version>1.14.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>2.5</version>
+            <scope>provided</scope>
         </dependency>
         <dependency><groupId>junit</groupId><artifactId>junit</artifactId><scope>test</scope></dependency>
         <dependency><groupId>org.mockito</groupId><artifactId>mockito-core</artifactId><scope>test</scope></dependency>
@@ -68,11 +83,18 @@
                         <Bundle-SymbolicName>org.protege.ai.core;singleton:=true</Bundle-SymbolicName>
                         <Embed-Dependency>
                             *;scope=provided;inline=!*module-info.class,
-                            *;groupId=com.github.victools|com.fasterxml;inline=!*module-info.class
+                            *;groupId=com.github.victools|com.fasterxml|com.networknt|com.ethlo.time;inline=!*module-info.class
                         </Embed-Dependency>
                         <Export-Package>org.protege.ai.core.*</Export-Package>
                         <_exportcontents>com.fasterxml.jackson.annotation</_exportcontents>
-                        <Import-Package>org.eclipse.core.runtime;registry="split",*</Import-Package>
+                        <!-- The validator uses Java regex; its alternative regex engines are optional. -->
+                        <Import-Package>
+                            org.eclipse.core.runtime;registry="split",
+                            org.graalvm.polyglot;resolution:=optional,
+                            org.jcodings*;resolution:=optional,
+                            org.joni*;resolution:=optional,
+                            *
+                        </Import-Package>
                     </instructions>
                 </configuration>
             </plugin>

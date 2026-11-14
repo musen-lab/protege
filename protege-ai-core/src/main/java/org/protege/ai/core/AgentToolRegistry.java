@@ -120,7 +120,7 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
         return Optional.ofNullable(tools.get(name)).map(entry -> entry.codec.schemas());
     }
 
-    /** No worker, schema validation, timeout, cancellation or rollback is implied by this call. */
+    /** Validates and invokes on the caller's thread, without timeouts, cancellation or rollback. */
     @Override
     public AgentToolResult execute(String name, String input) {
         if (input == null) {

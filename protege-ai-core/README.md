@@ -59,19 +59,21 @@ last call. Tool disposal must be quick and must arrange any necessary Swing-thre
 cleanup. A call that never returns delays its tool's cleanup indefinitely. Closing
 does not cancel work or keep the editor kit and ontology context alive.
 
-The registry accepts JSON text, binds it to the definition's argument class, and
-serializes the tool's returned Java object as JSON. Tools do not parse or write
+The registry accepts JSON text, applies input defaults, validates it against the
+input schema, and binds it to the definition's argument class. It serializes and
+validates the tool's returned Java object against the output schema. Tools do not parse or write
 JSON themselves. Unknown names return `NO_SUCH_TOOL`. Null input, malformed JSON,
-and binding failures return `INVALID_INPUT` without invoking a tool. Tool failures
+validation and binding failures return `INVALID_INPUT` without invoking a tool. Tool failures
 return `EXECUTION_ERROR` with their message (or failure type when no message exists),
 except `VirtualMachineError`, which is rethrown. Stack traces stay in the log.
 Interrupted calls preserve the thread's interrupt flag.
 
-Binding rejects missing or null record constructor arguments, unknown fields,
-trailing JSON, and scalar coercions. Successful results must not be null.
-Schemas are available for discovery, but invocation does not yet validate against
-them. In particular, required bean properties and null collection elements still
-need schema validation. Input defaults and OWL-type conversions are not implemented.
+Validation rejects missing required fields, disallowed nulls, unknown fields, and
+values of the wrong type. Parsing also rejects duplicate fields and trailing JSON.
+JSON numbers such as `7.0` are valid integers; fractional and out-of-range values
+are rejected before integer binding. Successful results must not be null or violate
+their schema. Results are never repaired with defaults. OWL-type conversions are
+not implemented yet.
 
 Thread scheduling, timeouts, and cancellation belong to the caller or a separate
 execution layer. There is no rollback or ontology-editing support.
@@ -105,19 +107,49 @@ and wrappers, `BigInteger`, `BigDecimal`, enums, typed `List` values, and arrays
 other than `byte[]` and `char[]`. Nested and recursive records are supported.
 Use wrapper classes for scalar root arguments or results; primitives are supported
 inside records, beans, and arrays.
-Schemas require every property and exclude nulls (including list elements) and
-unknown properties. Empty lists are valid. Maps, untyped values, OWL objects, and
+Schemas require every property and exclude nulls (including list elements) unless
+explicitly declared otherwise. Unknown properties are rejected; empty lists are valid.
+Maps, untyped values, OWL objects, and
 custom Jackson representations are not supported yet.
 
 `@JsonProperty` supplies property and enum names. `@JsonPropertyDescription` and
-`@JsonClassDescription` supply descriptions. Other Jackson annotations, property
-defaults, and read/write access overrides are rejected rather than advertised
-without matching execution support. Optional fields, defaults, and explicit
-nullability will be added together with invocation validation.
+`@JsonClassDescription` supply descriptions. Other Jackson annotations and
+read/write access overrides are rejected rather than advertised without matching
+execution support.
+
+## Optional fields, defaults, and nulls
+
+```java
+public record SearchArguments(
+        String label,
+        @JsonProperty(isRequired = OptBoolean.FALSE, defaultValue = "\"ALL\"") Scope scope,
+        @JsonProperty(isRequired = OptBoolean.FALSE) @ToolNullable String note) {}
+```
+
+- `label` is required and must not be null.
+- Omitting `scope` supplies `ALL`; explicit null is rejected.
+- Omitting `note` supplies null; explicit null is also accepted.
+
+Use `isRequired = OptBoolean.FALSE` to mark a property optional. The older
+`required = false` cannot distinguish an explicit choice from Jackson's default,
+so it does not make a tool property optional. Optional properties need a default
+or permission to accept null. Required properties cannot declare defaults.
+
+`defaultValue` is a JSON value: `"42"` in Java declares the number 42, while
+`"\"ALL\""` declares the string ALL. Defaults are checked when the tool registers,
+copied for each invocation, and applied only to omitted inputs, never explicit
+nulls or returned results. Nested objects and lists follow the same rules.
+
+`@ToolNullable`, from `protege-ai-api`, permits null at its exact type position.
+It works for arguments and results without making a property optional.
+`@ToolNullable List<String>` permits a null list; `List<@ToolNullable String>`
+permits null elements. Primitive values cannot be nullable; use a wrapper such as
+`Integer` instead of `int` when null is meaningful.
 
 Schema generation uses VicTools internally with the invocation mapper. Its
-libraries are embedded in core and are not exported as OSGi packages. Tests use
-an independent draft 2020-12 validator to check schemas and invocation examples.
+libraries and the NetworkNT validator are embedded in core and are not exported
+as OSGi packages. Registration checks the schemas and declared defaults before
+constructing the tool. Invocation uses the cached validators.
 
 Build dependencies once, then run just the registry and example tests:
 
