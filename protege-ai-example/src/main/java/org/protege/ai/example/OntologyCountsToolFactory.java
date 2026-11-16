@@ -9,9 +9,7 @@ public final class OntologyCountsToolFactory implements AgentToolFactory<Ontolog
 
     @Override
     public AgentToolDefinition<OntologyCountsArguments, OntologyCountsResult> getDefinition() {
-        return new AgentToolDefinition<>("example_ontology_counts",
-                "Count asserted classes and axioms in the active ontology, excluding imports.",
-                OntologyCountsArguments.class, OntologyCountsResult.class);
+        return OntologyCountsTool.DEFINITION;
     }
 
     @Override

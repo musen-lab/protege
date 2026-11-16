@@ -16,6 +16,20 @@ import static org.junit.Assert.*;
 public class OntologyCountsToolTest {
 
     @Test
+    public void factoryAndToolsShareMetadataWithoutAccessingAnOntology() {
+        var factory = new OntologyCountsToolFactory();
+        var first = new OntologyCountsTool(() -> { throw new AssertionError("Metadata needs no ontology"); });
+        var second = new OntologyCountsTool(() -> { throw new AssertionError("Metadata needs no ontology"); });
+        var definition = factory.getDefinition();
+        assertSame(definition, first.getDefinition());
+        assertSame(definition, second.getDefinition());
+        assertEquals(definition.name(), first.getName());
+        assertEquals(definition.description(), first.getDescription());
+        Class<OntologyCountsArguments> inputType = first.getInputType();
+        assertSame(OntologyCountsArguments.class, inputType);
+    }
+
+    @Test
     public void invokesRegisteredToolAgainstPizzaAndFollowsActiveOntologyChanges() throws Exception {
         var manager = OWLManager.createOWLOntologyManager();
         OWLOntology pizza;

@@ -27,6 +27,11 @@ public class AgentToolTypedContractTest {
     private static final AgentToolDefinition<Arguments, Result> DEFINITION =
             new AgentToolDefinition<>("find", "Find matching labels", Arguments.class, Result.class);
 
+    private <I, O> AgentToolSource<I, O> source(AgentToolDefinition<I, O> definition,
+                                              ToolStub.Invocation<I, O> invocation) {
+        return source(definition, new ToolStub<>(definition, invocation));
+    }
+
     private <I, O> AgentToolSource<I, O> source(AgentToolDefinition<I, O> definition, AgentTool<I, O> tool) {
         return new AgentToolSource<>() {
             public String getId() { return definition.name(); }
@@ -106,6 +111,7 @@ public class AgentToolTypedContractTest {
     public void nullResultIsAnExecutionFailureAndReleasesTheTool() {
         var disposed = new AtomicInteger();
         var registry = new AgentToolRegistry(List.of(source(DEFINITION, new AgentTool<Arguments, Result>() {
+            public AgentToolDefinition<Arguments, Result> getDefinition() { return DEFINITION; }
             public Result execute(Arguments arguments) { return null; }
             public void dispose() { disposed.incrementAndGet(); }
         })));

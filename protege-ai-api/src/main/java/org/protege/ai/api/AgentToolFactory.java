@@ -8,6 +8,6 @@ public interface AgentToolFactory<I, O> {
     /** Describes the tool without an editor kit or tool instance. Must be quick and stable. */
     AgentToolDefinition<I, O> getDefinition();
 
-    /** Capture the dependencies the tool needs; the registry calls initialise afterwards. */
+    /** Creates a tool with the same definition and its dependencies; the registry calls initialise afterwards. */
     AgentTool<I, O> createTool(OWLEditorKit editorKit);
 }

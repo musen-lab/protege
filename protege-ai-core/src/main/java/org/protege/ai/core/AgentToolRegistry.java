@@ -93,6 +93,9 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
             }
             ToolJsonCodec<I, O> codec = new ToolJsonCodec<>(definition);
             tool = Objects.requireNonNull(source.newInstance(), "Tool factory returned null");
+            if (!definition.equals(tool.getDefinition())) {
+                throw new IllegalArgumentException("Tool definition does not match its factory's definition");
+            }
             tool.initialise();
             tools.put(definition.name(), new Entry<>(sourceId, definition, tool, codec));
             return true;

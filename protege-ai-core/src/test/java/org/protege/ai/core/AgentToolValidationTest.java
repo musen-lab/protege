@@ -30,13 +30,13 @@ public class AgentToolValidationTest {
                                   @ToolNullable Scope scope) {}
     public record ArrayInput(@ToolNullable String[] items) {}
 
-    private <I, O> AgentToolRegistry registry(Class<I> input, Class<O> output, AgentTool<I, O> tool) {
+    private <I, O> AgentToolRegistry registry(Class<I> input, Class<O> output, ToolStub.Invocation<I, O> invocation) {
         return new AgentToolRegistry(List.of(new AgentToolSource<I, O>() {
             public String getId() { return "test.validation"; }
             public AgentToolDefinition<I, O> getDefinition() {
                 return new AgentToolDefinition<>("test", "Validate arguments and results", input, output);
             }
-            public AgentTool<I, O> newInstance() { return tool; }
+            public AgentTool<I, O> newInstance() { return new ToolStub<>(getDefinition(), invocation); }
         }));
     }
 
@@ -179,7 +179,7 @@ public class AgentToolValidationTest {
                 public AgentToolDefinition<Object, String> getDefinition() {
                     return new AgentToolDefinition<>("test", "Invalid declaration", (Class<Object>) input, String.class);
                 }
-                public AgentTool<Object, String> newInstance() { created.incrementAndGet(); return args -> "ok"; }
+                public AgentTool<Object, String> newInstance() { created.incrementAndGet(); return new ToolStub<>(getDefinition(), args -> "ok"); }
             }));
             assertEquals(input.getName(), 0, created.get());
             assertTrue(input.getName(), registry.listTools().isEmpty());

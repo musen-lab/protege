@@ -39,6 +39,7 @@ public class AgentToolPluginTest {
             receivedKit = kit;
             tools.incrementAndGet();
             return new AgentTool<String, String>() {
+                public AgentToolDefinition<String, String> getDefinition() { return DEFINITION; }
                 public String execute(String input) { return input; }
                 public void dispose() { disposed.incrementAndGet(); }
             };

@@ -45,13 +45,13 @@ public class AgentToolSchemaTest {
 
     public record Empty() {}
 
-    private <I, O> AgentToolSource<I, O> source(Class<I> input, Class<O> output, AgentTool<I, O> tool) {
+    private <I, O> AgentToolSource<I, O> source(Class<I> input, Class<O> output, ToolStub.Invocation<I, O> invocation) {
         return new AgentToolSource<>() {
             public String getId() { return "test.schema"; }
             public AgentToolDefinition<I, O> getDefinition() {
                 return new AgentToolDefinition<>("test", "Test schemas", input, output);
             }
-            public AgentTool<I, O> newInstance() { return tool; }
+            public AgentTool<I, O> newInstance() { return new ToolStub<>(getDefinition(), invocation); }
         };
     }
 
@@ -204,7 +204,7 @@ public class AgentToolSchemaTest {
             }
             public AgentTool<I, O> newInstance() {
                 constructed.incrementAndGet();
-                return args -> null;
+                return new ToolStub<>(getDefinition(), args -> null);
             }
         }));
         assertTrue(registry.listTools().isEmpty());

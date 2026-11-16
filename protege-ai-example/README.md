@@ -29,8 +29,12 @@ instance, and changing the active ontology changes the next invocation's target.
 
 To add your own tool, depend on `protege-ai-api`, implement `AgentToolFactory<I, O>`, and
 declare an extension following this plugin's `src/main/resources/plugin.xml`.
-Keep the name, description, and argument/result classes in the factory's
-`getDefinition()` method; the XML only identifies the factory class.
+Declare the name, description, and argument/result classes once in a shared
+`AgentToolDefinition`. Here, `OntologyCountsTool.DEFINITION` is returned by both
+the factory's and tool's `getDefinition()` methods; the XML only identifies the
+factory class. The tool inherits `getName()`, `getDescription()`, and
+`getInputType()`, which read that definition. Static metadata is shared across
+windows; each tool instance still has its own ontology supplier.
 For this example, `OntologyCountsArguments` is an empty record and
 `OntologyCountsResult` contains `classCount` and `axiomCount`. The tool returns that
 record; the registry converts it to JSON. No handwritten schema or JSON is needed

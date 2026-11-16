@@ -24,7 +24,7 @@ public class AgentToolRegistryConcurrencyTest {
         return new AgentToolSource<String, String>() {
             public String getId() { return name; }
             public AgentToolDefinition<String, String> getDefinition() {
-                return new AgentToolDefinition<String, String>(name, "Test tool", String.class, String.class);
+                return tool.getDefinition();
             }
             public AgentTool<String, String> newInstance() { return tool; }
         };
@@ -37,6 +37,9 @@ public class AgentToolRegistryConcurrencyTest {
         AtomicInteger busyDisposed = new AtomicInteger();
         AtomicInteger idleDisposed = new AtomicInteger();
         AgentTool<String, String> busy = new AgentTool<String, String>() {
+            public AgentToolDefinition<String, String> getDefinition() {
+                return new AgentToolDefinition<>("busy", "Test tool", String.class, String.class);
+            }
             public String execute(String input) throws InterruptedException {
                 started.countDown();
                 release.await();
@@ -45,6 +48,9 @@ public class AgentToolRegistryConcurrencyTest {
             public void dispose() { busyDisposed.incrementAndGet(); }
         };
         AgentTool<String, String> idle = new AgentTool<String, String>() {
+            public AgentToolDefinition<String, String> getDefinition() {
+                return new AgentToolDefinition<>("idle", "Test tool", String.class, String.class);
+            }
             public String execute(String input) { return input; }
             public void dispose() { idleDisposed.incrementAndGet(); }
         };
@@ -89,6 +95,9 @@ public class AgentToolRegistryConcurrencyTest {
         CountDownLatch releaseSecond = new CountDownLatch(1);
         AtomicInteger disposed = new AtomicInteger();
         AgentTool<String, String> tool = new AgentTool<String, String>() {
+            public AgentToolDefinition<String, String> getDefinition() {
+                return new AgentToolDefinition<>("parallel", "Test tool", String.class, String.class);
+            }
             public String execute(String input) throws InterruptedException {
                 started.countDown();
                 if (input.equals("first")) {
@@ -130,6 +139,9 @@ public class AgentToolRegistryConcurrencyTest {
         AtomicBoolean interrupted = new AtomicBoolean();
         AtomicInteger disposed = new AtomicInteger();
         AgentTool<String, String> tool = new AgentTool<String, String>() {
+            public AgentToolDefinition<String, String> getDefinition() {
+                return new AgentToolDefinition<>("interruptible", "Test tool", String.class, String.class);
+            }
             public String execute(String input) throws InterruptedException {
                 runningThread.set(Thread.currentThread());
                 started.countDown();

@@ -87,6 +87,11 @@ The factory's `getDefinition()` supplies `AgentToolDefinition<I, O>` with the to
 `name`, `description`, `Class<I> argumentType`, and `Class<O> resultType`.
 `createTool(editorKit)` returns an `AgentTool<I, O>` with the same types. The
 registry exposes these definitions through `listTools` and `findTool`.
+Declare the definition once and return it from both the factory's and tool's
+`getDefinition()`. The tool inherits `getName()`, `getDescription()`, and
+`getInputType()` from `AgentTool`; these methods read the definition, so authors
+do not repeat metadata. Registration rejects and disposes a tool whose definition
+differs from the factory's, before calling `initialise()`.
 Reading metadata constructs the factory, but does not create a tool or need an
 editor kit. Keep factory construction and metadata access quick and free of
 ontology access.

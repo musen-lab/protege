@@ -9,6 +9,7 @@ import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolSource;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -20,6 +21,15 @@ public class AgentToolRegistryTest {
     private static final AgentToolDefinition<String, String> DEFINITION =
             new AgentToolDefinition<String, String>("test_tool", "Test tool", String.class, String.class);
 
+    private AgentToolSource<String, String> source(String id, ToolStub.Invocation<String, String> invocation) {
+        return source(id, DEFINITION, new ToolStub<>(DEFINITION, invocation));
+    }
+
+    private AgentToolSource<String, String> source(String id, AgentToolDefinition<String, String> definition,
+                                                  ToolStub.Invocation<String, String> invocation) {
+        return source(id, definition, new ToolStub<>(definition, invocation));
+    }
+
     private AgentToolSource<String, String> source(String id, AgentTool<String, String> tool) {
         return source(id, DEFINITION, tool);
     }
@@ -30,6 +40,56 @@ public class AgentToolRegistryTest {
             public AgentToolDefinition<String, String> getDefinition() { return description; }
             public AgentTool<String, String> newInstance() { return tool; }
         };
+    }
+
+    @Test
+    public void rejectsMismatchedOrMissingDefinitionsBeforeInitializationAndDisposesTool() {
+        var differentName = new AgentToolDefinition<>("other", "Test tool", String.class, String.class);
+        var differentDescription = new AgentToolDefinition<>("test_tool", "Other description", String.class, String.class);
+        Logger logger = (Logger) LoggerFactory.getLogger(AgentToolRegistry.class);
+        var appender = new ListAppender<ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            for (var definition : Arrays.asList(differentName, differentDescription, null)) {
+                var initialized = new AtomicInteger();
+                var disposed = new AtomicInteger();
+                AgentTool<String, String> tool = new AgentTool<>() {
+                    public AgentToolDefinition<String, String> getDefinition() { return definition; }
+                    public void initialise() { initialized.incrementAndGet(); }
+                    public String execute(String input) { throw new AssertionError("Must not execute rejected tool"); }
+                    public void dispose() { disposed.incrementAndGet(); }
+                };
+                var registry = new AgentToolRegistry(List.of(source("plugin.mismatch", tool)));
+                assertTrue(registry.listTools().isEmpty());
+                assertTrue(registry.findSchemas(DEFINITION.name()).isEmpty());
+                assertEquals(NO_SUCH_TOOL, registry.execute(DEFINITION.name(), "\"input\"").status());
+                assertEquals(0, initialized.get());
+                assertEquals(1, disposed.get());
+                registry.dispose();
+                assertEquals(1, disposed.get());
+            }
+            assertEquals(3, appender.list.size());
+            for (var event : appender.list) {
+                assertTrue(event.getFormattedMessage().contains("plugin.mismatch"));
+                assertEquals("Tool definition does not match its factory's definition",
+                        event.getThrowableProxy().getMessage());
+            }
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
+    @Test
+    public void acceptsEqualDefinitionsWithoutRequiringTheSameObject() {
+        var equivalent = new AgentToolDefinition<>(DEFINITION.name(), DEFINITION.description(),
+                DEFINITION.argumentType(), DEFINITION.resultType());
+        assertNotSame(DEFINITION, equivalent);
+        var registry = new AgentToolRegistry(List.of(source("plugin.equivalent",
+                new ToolStub<>(equivalent, input -> input))));
+        assertEquals(SUCCESS, registry.execute(DEFINITION.name(), "\"input\"").status());
+        registry.dispose();
     }
 
     @Test
@@ -78,6 +138,7 @@ public class AgentToolRegistryTest {
         AtomicInteger initialized = new AtomicInteger();
         AtomicInteger disposed = new AtomicInteger();
         AgentTool<String, String> tool = new AgentTool<String, String>() {
+            public AgentToolDefinition<String, String> getDefinition() { return DEFINITION; }
             public void initialise() { initialized.incrementAndGet(); }
             public String execute(String input) { return "{}"; }
             public void dispose() { disposed.incrementAndGet(); }
@@ -96,6 +157,7 @@ public class AgentToolRegistryTest {
     public void cleansUpFailedInitializationAndLoadsNextSource() {
         AtomicInteger disposed = new AtomicInteger();
         AgentTool<String, String> broken = new AgentTool<String, String>() {
+            public AgentToolDefinition<String, String> getDefinition() { return DEFINITION; }
             public void initialise() { throw new IllegalStateException("Failed to initialize"); }
             public String execute(String input) { throw new AssertionError(); }
             public void dispose() { disposed.incrementAndGet(); }
@@ -116,6 +178,7 @@ public class AgentToolRegistryTest {
         logger.addAppender(appender);
         try {
             AgentTool<String, String> broken = new AgentTool<String, String>() {
+                public AgentToolDefinition<String, String> getDefinition() { return DEFINITION; }
                 public void initialise() { throw new IllegalStateException("Cannot initialize"); }
                 public String execute(String input) { throw new AssertionError(); }
             };
@@ -161,6 +224,7 @@ public class AgentToolRegistryTest {
     public void assertionErrorReturnsAnErrorAndReleasesTheCall() {
         AtomicInteger disposed = new AtomicInteger();
         AgentTool<String, String> tool = new AgentTool<String, String>() {
+            public AgentToolDefinition<String, String> getDefinition() { return DEFINITION; }
             public String execute(String input) { throw new AssertionError("Broken tool assumption"); }
             public void dispose() { disposed.incrementAndGet(); }
         };
@@ -177,6 +241,7 @@ public class AgentToolRegistryTest {
         VirtualMachineError failure = new InternalError("Simulated VM failure");
         AtomicInteger disposed = new AtomicInteger();
         AgentTool<String, String> tool = new AgentTool<String, String>() {
+            public AgentToolDefinition<String, String> getDefinition() { return DEFINITION; }
             public String execute(String input) { throw failure; }
             public void dispose() { disposed.incrementAndGet(); }
         };
@@ -216,7 +281,7 @@ public class AgentToolRegistryTest {
             public AgentToolDefinition<String, String> getDefinition() { return DEFINITION; }
             public AgentTool<String, String> newInstance() {
                 String instance = Integer.toString(instances.incrementAndGet());
-                return input -> instance;
+                return new ToolStub<>(DEFINITION, input -> instance);
             }
         };
         AgentToolRegistry first = new AgentToolRegistry(List.of(source));
