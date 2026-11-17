@@ -19,10 +19,21 @@ ToolRegistry registry = AgentToolRegistry.getRegistry(editorKit);
 List<AgentToolDefinition<?, ?>> tools = registry.listTools();
 AgentToolSchemas schemas = registry.findSchemas("example_ontology_counts").orElseThrow();
 AgentToolResult result = registry.execute("example_ontology_counts", "{}");
+if (result instanceof AgentToolResult.Success<?> success) {
+    Object value = success.value(); // Original Java result for application code.
+    String json = success.json();   // Validated JSON for the model.
+}
 ```
 
 Desktop wiring uses `protege-ai-core` to obtain the window's registry, then passes
 the `ToolRegistry` interface to agents. Agents need only the API module.
+`Success<R>` holds both result forms; `Failure` holds only a status and error
+message. `status()`, `isSuccess()`, and `content()` work on either response;
+`content()` returns JSON on success and the message on failure. A name-based call
+does not establish a Java result type, so use `Success<?>` and check the value's
+type before accessing tool-specific fields.
+Rebuild adapters against this API. Code constructing responses must use `Success`
+or `Failure` instead of the former `AgentToolResult(status, content)` constructor.
 
 An editor-kit hook creates the registry at window startup. `getRegistry` also
 initializes it if another hook requests it first. Descriptors are ordered by
@@ -61,7 +72,10 @@ does not cancel work or keep the editor kit and ontology context alive.
 
 The registry accepts JSON text, applies input defaults, validates it against the
 input schema, and binds it to the definition's argument class. It serializes and
-validates the tool's returned Java object against the output schema. Tools do not parse or write
+validates the tool's returned Java object against the output schema, then returns
+`Success` with that same object reference and the JSON. Execution happens once;
+serialization or output-validation failure returns `Failure` without exposing
+the result object. Tools do not parse or write
 JSON themselves. Unknown names return `NO_SUCH_TOOL`. Null input, malformed JSON,
 validation and binding failures return `INVALID_INPUT` without invoking a tool. Tool failures
 return `EXECUTION_ERROR` with their message (or failure type when no message exists),
@@ -74,6 +88,12 @@ JSON numbers such as `7.0` are valid integers; fractional and out-of-range value
 are rejected before integer binding. Successful results must not be null or violate
 their schema. Results are never repaired with defaults. OWL-type conversions are
 not implemented yet.
+
+Treat returned results as read-only, including nested objects and collections.
+Tools must not change them after returning, including during disposal. Consumers
+must copy any values they need to modify. Prefer records with immutable contents
+and unmodifiable collections. Core does not enforce deep immutability or make a
+defensive copy; JSON is a snapshot and will not track later object changes.
 
 Thread scheduling, timeouts, and cancellation belong to the caller or a separate
 execution layer. There is no rollback or ontology-editing support.

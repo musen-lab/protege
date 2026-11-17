@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Test;
 import org.protege.ai.api.AgentTool;
 import org.protege.ai.api.AgentToolDefinition;
+import org.protege.ai.api.AgentToolResult;
 import org.protege.ai.api.AgentToolSource;
 import org.protege.ai.api.ToolNullable;
 
@@ -152,7 +153,9 @@ public class AgentToolValidationTest {
     @Test
     public void checksReturnedValuesAndNeverRepairsResultsWithDefaults() {
         var badItems = registry(String.class, Strings.class, args -> new Strings(Arrays.asList("x", null)));
-        assertEquals(EXECUTION_ERROR, badItems.execute("test", "\"x\"").status());
+        var result = badItems.execute("test", "\"x\"");
+        assertTrue(result instanceof AgentToolResult.Failure);
+        assertEquals(EXECUTION_ERROR, result.status());
         badItems.dispose();
         var missing = registry(String.class, DefaultResult.class, args -> new DefaultResult(null));
         assertEquals(EXECUTION_ERROR, missing.execute("test", "\"x\"").status());

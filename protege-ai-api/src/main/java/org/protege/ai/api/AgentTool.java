@@ -23,6 +23,8 @@ public interface AgentTool<I, O> extends ProtegePluginInstance {
     /**
      * Runs synchronously and may be called concurrently, including on the same instance.
      * Receives the declared argument type and returns the declared successful result type.
+     * Return a completed result and never mutate it or its nested values afterward,
+     * including during disposal. Prefer records with immutable contents and unmodifiable collections.
      * Exception messages are returned to the caller and should explain the failure for the model.
      */
     O execute(I arguments) throws Exception;

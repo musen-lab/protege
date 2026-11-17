@@ -3,6 +3,7 @@ package org.protege.ai.example;
 import org.junit.Test;
 import org.protege.ai.api.AgentTool;
 import org.protege.ai.api.AgentToolDefinition;
+import org.protege.ai.api.AgentToolResult;
 import org.protege.ai.api.AgentToolSource;
 import org.protege.ai.core.AgentToolRegistry;
 import org.semanticweb.owlapi.apibinding.OWLManager;
@@ -48,6 +49,11 @@ public class OntologyCountsToolTest {
         var registry = new AgentToolRegistry(List.of(source));
         var result = registry.execute("example_ontology_counts", "{}");
         assertTrue(result.isSuccess());
+        assertTrue(result instanceof AgentToolResult.Success<?>);
+        var success = (AgentToolResult.Success<?>) result;
+        assertEquals(new OntologyCountsResult(pizza.getClassesInSignature().size(), pizza.getAxiomCount()),
+                success.value());
+        assertEquals(result.content(), success.json());
         assertTrue(pizza.getClassesInSignature().size() > 0);
         assertEquals("{\"classCount\":" + pizza.getClassesInSignature().size()
                 + ",\"axiomCount\":" + pizza.getAxiomCount() + "}", result.content());

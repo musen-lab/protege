@@ -21,11 +21,23 @@ For the editor kit of an open ontology window:
 AgentToolRegistry registry = AgentToolRegistry.getRegistry(editorKit);
 AgentToolSchemas schemas = registry.findSchemas("example_ontology_counts").orElseThrow();
 AgentToolResult result = registry.execute("example_ontology_counts", "{}");
+if (result instanceof AgentToolResult.Success<?> success) {
+    OntologyCountsResult counts = OntologyCountsResult.class.cast(success.value());
+    String json = success.json();
+}
 ```
 
-A successful result contains JSON such as `{"classCount":98,"axiomCount":945}`;
+A successful response retains the original `OntologyCountsResult` and JSON such
+as `{"classCount":98,"axiomCount":945}`;
 the values depend on the ontology. Opening another window creates another tool
 instance, and changing the active ontology changes the next invocation's target.
+Failures carry a status and message, without a result object. `content()` still
+returns the JSON on success or the error message on failure.
+Treat the returned object as read-only and copy before modifying it. Tools must
+not mutate returned results, even during disposal. This example's result is a
+record containing only integer counts; other tools must also protect nested
+collections and objects. Core retains the original reference and does not
+enforce deep immutability.
 
 To add your own tool, depend on `protege-ai-api`, implement `AgentToolFactory<I, O>`, and
 declare an extension following this plugin's `src/main/resources/plugin.xml`.

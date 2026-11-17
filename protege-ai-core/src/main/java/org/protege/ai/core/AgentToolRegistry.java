@@ -127,23 +127,23 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
     @Override
     public AgentToolResult execute(String name, String input) {
         if (input == null) {
-            return new AgentToolResult(INVALID_INPUT, "Tool input must not be null");
+            return new AgentToolResult.Failure(INVALID_INPUT, "Tool input must not be null");
         }
         Entry<?, ?> entry;
         synchronized (this) {
             if (disposed) {
-                return new AgentToolResult(REGISTRY_CLOSED, "Tool registry is closed");
+                return new AgentToolResult.Failure(REGISTRY_CLOSED, "Tool registry is closed");
             }
             entry = tools.get(name);
             if (entry == null) {
-                return new AgentToolResult(NO_SUCH_TOOL, "No such tool: " + name);
+                return new AgentToolResult.Failure(NO_SUCH_TOOL, "No such tool: " + name);
             }
             entry.inFlight++;
         }
         try {
             return invoke(entry, input);
         } catch (ToolJsonCodec.InvalidInputException e) {
-            return new AgentToolResult(INVALID_INPUT, e.getMessage());
+            return new AgentToolResult.Failure(INVALID_INPUT, e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             logger.warn("Tool '{}' from '{}' interrupted", name, entry.sourceId, e);
@@ -190,13 +190,14 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
     private static <I, O> AgentToolResult invoke(Entry<I, O> entry, String input) throws Exception {
         I arguments = entry.codec.readArguments(input);
         O result = entry.tool.execute(arguments);
-        return new AgentToolResult(SUCCESS, entry.codec.writeResult(result));
+        String json = entry.codec.writeResult(result);
+        return new AgentToolResult.Success<>(result, json);
     }
 
     private static AgentToolResult executionError(String summary, Throwable cause) {
         String message = cause.getMessage();
         String detail = message == null || message.isBlank() ? cause.getClass().getSimpleName() : message;
-        return new AgentToolResult(EXECUTION_ERROR, summary + ": " + detail);
+        return new AgentToolResult.Failure(EXECUTION_ERROR, summary + ": " + detail);
     }
 
     private static void disposeTool(AgentTool<?, ?> tool, String sourceId) {

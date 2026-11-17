@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Test;
 import org.protege.ai.api.AgentTool;
 import org.protege.ai.api.AgentToolDefinition;
+import org.protege.ai.api.AgentToolResult;
 import org.protege.ai.api.AgentToolSource;
 
 import java.util.List;
@@ -43,20 +44,74 @@ public class AgentToolTypedContractTest {
     @Test
     public void passesTypedArgumentsToToolAndSerializesNestedResults() throws Exception {
         var received = new AtomicReference<Arguments>();
+        var returned = new AtomicReference<Result>();
+        var calls = new AtomicInteger();
         var registry = new AgentToolRegistry(List.of(source(DEFINITION, arguments -> {
+            calls.incrementAndGet();
             received.set(arguments);
-            return new Result(List.of(new Match(arguments.name())));
+            var result = new Result(List.of(new Match(arguments.name())));
+            returned.set(result);
+            return result;
         })));
 
         var result = registry.execute("find", "{\"label\":\"Pizza\",\"scope\":\"DIRECT\"}");
 
         assertEquals(SUCCESS, result.status());
+        assertTrue(result instanceof AgentToolResult.Success<?>);
+        var success = (AgentToolResult.Success<?>) result;
+        assertSame(returned.get(), success.value());
+        assertSame(result.content(), success.json());
+        assertEquals(1, calls.get());
         assertEquals(new Arguments("Pizza", Scope.DIRECT), received.get());
         var mapper = new ObjectMapper();
         assertEquals(mapper.readTree("{\"matches\":[{\"label\":\"Pizza\"}]}"), mapper.readTree(result.content()));
         assertSame(Arguments.class, registry.findTool("find").orElseThrow().argumentType());
         assertSame(Result.class, registry.findTool("find").orElseThrow().resultType());
         registry.dispose();
+        assertEquals(List.of(new Match("Pizza")), ((Result) success.value()).matches());
+    }
+
+    public static class ReadOnceResult {
+        private int reads;
+
+        public String getValue() {
+            if (++reads > 1) {
+                throw new IllegalStateException("Result was serialized more than once");
+            }
+            return "value";
+        }
+    }
+
+    @Test
+    public void retainsOriginalBeanAndSerializesItOnlyOnce() {
+        var definition = new AgentToolDefinition<>("bean", "Return a bean", String.class, ReadOnceResult.class);
+        var original = new ReadOnceResult();
+        var registry = new AgentToolRegistry(List.of(source(definition, input -> original)));
+        try {
+            var result = registry.execute("bean", "\"input\"");
+            assertTrue(result.content(), result instanceof AgentToolResult.Success<?>);
+            var success = (AgentToolResult.Success<?>) result;
+            assertSame(original, success.value());
+            assertEquals("{\"value\":\"value\"}", success.json());
+            assertEquals(1, original.reads);
+        } finally {
+            registry.dispose();
+        }
+    }
+
+    @Test
+    public void responsesRequireCompleteSuccessOrNonSuccessFailure() {
+        assertThrows(NullPointerException.class, () -> new AgentToolResult.Success<>(null, "{}"));
+        assertThrows(NullPointerException.class, () -> new AgentToolResult.Success<>(new Result(List.of()), null));
+        assertThrows(NullPointerException.class, () -> new AgentToolResult.Failure(null, "Failure"));
+        assertThrows(NullPointerException.class, () -> new AgentToolResult.Failure(EXECUTION_ERROR, null));
+        assertThrows(IllegalArgumentException.class, () -> new AgentToolResult.Failure(SUCCESS, "{}"));
+        for (var status : List.of(NO_SUCH_TOOL, INVALID_INPUT, EXECUTION_ERROR, REGISTRY_CLOSED)) {
+            var failure = new AgentToolResult.Failure(status, "Failure");
+            assertFalse(failure.isSuccess());
+            assertEquals(status, failure.status());
+            assertEquals("Failure", failure.content());
+        }
     }
 
     @Test
@@ -116,8 +171,9 @@ public class AgentToolTypedContractTest {
             public void dispose() { disposed.incrementAndGet(); }
         })));
 
-        assertEquals(EXECUTION_ERROR,
-                registry.execute("find", "{\"label\":\"Pizza\",\"scope\":\"ALL\"}").status());
+        var result = registry.execute("find", "{\"label\":\"Pizza\",\"scope\":\"ALL\"}");
+        assertTrue(result instanceof AgentToolResult.Failure);
+        assertEquals(EXECUTION_ERROR, result.status());
         registry.dispose();
         assertEquals(1, disposed.get());
     }
@@ -131,8 +187,9 @@ public class AgentToolTypedContractTest {
         var definition = new AgentToolDefinition<>("broken", "Broken result", Arguments.class, BrokenResult.class);
         var registry = new AgentToolRegistry(List.of(source(definition, arguments -> new BrokenResult())));
 
-        assertEquals(EXECUTION_ERROR,
-                registry.execute("broken", "{\"label\":\"Pizza\",\"scope\":\"ALL\"}").status());
+        var result = registry.execute("broken", "{\"label\":\"Pizza\",\"scope\":\"ALL\"}");
+        assertTrue(result instanceof AgentToolResult.Failure);
+        assertEquals(EXECUTION_ERROR, result.status());
         registry.dispose();
     }
 
