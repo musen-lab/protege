@@ -9,6 +9,8 @@ import org.protege.ai.api.ToolRegistry;
 import org.protege.ai.core.plugin.AgentToolPluginLoader;
 import org.protege.editor.core.Disposable;
 import org.protege.editor.owl.OWLEditorKit;
+import org.semanticweb.owlapi.apibinding.OWLManager;
+import org.semanticweb.owlapi.model.OWLDataFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,9 +48,16 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
 
     private final Map<String, Entry<?, ?>> tools = new LinkedHashMap<>();
     private final Map<String, String> claimedNames = new LinkedHashMap<>();
+    private final OWLDataFactory dataFactory;
     private boolean disposed;
 
     public AgentToolRegistry(Iterable<? extends AgentToolSource<?, ?>> sources) {
+        this(sources, OWLManager.getOWLDataFactory());
+    }
+
+    /** Creates a registry with a supplied OWL factory, without requiring an editor kit. */
+    public AgentToolRegistry(Iterable<? extends AgentToolSource<?, ?>> sources, OWLDataFactory dataFactory) {
+        this.dataFactory = Objects.requireNonNull(dataFactory);
         sources.forEach(this::register);
     }
 
@@ -66,7 +75,8 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
             if (existing instanceof AgentToolRegistry registry) {
                 return registry;
             }
-            AgentToolRegistry registry = new AgentToolRegistry(List.of());
+            AgentToolRegistry registry = new AgentToolRegistry(List.of(),
+                    editorKit.getOWLModelManager().getOWLDataFactory());
             editorKit.put(KEY, registry);
             new AgentToolPluginLoader(editorKit).getPlugins().stream()
                     .sorted(java.util.Comparator.comparing(AgentToolSource::getId))
@@ -91,7 +101,7 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
                         definition.name(), sourceId, previous);
                 return false;
             }
-            ToolJsonCodec<I, O> codec = new ToolJsonCodec<>(definition);
+            ToolJsonCodec<I, O> codec = new ToolJsonCodec<>(definition, dataFactory);
             tool = Objects.requireNonNull(source.newInstance(), "Tool factory returned null");
             if (!definition.equals(tool.getDefinition())) {
                 throw new IllegalArgumentException("Tool definition does not match its factory's definition");

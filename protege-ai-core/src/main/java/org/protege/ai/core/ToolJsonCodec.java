@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.type.LogicalType;
 import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolSchemas;
+import org.semanticweb.owlapi.model.OWLDataFactory;
 
 import java.util.Objects;
 import java.io.IOException;
@@ -27,8 +28,9 @@ final class ToolJsonCodec<I, O> {
     private final ToolJsonSchema inputSchema;
     private final ToolJsonSchema outputSchema;
 
-    ToolJsonCodec(AgentToolDefinition<I, O> definition) {
+    ToolJsonCodec(AgentToolDefinition<I, O> definition, OWLDataFactory dataFactory) {
         var mapper = JsonMapper.builder()
+                .addModule(new OwlClassJsonModule(dataFactory))
                 .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
                 // JSON Schema treats 7 and 7.0 as integers; it rejects fractional values before binding.
                 .enable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)

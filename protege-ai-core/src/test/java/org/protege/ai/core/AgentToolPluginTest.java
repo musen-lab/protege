@@ -11,6 +11,11 @@ import org.protege.ai.core.plugin.AgentToolPluginImpl;
 import org.protege.editor.core.Disposable;
 import org.protege.editor.core.editorkit.plugin.EditorKitHookPluginImpl;
 import org.protege.editor.owl.OWLEditorKit;
+import org.protege.editor.owl.model.OWLModelManager;
+import org.semanticweb.owlapi.apibinding.OWLManager;
+import org.semanticweb.owlapi.model.IRI;
+import org.semanticweb.owlapi.model.OWLClass;
+import org.semanticweb.owlapi.model.OWLDataFactory;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
@@ -26,6 +31,44 @@ public class AgentToolPluginTest {
 
     private static final AgentToolDefinition<String, String> DEFINITION =
             new AgentToolDefinition<String, String>("test_tool", "Test tool", String.class, String.class);
+
+    private OWLEditorKit editorKit() {
+        var kit = mock(OWLEditorKit.class);
+        var manager = mock(OWLModelManager.class);
+        when(kit.getOWLModelManager()).thenReturn(manager);
+        when(manager.getOWLDataFactory()).thenReturn(OWLManager.getOWLDataFactory());
+        return kit;
+    }
+
+    public static class ClassFactory implements AgentToolFactory<OWLClass, OWLClass> {
+        public AgentToolDefinition<OWLClass, OWLClass> getDefinition() {
+            return new AgentToolDefinition<>("class_reference", "Return a class", OWLClass.class, OWLClass.class);
+        }
+        public AgentTool<OWLClass, OWLClass> createTool(OWLEditorKit kit) {
+            return new ToolStub<>(getDefinition(), input -> input);
+        }
+    }
+
+    @Test
+    public void registryUsesTheWindowsDataFactoryForClassArguments() throws Exception {
+        var kit = editorKit();
+        var factory = mock(OWLDataFactory.class);
+        var iri = IRI.create("https://example.org/Pizza");
+        var owlClass = OWLManager.getOWLDataFactory().getOWLClass(iri);
+        when(factory.getOWLClass(iri)).thenReturn(owlClass);
+        when(kit.getOWLModelManager().getOWLDataFactory()).thenReturn(factory);
+        var extension = TestPluginRuntime.extension("test.owlClass", ClassFactory.class.getName());
+        try (var runtime = new TestPluginRuntime(extension)) {
+            var registry = AgentToolRegistry.getRegistry(kit);
+            try {
+                var result = registry.execute("class_reference", "\"https://example.org/Pizza\"");
+                assertEquals(SUCCESS, result.status());
+                verify(factory).getOWLClass(iri);
+            } finally {
+                registry.dispose();
+            }
+        }
+    }
 
     public static class TestFactory implements AgentToolFactory<String, String> {
         static final AtomicInteger factories = new AtomicInteger();
@@ -60,7 +103,7 @@ public class AgentToolPluginTest {
         TestFactory.factories.set(0);
         TestFactory.tools.set(0);
         var extension = TestPluginRuntime.extension("test.mapping", TestFactory.class.getName());
-        var kit = mock(OWLEditorKit.class);
+        var kit = editorKit();
         try (var runtime = new TestPluginRuntime(extension)) {
             var plugin = new AgentToolPluginImpl<String, String>(extension, kit);
             assertEquals("test.mapping", plugin.getId());
@@ -84,7 +127,7 @@ public class AgentToolPluginTest {
         var extension = TestPluginRuntime.extension("test.lifecycle", TestFactory.class.getName());
         // Stands in for the model manager's object map, to which the real OWLEditorKit forwards put/get.
         Map<Object, Disposable> objects = new HashMap<>();
-        OWLEditorKit kit = mock(OWLEditorKit.class);
+        OWLEditorKit kit = editorKit();
         when(kit.get(any())).thenAnswer(call -> objects.get(call.getArgument(0)));
         doAnswer(call -> {
             objects.put(call.getArgument(0), call.getArgument(1));
@@ -128,7 +171,7 @@ public class AgentToolPluginTest {
         appender.start();
         logger.addAppender(appender);
         try (var runtime = new TestPluginRuntime(blankName, blankClass, valid)) {
-            var registry = AgentToolRegistry.getRegistry(mock(OWLEditorKit.class));
+            var registry = AgentToolRegistry.getRegistry(editorKit());
             assertEquals(java.util.List.of(DEFINITION), registry.listTools());
             assertTrue(appender.list.stream().map(ILoggingEvent::getFormattedMessage)
                     .anyMatch(message -> message.contains("test.blankName")));

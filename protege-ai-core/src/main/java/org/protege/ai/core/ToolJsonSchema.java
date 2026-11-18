@@ -8,6 +8,7 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.PathType;
 import com.networknt.schema.SchemaLocation;
+import com.networknt.schema.SchemaValidatorsConfig;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.resource.ClasspathSchemaLoader;
 
@@ -38,7 +39,9 @@ final class ToolJsonSchema {
         if (!errors.isEmpty()) {
             throw new IllegalArgumentException("Invalid generated tool schema: " + errors);
         }
-        validator = factory.getSchema(document);
+        // Draft 2020-12 treats formats as annotations unless assertions are enabled.
+        validator = factory.getSchema(document, SchemaValidatorsConfig.builder()
+                .formatAssertionsEnabled(true).build());
         validator.initializeValidators();
         checkDefaults(document, new JsonNodePath(PathType.JSON_POINTER));
     }

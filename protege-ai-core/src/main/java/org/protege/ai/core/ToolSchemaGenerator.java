@@ -16,6 +16,8 @@ import com.github.victools.jsonschema.generator.SchemaGenerator;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 import com.github.victools.jsonschema.generator.SchemaVersion;
 import com.github.victools.jsonschema.module.jackson.JacksonModule;
+import org.semanticweb.owlapi.model.OWLClass;
+import org.semanticweb.owlapi.model.OWLObject;
 
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Modifier;
@@ -61,6 +63,14 @@ final class ToolSchemaGenerator {
                 .withNumberInclusiveMaximumResolver(type -> upperBound(type.getType().getErasedType()));
         // Use the mapper's enum names, including individually renamed constants.
         config.forTypesInGeneral().withCustomDefinitionProvider((type, context) -> {
+            if (type.getErasedType() == OWLClass.class) {
+                // Inline this scalar so collection-item nullability is not lost in a deferred reference.
+                return new CustomDefinition(mapper.createObjectNode()
+                        .put("type", "string").put("format", "iri")
+                        // The validator's IRI fallback accepts "//" and invalid schemes such as "1:".
+                        .put("pattern", "^[A-Za-z][A-Za-z0-9+.-]*:"),
+                        CustomDefinition.INLINE_DEFINITION, CustomDefinition.INCLUDING_ATTRIBUTES);
+            }
             Object[] constants = type.getErasedType().getEnumConstants();
             if (constants == null) {
                 return null;
@@ -123,7 +133,7 @@ final class ToolSchemaGenerator {
             return;
         }
         Class<?> raw = type.getRawClass();
-        if (SCALARS.contains(raw)) {
+        if (SCALARS.contains(raw) || raw == OWLClass.class) {
             return;
         }
         if (raw == List.class || raw.isArray() && raw != byte[].class && raw != char[].class) {
@@ -131,6 +141,7 @@ final class ToolSchemaGenerator {
             return;
         }
         if (raw == byte[].class || raw == char[].class || raw == Object.class
+                || OWLObject.class.isAssignableFrom(raw)
                 || raw.getName().startsWith("java.") || raw.isInterface()
                 || JsonSerializable.class.isAssignableFrom(raw)
                 || Modifier.isAbstract(raw.getModifiers())) {

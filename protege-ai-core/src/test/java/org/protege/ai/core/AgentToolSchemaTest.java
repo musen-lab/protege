@@ -19,7 +19,7 @@ import org.protege.ai.api.AgentTool;
 import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolSource;
 import org.protege.ai.api.ToolRegistry;
-import org.semanticweb.owlapi.model.OWLClass;
+import org.semanticweb.owlapi.model.OWLClassExpression;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
@@ -159,7 +159,7 @@ public class AgentToolSchemaTest {
         registry.dispose();
     }
 
-    public record UnsupportedNested(List<OWLClass> classes) {}
+    public record UnsupportedNested(List<OWLClassExpression> classes) {}
     public record RawCollection(List values) {}
     public record DynamicValue(Object value) {}
     public record UnappliedDefault(@JsonProperty(defaultValue = "ALL") Scope scope) {}

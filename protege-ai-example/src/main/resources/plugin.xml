@@ -4,4 +4,7 @@
     <extension id="OntologyCounts" point="org.protege.ai.core.AgentTool">
         <class value="org.protege.ai.example.OntologyCountsToolFactory"/>
     </extension>
+    <extension id="ClassReference" point="org.protege.ai.core.AgentTool">
+        <class value="org.protege.ai.example.ClassReferenceToolFactory"/>
+    </extension>
 </plugin>

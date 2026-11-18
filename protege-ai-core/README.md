@@ -1,186 +1,114 @@
 # Agent tools
 
-`protege-ai-api` defines typed tool contracts, factories, lifecycle, results, and the
-`ToolRegistry` interface used by agents and adapters.
-`protege-ai-core` discovers extensions and owns a registry for each `OWLEditorKit`.
-Neither module depends on an AI framework. The API depends on Protégé's editor
-modules because factories receive an editor kit and tools use its plugin lifecycle.
-The editor modules do not depend on these AI modules.
+Plugins contribute tools. Agents discover and call them through a registry.
+Each ontology window has its own registry and tool instances. Core handles JSON
+conversion and validation; tools work with Java objects.
 
-## Calling tools
+| Module | Purpose |
+| --- | --- |
+| `protege-ai-api` | Interfaces used by tools and agents |
+| `protege-ai-core` | Plugin discovery, registry, JSON conversion, and validation |
+| `protege-ai-example` | A separate plugin you can build and try |
 
-Call `getRegistry` on the Swing thread, normally from an editor-kit hook's
-`initialise()`, and keep the returned reference for later calls.
-The editor kit forwards put/get to the model manager's unsynchronized map, which
-Protégé writes on the Swing thread.
+These modules have no dependency on an AI framework. The API uses Protégé's editor
+modules for plugin lifecycle and window access; editor modules do not depend on AI.
+
+## Add a tool
+
+Start with the [example plugin](../protege-ai-example/README.md).
+
+1. **Define the input and result.** Use Java records or classes with
+   [supported field types](docs/tool-contract.md#supported-types).
+2. **Implement `AgentTool<I, O>`.** Its `execute` method receives the input object
+   and returns the result object. Core handles parsing and writing JSON.
+3. **Implement `AgentToolFactory<I, O>`.** Give it a public no-argument constructor.
+   Return a fresh tool from `createTool(editorKit)`, passing in the dependencies
+   that tool needs.
+4. **Register the factory in `plugin.xml`.** Add one extension per tool:
+
+```xml
+<extension id="ClassReference" point="org.protege.ai.core.AgentTool">
+    <class value="org.protege.ai.example.ClassReferenceToolFactory"/>
+</extension>
+```
+
+Declare one `AgentToolDefinition` with the tool's name, description, input class,
+and result class. Return it from both the factory's and tool's `getDefinition()`.
+The tool inherits `getName()`, `getDescription()`, and `getInputType()` from it.
+See the [example tool](../protege-ai-example/src/main/java/org/protege/ai/example/ClassReferenceTool.java)
+and [factory](../protege-ai-example/src/main/java/org/protege/ai/example/ClassReferenceToolFactory.java).
+
+Keep factory construction, metadata access, and `initialise()` quick. An ontology
+may not be loaded yet. If the tool needs the active ontology, look it up once per
+call, as the [counts example](../protege-ai-example/src/main/java/org/protege/ai/example/OntologyCountsTool.java) does.
+
+## Call a tool
+
+Obtain the registry on the Swing thread, normally in a hook's `initialise()`, and
+keep the reference. The editor kit stores it in the model manager's unsynchronized
+map, which Protégé writes on the Swing thread.
 
 ```java
 ToolRegistry registry = AgentToolRegistry.getRegistry(editorKit);
-List<AgentToolDefinition<?, ?>> tools = registry.listTools();
-AgentToolSchemas schemas = registry.findSchemas("example_ontology_counts").orElseThrow();
+```
+
+Calls run on the caller's thread. Run expensive tools on a worker thread:
+
+```java
 AgentToolResult result = registry.execute("example_ontology_counts", "{}");
+
+String modelText = result.content(); // JSON on success, error message on failure.
 if (result instanceof AgentToolResult.Success<?> success) {
-    Object value = success.value(); // Original Java result for application code.
-    String json = success.json();   // Validated JSON for the model.
+    Object value = success.value();  // Original Java result for application code.
+    String json = success.json();
 }
 ```
 
-Desktop wiring uses `protege-ai-core` to obtain the window's registry, then passes
-the `ToolRegistry` interface to agents. Agents need only the API module.
-`Success<R>` holds both result forms; `Failure` holds only a status and error
-message. `status()`, `isSuccess()`, and `content()` work on either response;
-`content()` returns JSON on success and the message on failure. A name-based call
-does not establish a Java result type, so use `Success<?>` and check the value's
-type before accessing tool-specific fields.
-Rebuild adapters against this API. Code constructing responses must use `Success`
-or `Failure` instead of the former `AgentToolResult(status, content)` constructor.
+A failure contains a status and message, with no result object. Use `isSuccess()`
+or `status()` to check the outcome. A call by name can return different Java types;
+check the value's type before using tool-specific fields.
 
-An editor-kit hook creates the registry at window startup. `getRegistry` also
-initializes it if another hook requests it first. Descriptors are ordered by
-extension ID before registration. Duplicate tool names are rejected before the
-second tool is constructed, with both source IDs logged. A name stays claimed
-even if its first source fails to initialize; a duplicate cannot silently replace
-it. Other names can still load.
+For discovery, use `listTools()` or `findTool(name)`. To describe a tool to a model,
+use `findSchemas(name)` for its generated input and output JSON Schemas.
+Agents can depend on `protege-ai-api`; desktop code uses core to obtain the registry.
 
-Each accepted factory creates a fresh tool for that window. The registry calls
-`initialise`, then `dispose` when the editor kit closes. Tools should release any
-listeners in `dispose`. Plugin installation changes take effect in newly created
-windows; there is no live registry refresh yet.
-Factories and `initialise` must be quick and must not require an active ontology:
-they run during window construction, before an ontology is loaded.
+## Lifetime and threading
 
-## Ontology context
+| When | What happens |
+| --- | --- |
+| A window opens | A hook creates its registry. `getRegistry` also creates it if requested before that hook runs. |
+| A tool loads | Its factory creates a tool, and core calls `initialise()`. |
+| The active ontology changes | The registry and tools stay alive. Tools must resolve the current ontology when called. |
+| The window closes | Core rejects new calls and disposes idle tools. Running tools are disposed after their last call returns. |
 
-A factory receives the window's `OWLEditorKit` and passes the dependencies its tool
-needs to the tool's constructor. Resolve the active ontology once at invocation
-time, rather than capturing it when the window opens. Switching the active
-ontology does not recreate the registry. A separate `AgentToolContext` is not
-needed for this initial API.
+- Each window gets its own factory and tool instances. Static fields are shared
+  across windows, so keep window-specific state in instance fields.
+- Calls may run concurrently, even on the same tool. Core does not hold the
+  registry lock while a tool runs.
+- `dispose()` must finish promptly. It may run on the thread finishing a call;
+  arrange Swing cleanup on the Swing thread when needed.
+- Closing does not cancel work or keep the ontology context alive. A call that
+  never returns delays that tool's disposal indefinitely.
+- **Treat returned results as read-only**, including nested lists and objects.
+  Tools must not modify them after returning, even during disposal. Consumers
+  must copy before modifying. Core does not copy or freeze results; JSON is a snapshot.
 
-## Execution boundary
+Plugin changes take effect in new windows. There is no live registry refresh.
+Scheduling, timeouts, cancellation, rollback, and ontology editing are outside this registry.
 
-`execute` runs synchronously on the caller's thread, outside the registry lock.
-Calls in one window may run concurrently, including calls to the same tool, so
-tools must support concurrent invocation. Callers must arrange suitable threading;
-expensive work must not run on Swing's event thread.
+## Input and result rules
 
-Closing the registry rejects new calls and disposes idle tools without waiting
-for running calls. Each busy tool is disposed once, on the thread completing its
-last call. Tool disposal must be quick and must arrange any necessary Swing-thread
-cleanup. A call that never returns delays its tool's cleanup indefinitely. Closing
-does not cancel work or keep the editor kit and ontology context alive.
+See the [tool contract reference](docs/tool-contract.md) for supported types,
+optional fields, defaults, nulls, OWL class references, and failure statuses.
+It also records the current limit on custom conversions and a possible extension.
 
-The registry accepts JSON text, applies input defaults, validates it against the
-input schema, and binds it to the definition's argument class. It serializes and
-validates the tool's returned Java object against the output schema, then returns
-`Success` with that same object reference and the JSON. Execution happens once;
-serialization or output-validation failure returns `Failure` without exposing
-the result object. Tools do not parse or write
-JSON themselves. Unknown names return `NO_SUCH_TOOL`. Null input, malformed JSON,
-validation and binding failures return `INVALID_INPUT` without invoking a tool. Tool failures
-return `EXECUTION_ERROR` with their message (or failure type when no message exists),
-except `VirtualMachineError`, which is rethrown. Stack traces stay in the log.
-Interrupted calls preserve the thread's interrupt flag.
+## Build and test
 
-Validation rejects missing required fields, disallowed nulls, unknown fields, and
-values of the wrong type. Parsing also rejects duplicate fields and trailing JSON.
-JSON numbers such as `7.0` are valid integers; fractional and out-of-range values
-are rejected before integer binding. Successful results must not be null or violate
-their schema. Results are never repaired with defaults. OWL-type conversions are
-not implemented yet.
-
-Treat returned results as read-only, including nested objects and collections.
-Tools must not change them after returning, including during disposal. Consumers
-must copy any values they need to modify. Prefer records with immutable contents
-and unmodifiable collections. Core does not enforce deep immutability or make a
-defensive copy; JSON is a snapshot and will not track later object changes.
-
-Thread scheduling, timeouts, and cancellation belong to the caller or a separate
-execution layer. There is no rollback or ontology-editing support.
-
-## Contributing a tool
-
-See [the separate example plugin](../protege-ai-example/README.md). Its factory has
-a public zero-argument constructor and implements `AgentToolFactory<I, O>`. Each
-`org.protege.ai.core.AgentTool` extension supplies its factory's `class`.
-The factory's `getDefinition()` supplies `AgentToolDefinition<I, O>` with the tool's
-`name`, `description`, `Class<I> argumentType`, and `Class<O> resultType`.
-`createTool(editorKit)` returns an `AgentTool<I, O>` with the same types. The
-registry exposes these definitions through `listTools` and `findTool`.
-Declare the definition once and return it from both the factory's and tool's
-`getDefinition()`. The tool inherits `getName()`, `getDescription()`, and
-`getInputType()` from `AgentTool`; these methods read the definition, so authors
-do not repeat metadata. Registration rejects and disposes a tool whose definition
-differs from the factory's, before calling `initialise()`.
-Reading metadata constructs the factory, but does not create a tool or need an
-editor kit. Keep factory construction and metadata access quick and free of
-ontology access.
-
-Jackson binding stays inside core. Its mapper and JSON tree types are not part of
-the tool API. Core exports Jackson annotations so plugins can import the same
-annotation classes used by its mapper, for example `@JsonProperty` for a field name.
-
-## Generated schemas
-
-Registration generates input and output JSON Schemas (draft 2020-12) before
-constructing the tool. `findSchemas(name)` returns the cached documents as JSON
-strings, so agents need no schema-library dependency. Unsupported contracts are
-rejected with their source ID and the reason in the log.
-
-Supported types are records and Java beans, strings, booleans, numeric primitives
-and wrappers, `BigInteger`, `BigDecimal`, enums, typed `List` values, and arrays
-other than `byte[]` and `char[]`. Nested and recursive records are supported.
-Use wrapper classes for scalar root arguments or results; primitives are supported
-inside records, beans, and arrays.
-Schemas require every property and exclude nulls (including list elements) unless
-explicitly declared otherwise. Unknown properties are rejected; empty lists are valid.
-Maps, untyped values, OWL objects, and
-custom Jackson representations are not supported yet.
-
-`@JsonProperty` supplies property and enum names. `@JsonPropertyDescription` and
-`@JsonClassDescription` supply descriptions. Other Jackson annotations and
-read/write access overrides are rejected rather than advertised without matching
-execution support.
-
-## Optional fields, defaults, and nulls
-
-```java
-public record SearchArguments(
-        String label,
-        @JsonProperty(isRequired = OptBoolean.FALSE, defaultValue = "\"ALL\"") Scope scope,
-        @JsonProperty(isRequired = OptBoolean.FALSE) @ToolNullable String note) {}
-```
-
-- `label` is required and must not be null.
-- Omitting `scope` supplies `ALL`; explicit null is rejected.
-- Omitting `note` supplies null; explicit null is also accepted.
-
-Use `isRequired = OptBoolean.FALSE` to mark a property optional. The older
-`required = false` cannot distinguish an explicit choice from Jackson's default,
-so it does not make a tool property optional. Optional properties need a default
-or permission to accept null. Required properties cannot declare defaults.
-
-`defaultValue` is a JSON value: `"42"` in Java declares the number 42, while
-`"\"ALL\""` declares the string ALL. Defaults are checked when the tool registers,
-copied for each invocation, and applied only to omitted inputs, never explicit
-nulls or returned results. Nested objects and lists follow the same rules.
-
-`@ToolNullable`, from `protege-ai-api`, permits null at its exact type position.
-It works for arguments and results without making a property optional.
-`@ToolNullable List<String>` permits a null list; `List<@ToolNullable String>`
-permits null elements. Primitive values cannot be nullable; use a wrapper such as
-`Integer` instead of `int` when null is meaningful.
-
-Schema generation uses VicTools internally with the invocation mapper. Its
-libraries and the NetworkNT validator are embedded in core and are not exported
-as OSGi packages. Registration checks the schemas and declared defaults before
-constructing the tool. Invocation uses the cached validators.
-
-Build dependencies once, then run just the registry and example tests:
+Use JDK 25. From the repository root, install dependencies once, then run the tests:
 
 ```sh
 mvn -pl protege-ai-core,protege-ai-example -am -Dmaven.test.skip=true clean install
 mvn -pl protege-ai-core,protege-ai-example test
 ```
 
-These tests need no window, network connection, model, or credentials.
+The tests need no desktop window, model, or credentials. They make no network calls.

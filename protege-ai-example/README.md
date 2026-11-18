@@ -1,65 +1,79 @@
 # Example tool plugin
 
-This is a separate OSGi plugin, built by the reactor but not bundled with the
-desktop application. It contributes `example_ontology_counts` through `plugin.xml`.
-The tool reports asserted class and axiom counts in the active ontology, excluding
-imports. It has no agent or chat of its own.
+This plugin adds two tools to each ontology window. It has no agent or chat of
+its own and is not bundled with the desktop application.
 
-Build with Java 25:
+| Tool | What it does |
+| --- | --- |
+| `example_ontology_counts` | Counts asserted classes and axioms in the active ontology, excluding imports. |
+| `example_class_reference` | Returns an `OWLClass` unchanged to demonstrate conversion between Java and JSON. |
+
+## Build and install
+
+Use JDK 25. From the repository root:
 
 ```sh
 mvn -pl protege-ai-example -am -Dmaven.test.skip=true clean install
 ```
 
-Copy `target/protege-ai-example-6.0.0-alpha-1.jar` into the `plugins` directory of a
-desktop build containing `protege-ai-api` and `protege-ai-core`, then restart.
-On macOS, use `Protégé.app/Contents/plugins`.
+Copy `protege-ai-example/target/protege-ai-example-6.0.0-alpha-1.jar` into the
+`plugins` directory of a desktop build containing `protege-ai-api` and
+`protege-ai-core`, then restart. On macOS, use `Protégé.app/Contents/plugins`.
 
-For the editor kit of an open ontology window:
+## Try the tools
+
+Obtain the registry on the Swing thread and keep it for later calls:
 
 ```java
-AgentToolRegistry registry = AgentToolRegistry.getRegistry(editorKit);
-AgentToolSchemas schemas = registry.findSchemas("example_ontology_counts").orElseThrow();
-AgentToolResult result = registry.execute("example_ontology_counts", "{}");
+ToolRegistry registry = AgentToolRegistry.getRegistry(editorKit);
+```
+
+Calls run on the caller's thread. Use a worker thread for expensive work.
+
+**Count ontology content:**
+
+```java
+AgentToolResult counts = registry.execute("example_ontology_counts", "{}");
+```
+
+On success, `counts.content()` is JSON such as
+`{"classCount":98,"axiomCount":930}`. The values depend on the active ontology.
+Changing the active ontology changes the next call's target.
+
+**Convert a class reference:**
+
+```java
+AgentToolResult result = registry.execute("example_class_reference",
+        "\"https://example.org/Pizza\"");
+
 if (result instanceof AgentToolResult.Success<?> success) {
-    OntologyCountsResult counts = OntologyCountsResult.class.cast(success.value());
+    OWLClass owlClass = OWLClass.class.cast(success.value());
     String json = success.json();
 }
 ```
 
-A successful response retains the original `OntologyCountsResult` and JSON such
-as `{"classCount":98,"axiomCount":945}`;
-the values depend on the ontology. Opening another window creates another tool
-instance, and changing the active ontology changes the next invocation's target.
-Failures carry a status and message, without a result object. `content()` still
-returns the JSON on success or the error message on failure.
-Treat the returned object as read-only and copy before modifying it. Tools must
-not mutate returned results, even during disposal. This example's result is a
-record containing only integer counts; other tools must also protect nested
-collections and objects. Core retains the original reference and does not
-enforce deep immutability.
+The result contains an `OWLClass` and the JSON string `"https://example.org/Pizza"`.
+The tool does not check whether that class exists or change the ontology.
+Relative IRIs such as `"Pizza"` fail validation.
 
-To add your own tool, depend on `protege-ai-api`, implement `AgentToolFactory<I, O>`, and
-declare an extension following this plugin's `src/main/resources/plugin.xml`.
-Declare the name, description, and argument/result classes once in a shared
-`AgentToolDefinition`. Here, `OntologyCountsTool.DEFINITION` is returned by both
-the factory's and tool's `getDefinition()` methods; the XML only identifies the
-factory class. The tool inherits `getName()`, `getDescription()`, and
-`getInputType()`, which read that definition. Static metadata is shared across
-windows; each tool instance still has its own ontology supplier.
-For this example, `OntologyCountsArguments` is an empty record and
-`OntologyCountsResult` contains `classCount` and `axiomCount`. The tool returns that
-record; the registry converts it to JSON. No handwritten schema or JSON is needed
-in the factory or tool.
-The registry generates and caches both schemas during registration. The input
-schema describes an empty object; the output schema requires the two integer
-counts. The registry validates both the arguments and the serialized result.
-This example has no optional arguments. Other tools can use
-`@JsonProperty(isRequired = OptBoolean.FALSE, defaultValue = "42")` for an omitted
-integer argument that should become 42, and `@ToolNullable` to permit null.
-An optional argument without a default must explicitly permit null.
-Each extension gets a new factory instance per window, so factory instance fields
-are separate while static fields are shared across windows.
-The factory receives an editor kit and can inject a model manager or an ontology
-supplier into the tool. The tool implements `AgentTool<I, O>`; listener setup and cleanup
-belong in `initialise` and `dispose`.
+Both tools return `Failure` with a status and message if a call fails. Treat
+successful result objects as read-only. See the [registry guide](../protege-ai-core/README.md)
+for threading and lifecycle rules.
+
+## Use this plugin as a starting point
+
+| File | What to copy or adapt |
+| --- | --- |
+| [ClassReferenceTool](src/main/java/org/protege/ai/example/ClassReferenceTool.java) | A minimal tool with one shared definition and an `execute` method. |
+| [ClassReferenceToolFactory](src/main/java/org/protege/ai/example/ClassReferenceToolFactory.java) | A factory that exposes the definition and creates a tool. |
+| [OntologyCountsTool](src/main/java/org/protege/ai/example/OntologyCountsTool.java) | A tool that looks up the active ontology once per call. |
+| [OntologyCountsToolFactory](src/main/java/org/protege/ai/example/OntologyCountsToolFactory.java) | Passing a dependency from the editor kit into a tool. |
+| [plugin.xml](src/main/resources/plugin.xml) | One extension entry per tool, each pointing to its factory. |
+
+The factory and tool return the same definition. Core handles JSON and generates
+the schemas. Tool authors supply ordinary Java argument and result types.
+See [input and result rules](../protege-ai-core/docs/tool-contract.md) for supported
+types, defaults, and nulls.
+
+The tests run without a window. They check ontology switching and verify that
+class conversion leaves Pizza's axioms unchanged, even for an unknown class IRI.
