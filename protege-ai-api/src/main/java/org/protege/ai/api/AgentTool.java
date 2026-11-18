@@ -25,7 +25,8 @@ public interface AgentTool<I, O> extends ProtegePluginInstance {
      * Receives the declared argument type and returns the declared successful result type.
      * Return a completed result and never mutate it or its nested values afterward,
      * including during disposal. Prefer records with immutable contents and unmodifiable collections.
-     * Exception messages are returned to the caller and should explain the failure for the model.
+     * Use {@link AgentToolException} for expected failures with a message intended for the caller.
+     * Other exceptions are logged and produce a generic error with a diagnostic reference.
      */
     O execute(I arguments) throws Exception;
 

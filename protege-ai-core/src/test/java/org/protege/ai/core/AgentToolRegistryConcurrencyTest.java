@@ -162,8 +162,8 @@ public class AgentToolRegistryConcurrencyTest {
             registry.dispose();
             runningThread.get().interrupt();
             var result = call.get(5, SECONDS);
-            assertEquals(EXECUTION_ERROR, result.status());
-            assertTrue(result.content().contains("InterruptedException"));
+            assertEquals(INTERRUPTED, result.status());
+            assertTrue(result.content().contains("interrupted"));
             assertTrue(interrupted.get());
             assertEquals(1, disposed.get());
         } finally {

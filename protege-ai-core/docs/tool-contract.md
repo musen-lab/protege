@@ -116,14 +116,38 @@ are rejected. A successful result cannot be null.
 | `SUCCESS` | The result object and validated JSON are available. |
 | `INVALID_INPUT` | Input parsing, validation, or conversion failed. The tool was not invoked. |
 | `NO_SUCH_TOOL` | The registry has no tool with that name. |
-| `EXECUTION_ERROR` | The tool failed, or its result could not be serialized or validated. |
+| `TOOL_ERROR` | The tool reported an expected failure through `AgentToolException`. |
+| `EXECUTION_ERROR` | An unexpected exception occurred, or the result could not be serialized or validated. |
+| `INTERRUPTED` | The call was interrupted; the thread's interrupt flag is preserved. |
 | `REGISTRY_CLOSED` | The registry is closed to new calls. |
 
-Failures carry a status and message, without exposing a result object. Currently,
-execution errors include the exception message, or its type if no message exists.
-Tool authors must keep those messages suitable for the model. Stack traces stay
-in the log. Interrupted calls preserve the interrupt flag; `VirtualMachineError`
-is rethrown.
+Failures carry `status()`, `code()`, `content()` (the message), and `details()`.
+They never expose a successful result object. The code normally matches the status
+name. An expected tool failure supplies its own stable code:
+
+```java
+throw new AgentToolException("REASONER_UNAVAILABLE", "Initialize the reasoner first.");
+```
+
+This returns `TOOL_ERROR` with code `REASONER_UNAVAILABLE`. Keep the message suitable
+for the caller. An optional third constructor argument accepts a list of
+`AgentToolResult.ErrorDetail(field, message)` values. Each field is a JSON Pointer,
+such as `/queries/0/scope`; an empty pointer means the whole input.
+
+Schema validation returns up to three field details. A missing field may point to
+its containing object, with the missing name in the message. Parsing errors and
+binding failures may have no field details. Code and field locations are for
+programmatic use; message wording is not a stable API.
+
+Unexpected failures return a generic message with a diagnostic reference. The
+same reference and full exception are logged; arbitrary exception messages and
+stack traces are not sent to the model. `VirtualMachineError` is rethrown.
+The registry does not retry calls or implement cancellation. `INTERRUPTED` reports
+an actual interruption, not proof that a separate timeout or cancellation request
+stopped the tool.
+
+Existing `new Failure(status, message)` calls still work. Adapters with exhaustive
+status switches must handle the new `TOOL_ERROR` and `INTERRUPTED` cases.
 
 ## Registration checks
 

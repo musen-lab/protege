@@ -56,7 +56,10 @@ The result contains an `OWLClass` and the JSON string `"https://example.org/Pizz
 The tool does not check whether that class exists or change the ontology.
 Relative IRIs such as `"Pizza"` fail validation.
 
-Both tools return `Failure` with a status and message if a call fails. Treat
+Failed registry calls return `Failure` with a status, code, message, and field
+details where available. Tools report expected failures by throwing
+`AgentToolException`, for example when a required reasoner is unavailable.
+Unexpected exception messages stay in the application log. Treat
 successful result objects as read-only. See the [registry guide](../protege-ai-core/README.md)
 for threading and lifecycle rules.
 

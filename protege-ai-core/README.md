@@ -64,9 +64,17 @@ if (result instanceof AgentToolResult.Success<?> success) {
 }
 ```
 
-A failure contains a status and message, with no result object. Use `isSuccess()`
-or `status()` to check the outcome. A call by name can return different Java types;
+A failure contains a status, stable code, message, and any field details, with no
+result object. Use `isSuccess()` or `status()` to check the outcome.
+Read `Failure.code()` for programmatic handling and `content()` for the model.
+A call by name can return different Java types;
 check the value's type before using tool-specific fields.
+
+For an expected failure, a tool can throw
+`new AgentToolException("REASONER_UNAVAILABLE", "Initialize the reasoner first.")`.
+Core returns `TOOL_ERROR` with that code and message. Unexpected exceptions return
+`EXECUTION_ERROR` with a reference to the full error in the application log.
+See [failure handling](docs/tool-contract.md#validation-and-failures).
 
 For discovery, use `listTools()` or `findTool(name)`. To describe a tool to a model,
 use `findSchemas(name)` for its generated input and output JSON Schemas.

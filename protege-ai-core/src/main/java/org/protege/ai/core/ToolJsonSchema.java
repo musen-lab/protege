@@ -11,8 +11,10 @@ import com.networknt.schema.SchemaLocation;
 import com.networknt.schema.SchemaValidatorsConfig;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.resource.ClasspathSchemaLoader;
+import org.protege.ai.api.AgentToolResult.ErrorDetail;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
@@ -41,14 +43,20 @@ final class ToolJsonSchema {
         }
         // Draft 2020-12 treats formats as annotations unless assertions are enabled.
         validator = factory.getSchema(document, SchemaValidatorsConfig.builder()
-                .formatAssertionsEnabled(true).build());
+                .formatAssertionsEnabled(true).pathType(PathType.JSON_POINTER).build());
         validator.initializeValidators();
         checkDefaults(document, new JsonNodePath(PathType.JSON_POINTER));
     }
 
     String violations(JsonNode value) {
-        return validator.validate(value).stream().map(message -> message.getMessage())
-                .sorted().limit(3).collect(Collectors.joining("; "));
+        return details(value).stream().map(ErrorDetail::message).collect(Collectors.joining("; "));
+    }
+
+    List<ErrorDetail> details(JsonNode value) {
+        return validator.validate(value).stream()
+                .map(message -> new ErrorDetail(message.getInstanceLocation().toString(), message.getMessage()))
+                .sorted(Comparator.comparing(ErrorDetail::field).thenComparing(ErrorDetail::message))
+                .limit(3).toList();
     }
 
     void applyInputDefaults(JsonNode value) {

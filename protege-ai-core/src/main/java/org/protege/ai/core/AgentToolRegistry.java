@@ -2,6 +2,7 @@ package org.protege.ai.core;
 
 import org.protege.ai.api.AgentTool;
 import org.protege.ai.api.AgentToolDefinition;
+import org.protege.ai.api.AgentToolException;
 import org.protege.ai.api.AgentToolResult;
 import org.protege.ai.api.AgentToolSchemas;
 import org.protege.ai.api.AgentToolSource;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.protege.ai.api.AgentToolResult.Status.*;
 
@@ -153,16 +155,19 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
         try {
             return invoke(entry, input);
         } catch (ToolJsonCodec.InvalidInputException e) {
-            return new AgentToolResult.Failure(INVALID_INPUT, e.getMessage());
+            return new AgentToolResult.Failure(INVALID_INPUT, e.getMessage(), INVALID_INPUT.name(), e.details());
+        } catch (AgentToolException e) {
+            return new AgentToolResult.Failure(TOOL_ERROR, e.getMessage(), e.code(), e.details());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            logger.warn("Tool '{}' from '{}' interrupted", name, entry.sourceId, e);
-            return executionError("Tool interrupted: " + name, e);
+            return new AgentToolResult.Failure(INTERRUPTED, "Tool call was interrupted: " + name);
         } catch (VirtualMachineError e) {
             throw e;
         } catch (Throwable e) {
-            logger.warn("Tool '{}' from '{}' failed", name, entry.sourceId, e);
-            return executionError("Tool execution failed: " + name, e);
+            String reference = UUID.randomUUID().toString();
+            logger.warn("Tool '{}' from '{}' failed (reference {})", name, entry.sourceId, reference, e);
+            return new AgentToolResult.Failure(EXECUTION_ERROR,
+                    "Tool execution failed: " + name + ". See the application log (reference " + reference + ").");
         } finally {
             boolean disposeTool;
             synchronized (this) {
@@ -202,12 +207,6 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
         O result = entry.tool.execute(arguments);
         String json = entry.codec.writeResult(result);
         return new AgentToolResult.Success<>(result, json);
-    }
-
-    private static AgentToolResult executionError(String summary, Throwable cause) {
-        String message = cause.getMessage();
-        String detail = message == null || message.isBlank() ? cause.getClass().getSimpleName() : message;
-        return new AgentToolResult.Failure(EXECUTION_ERROR, summary + ": " + detail);
     }
 
     private static void disposeTool(AgentTool<?, ?> tool, String sourceId) {

@@ -216,7 +216,7 @@ public class AgentToolRegistryTest {
             return input;
         })));
         assertEquals(EXECUTION_ERROR, registry.execute("test_tool", "\"fail\"").status());
-        assertEquals("Tool execution failed: test_tool: Failure details", registry.execute("test_tool", "\"fail\"").content());
+        assertFalse(registry.execute("test_tool", "\"fail\"").content().contains("Failure details"));
         assertEquals(SUCCESS, registry.execute("test_tool", "\"{}\"").status());
     }
 
@@ -231,7 +231,8 @@ public class AgentToolRegistryTest {
         AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", tool)));
         var result = registry.execute("test_tool", "\"{}\"");
         assertEquals(EXECUTION_ERROR, result.status());
-        assertEquals("Tool execution failed: test_tool: Broken tool assumption", result.content());
+        assertFalse(result.content().contains("Broken tool assumption"));
+        assertTrue(result.content().contains("reference"));
         registry.dispose();
         assertEquals(1, disposed.get());
     }
@@ -252,12 +253,11 @@ public class AgentToolRegistryTest {
     }
 
     @Test
-    public void failureWithoutMessageIncludesExceptionType() {
+    public void failureWithoutMessageStillHasDiagnosticReference() {
         AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", input -> {
             throw new IllegalStateException();
         })));
-        assertEquals("Tool execution failed: test_tool: IllegalStateException",
-                registry.execute("test_tool", "\"{}\"").content());
+        assertTrue(registry.execute("test_tool", "\"{}\"").content().contains("reference"));
     }
 
     @Test
@@ -266,7 +266,7 @@ public class AgentToolRegistryTest {
             throw new InterruptedException();
         })));
         try {
-            assertEquals(EXECUTION_ERROR, registry.execute("test_tool", "\"{}\"").status());
+            assertEquals(INTERRUPTED, registry.execute("test_tool", "\"{}\"").status());
             assertTrue(Thread.currentThread().isInterrupted());
         } finally {
             Thread.interrupted();

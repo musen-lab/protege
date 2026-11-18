@@ -12,9 +12,12 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.type.LogicalType;
 import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolSchemas;
+import org.protege.ai.api.AgentToolResult.ErrorDetail;
 import org.semanticweb.owlapi.model.OWLDataFactory;
 
 import java.util.Objects;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.io.IOException;
 
 /** Validates JSON and binds it to one tool's declared Java types. */
@@ -66,13 +69,15 @@ final class ToolJsonCodec<I, O> {
                 throw new InvalidInputException("Tool arguments must contain a JSON value");
             }
             inputSchema.applyInputDefaults(value);
-            String violations = inputSchema.violations(value);
+            var violations = inputSchema.details(value);
             if (!violations.isEmpty()) {
-                throw new InvalidInputException("Invalid tool arguments: " + violations);
+                throw new InvalidInputException("Invalid tool arguments: " + violations.stream()
+                        .map(ErrorDetail::message).collect(Collectors.joining("; ")), violations);
             }
             return reader.readValue(value);
         } catch (IOException e) {
-            throw new InvalidInputException("Arguments do not match the tool's declared input type", e);
+            // Binding exceptions can contain arbitrary messages from argument constructors.
+            throw new InvalidInputException("Arguments must be valid JSON matching the tool's declared input type");
         }
     }
 
@@ -86,12 +91,19 @@ final class ToolJsonCodec<I, O> {
     }
 
     static final class InvalidInputException extends Exception {
+        private final List<ErrorDetail> details;
+
         InvalidInputException(String message) {
-            super(message);
+            this(message, List.of());
         }
 
-        InvalidInputException(String message, Throwable cause) {
-            super(message, cause);
+        InvalidInputException(String message, List<ErrorDetail> details) {
+            super(message);
+            this.details = List.copyOf(details);
+        }
+
+        List<ErrorDetail> details() {
+            return details;
         }
     }
 }
