@@ -22,6 +22,16 @@ Copy `protege-ai-example/target/protege-ai-example-6.0.0-alpha-1.jar` into the
 
 ## Try the tools
 
+The Java snippets below belong in an agent or other plugin with access to an
+`OWLEditorKit`. For runnable examples without opening Protégé, see
+[OntologyCountsToolTest](src/test/java/org/protege/ai/example/OntologyCountsToolTest.java)
+and [ClassReferenceToolTest](src/test/java/org/protege/ai/example/ClassReferenceToolTest.java).
+After the build above, run them from the repository root:
+
+```sh
+mvn -pl protege-ai-example test
+```
+
 Obtain the registry on the Swing thread and keep it for later calls:
 
 ```java

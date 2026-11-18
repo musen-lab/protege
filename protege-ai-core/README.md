@@ -19,12 +19,16 @@ Start with the [example plugin](../protege-ai-example/README.md).
 
 1. **Define the input and result.** Use Java records or classes with
    [supported field types](docs/tool-contract.md#supported-types).
-2. **Implement `AgentTool<I, O>`.** Its `execute` method receives the input object
+2. **Declare one `AgentToolDefinition`.** It holds the tool's name, description,
+   input class, and result class. Both the tool and factory return this definition
+   from `getDefinition()`.
+3. **Implement `AgentTool<I, O>`.** Its `execute` method receives the input object
    and returns the result object. Core handles parsing and writing JSON.
-3. **Implement `AgentToolFactory<I, O>`.** Give it a public no-argument constructor.
+   The tool inherits `getName()`, `getDescription()`, and `getInputType()` from its definition.
+4. **Implement `AgentToolFactory<I, O>`.** Give it a public no-argument constructor.
    Return a fresh tool from `createTool(editorKit)`, passing in the dependencies
    that tool needs.
-4. **Register the factory in `plugin.xml`.** Add one extension per tool:
+5. **Register the factory in `plugin.xml`.** Add one extension per tool:
 
 ```xml
 <extension id="ClassReference" point="org.protege.ai.core.AgentTool">
@@ -32,15 +36,23 @@ Start with the [example plugin](../protege-ai-example/README.md).
 </extension>
 ```
 
-Declare one `AgentToolDefinition` with the tool's name, description, input class,
-and result class. Return it from both the factory's and tool's `getDefinition()`.
-The tool inherits `getName()`, `getDescription()`, and `getInputType()` from it.
 See the [example tool](../protege-ai-example/src/main/java/org/protege/ai/example/ClassReferenceTool.java)
 and [factory](../protege-ai-example/src/main/java/org/protege/ai/example/ClassReferenceToolFactory.java).
 
 Keep factory construction, metadata access, and `initialise()` quick. An ontology
 may not be loaded yet. If the tool needs the active ontology, look it up once per
 call, as the [counts example](../protege-ai-example/src/main/java/org/protege/ai/example/OntologyCountsTool.java) does.
+
+For an expected failure, throw an exception with a stable code and a message
+intended for the caller:
+
+```java
+throw new AgentToolException("REASONER_UNAVAILABLE", "Initialize the reasoner first.");
+```
+
+Core returns `TOOL_ERROR` with that code and message. Unexpected exceptions return
+`EXECUTION_ERROR` with a reference to the full error in the application log.
+See [failure handling](docs/tool-contract.md#validation-and-failures).
 
 ## Call a tool
 
@@ -61,20 +73,18 @@ String modelText = result.content(); // JSON on success, error message on failur
 if (result instanceof AgentToolResult.Success<?> success) {
     Object value = success.value();  // Original Java result for application code.
     String json = success.json();
+} else if (result instanceof AgentToolResult.Failure failure) {
+    String code = failure.code();    // Stable code for application decisions.
+    var details = failure.details(); // Field locations and explanations, when available.
 }
 ```
 
 A failure contains a status, stable code, message, and any field details, with no
 result object. Use `isSuccess()` or `status()` to check the outcome.
 Read `Failure.code()` for programmatic handling and `content()` for the model.
-A call by name can return different Java types;
-check the value's type before using tool-specific fields.
-
-For an expected failure, a tool can throw
-`new AgentToolException("REASONER_UNAVAILABLE", "Initialize the reasoner first.")`.
-Core returns `TOOL_ERROR` with that code and message. Unexpected exceptions return
-`EXECUTION_ERROR` with a reference to the full error in the application log.
-See [failure handling](docs/tool-contract.md#validation-and-failures).
+A call by name can return different Java types; check the value's type before
+using tool-specific fields. See [failure statuses](docs/tool-contract.md#validation-and-failures)
+for the distinction between invalid input, expected failures, and unexpected errors.
 
 For discovery, use `listTools()` or `findTool(name)`. To describe a tool to a model,
 use `findSchemas(name)` for its generated input and output JSON Schemas.
