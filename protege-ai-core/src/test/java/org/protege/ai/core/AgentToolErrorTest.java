@@ -7,9 +7,9 @@ import org.junit.Test;
 import org.protege.ai.api.AgentTool;
 import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolException;
-import org.protege.ai.api.AgentToolResult.ErrorDetail;
-import org.protege.ai.api.AgentToolResult.Failure;
+import org.protege.ai.api.ToolFailure.Detail;
 import org.protege.ai.api.AgentToolSource;
+import org.protege.ai.api.ToolFailure;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
-import static org.protege.ai.api.AgentToolResult.Status.*;
+import static org.protege.ai.api.ToolStatus.*;
 
 public class AgentToolErrorTest {
 
@@ -49,13 +49,13 @@ public class AgentToolErrorTest {
             return "ok";
         });
         try {
-            var failure = (Failure) registry.execute("test", "{\"queries\":[{\"scope\":\"INVALID\"}]}");
+            var failure = (ToolFailure) registry.execute("test", "{\"queries\":[{\"scope\":\"INVALID\"}]}");
             assertEquals(INVALID_INPUT, failure.status());
             assertEquals("INVALID_INPUT", failure.code());
             assertEquals("/queries/0/scope", failure.details().getFirst().field());
             assertTrue(failure.details().getFirst().message().contains("DIRECT"));
             assertTrue(failure.content().contains(failure.details().getFirst().message()));
-            var missing = (Failure) registry.execute("test", "{\"queries\":[{}]}");
+            var missing = (ToolFailure) registry.execute("test", "{\"queries\":[{}]}");
             assertEquals(INVALID_INPUT, missing.status());
             assertTrue(missing.details().getFirst().message().contains("scope"));
             assertEquals(0, calls.get());
@@ -74,7 +74,7 @@ public class AgentToolErrorTest {
         });
         try {
             for (String json : List.of("{", "{\"value\":\"bad\"}")) {
-                var failure = (Failure) registry.execute("test", json);
+                var failure = (ToolFailure) registry.execute("test", json);
                 assertEquals(INVALID_INPUT, failure.status());
                 assertEquals("INVALID_INPUT", failure.code());
                 assertFalse(failure.content().contains("private constructor details"));
@@ -87,7 +87,7 @@ public class AgentToolErrorTest {
 
     @Test
     public void expectedFailurePreservesTheToolsCodeMessageAndDetails() {
-        var details = List.of(new ErrorDetail("/scope", "Inferred queries require an initialized reasoner."));
+        var details = List.of(new Detail("/scope", "Inferred queries require an initialized reasoner."));
         var registry = registry(String.class, input -> {
             if (input.equals("inferred")) {
                 throw new AgentToolException("REASONER_UNAVAILABLE", "Initialize the reasoner first.", details);
@@ -95,7 +95,7 @@ public class AgentToolErrorTest {
             return input;
         });
         try {
-            var failure = (Failure) registry.execute("test", "\"inferred\"");
+            var failure = (ToolFailure) registry.execute("test", "\"inferred\"");
             assertEquals(TOOL_ERROR, failure.status());
             assertEquals("REASONER_UNAVAILABLE", failure.code());
             assertEquals("Initialize the reasoner first.", failure.content());
@@ -119,7 +119,7 @@ public class AgentToolErrorTest {
             return input;
         });
         try {
-            var failure = (Failure) registry.execute("test", "\"fail\"");
+            var failure = (ToolFailure) registry.execute("test", "\"fail\"");
             assertEquals(EXECUTION_ERROR, failure.status());
             assertEquals("EXECUTION_ERROR", failure.code());
             assertTrue(failure.details().isEmpty());
@@ -139,17 +139,17 @@ public class AgentToolErrorTest {
 
     @Test
     public void errorDetailsAreImmutableAndLegacyFailureConstructorStillWorks() {
-        var details = new ArrayList<>(List.of(new ErrorDetail("/scope", "Choose DIRECT or ALL.")));
+        var details = new ArrayList<>(List.of(new Detail("/scope", "Choose DIRECT or ALL.")));
         var exception = new AgentToolException("BAD_SCOPE", "Unsupported scope.", details);
-        var failure = new Failure(TOOL_ERROR, exception.getMessage(), exception.code(), details);
+        var failure = new ToolFailure(TOOL_ERROR, exception.getMessage(), exception.code(), details);
         details.clear();
         assertEquals(1, exception.details().size());
         assertEquals(1, failure.details().size());
         assertThrows(UnsupportedOperationException.class, () -> failure.details().clear());
         assertThrows(UnsupportedOperationException.class, () -> exception.details().clear());
-        assertEquals("NO_SUCH_TOOL", new Failure(NO_SUCH_TOOL, "Missing tool.").code());
+        assertEquals("NO_SUCH_TOOL", new ToolFailure(NO_SUCH_TOOL, "Missing tool.").code());
         assertThrows(IllegalArgumentException.class, () -> new AgentToolException(" ", "Message"));
         assertThrows(IllegalArgumentException.class, () -> new AgentToolException("CODE", " "));
-        assertThrows(IllegalArgumentException.class, () -> new Failure(TOOL_ERROR, "Message", "", List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new ToolFailure(TOOL_ERROR, "Message", "", List.of()));
     }
 }

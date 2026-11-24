@@ -66,7 +66,7 @@ The result contains an `OWLClass` and the JSON string `"https://example.org/Pizz
 The tool does not check whether that class exists or change the ontology.
 Relative IRIs such as `"Pizza"` fail validation.
 
-Failed registry calls return `Failure` with a status, code, message, and field
+Failed registry calls return `ToolFailure` with a status, code, message, and field
 details where available. Tools report expected failures by throwing
 `AgentToolException`, for example when a required reasoner is unavailable.
 Unexpected exception messages stay in the application log. Treat

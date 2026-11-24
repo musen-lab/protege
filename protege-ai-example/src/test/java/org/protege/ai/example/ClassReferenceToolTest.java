@@ -13,7 +13,7 @@ import org.semanticweb.owlapi.model.OWLClass;
 import java.util.List;
 
 import static org.junit.Assert.*;
-import static org.protege.ai.api.AgentToolResult.Status.INVALID_INPUT;
+import static org.protege.ai.api.ToolStatus.INVALID_INPUT;
 
 public class ClassReferenceToolTest {
 

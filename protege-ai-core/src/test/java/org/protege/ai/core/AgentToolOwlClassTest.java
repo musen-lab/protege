@@ -9,6 +9,7 @@ import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolResult;
 import org.protege.ai.api.AgentToolSource;
 import org.protege.ai.api.ToolNullable;
+import org.protege.ai.api.ToolFailure;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.IRI;
 import org.semanticweb.owlapi.model.OWLClass;
@@ -20,7 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
-import static org.protege.ai.api.AgentToolResult.Status.*;
+import static org.protege.ai.api.ToolStatus.*;
 
 public class AgentToolOwlClassTest {
 
@@ -198,7 +199,7 @@ public class AgentToolOwlClassTest {
                     value -> new Result(invalid, List.of(invalid)))));
             try {
                 var result = registry.execute("test", "\"input\"");
-                assertTrue(result instanceof AgentToolResult.Failure);
+                assertTrue(result instanceof ToolFailure);
                 assertEquals(EXECUTION_ERROR, result.status());
             } finally {
                 registry.dispose();

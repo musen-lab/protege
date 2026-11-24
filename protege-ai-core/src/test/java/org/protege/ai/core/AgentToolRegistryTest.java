@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
-import static org.protege.ai.api.AgentToolResult.Status.*;
+import static org.protege.ai.api.ToolStatus.*;
 
 public class AgentToolRegistryTest {
 

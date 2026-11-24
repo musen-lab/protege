@@ -9,6 +9,7 @@ import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolResult;
 import org.protege.ai.api.AgentToolSource;
 import org.protege.ai.api.ToolNullable;
+import org.protege.ai.api.ToolFailure;
 
 import java.util.Arrays;
 import java.util.List;
@@ -16,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.*;
-import static org.protege.ai.api.AgentToolResult.Status.*;
+import static org.protege.ai.api.ToolStatus.*;
 
 public class AgentToolValidationTest {
 
@@ -154,7 +155,7 @@ public class AgentToolValidationTest {
     public void checksReturnedValuesAndNeverRepairsResultsWithDefaults() {
         var badItems = registry(String.class, Strings.class, args -> new Strings(Arrays.asList("x", null)));
         var result = badItems.execute("test", "\"x\"");
-        assertTrue(result instanceof AgentToolResult.Failure);
+        assertTrue(result instanceof ToolFailure);
         assertEquals(EXECUTION_ERROR, result.status());
         badItems.dispose();
         var missing = registry(String.class, DefaultResult.class, args -> new DefaultResult(null));

@@ -12,7 +12,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.type.LogicalType;
 import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolSchemas;
-import org.protege.ai.api.AgentToolResult.ErrorDetail;
+import org.protege.ai.api.ToolFailure.Detail;
 import org.semanticweb.owlapi.model.OWLDataFactory;
 
 import java.util.Objects;
@@ -72,7 +72,7 @@ final class ToolJsonCodec<I, O> {
             var violations = inputSchema.details(value);
             if (!violations.isEmpty()) {
                 throw new InvalidInputException("Invalid tool arguments: " + violations.stream()
-                        .map(ErrorDetail::message).collect(Collectors.joining("; ")), violations);
+                        .map(Detail::message).collect(Collectors.joining("; ")), violations);
             }
             return reader.readValue(value);
         } catch (IOException e) {
@@ -91,18 +91,18 @@ final class ToolJsonCodec<I, O> {
     }
 
     static final class InvalidInputException extends Exception {
-        private final List<ErrorDetail> details;
+        private final List<Detail> details;
 
         InvalidInputException(String message) {
             this(message, List.of());
         }
 
-        InvalidInputException(String message, List<ErrorDetail> details) {
+        InvalidInputException(String message, List<Detail> details) {
             super(message);
             this.details = List.copyOf(details);
         }
 
-        List<ErrorDetail> details() {
+        List<Detail> details() {
             return details;
         }
     }

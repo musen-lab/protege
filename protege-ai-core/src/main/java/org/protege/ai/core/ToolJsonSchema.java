@@ -11,7 +11,7 @@ import com.networknt.schema.SchemaLocation;
 import com.networknt.schema.SchemaValidatorsConfig;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.resource.ClasspathSchemaLoader;
-import org.protege.ai.api.AgentToolResult.ErrorDetail;
+import org.protege.ai.api.ToolFailure.Detail;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -49,13 +49,13 @@ final class ToolJsonSchema {
     }
 
     String violations(JsonNode value) {
-        return details(value).stream().map(ErrorDetail::message).collect(Collectors.joining("; "));
+        return details(value).stream().map(Detail::message).collect(Collectors.joining("; "));
     }
 
-    List<ErrorDetail> details(JsonNode value) {
+    List<Detail> details(JsonNode value) {
         return validator.validate(value).stream()
-                .map(message -> new ErrorDetail(message.getInstanceLocation().toString(), message.getMessage()))
-                .sorted(Comparator.comparing(ErrorDetail::field).thenComparing(ErrorDetail::message))
+                .map(message -> new Detail(message.getInstanceLocation().toString(), message.getMessage()))
+                .sorted(Comparator.comparing(Detail::field).thenComparing(Detail::message))
                 .limit(3).toList();
     }
 

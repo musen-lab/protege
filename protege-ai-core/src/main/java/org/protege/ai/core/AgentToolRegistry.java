@@ -7,6 +7,7 @@ import org.protege.ai.api.AgentToolResult;
 import org.protege.ai.api.AgentToolSchemas;
 import org.protege.ai.api.AgentToolSource;
 import org.protege.ai.api.ToolRegistry;
+import org.protege.ai.api.ToolFailure;
 import org.protege.ai.core.plugin.AgentToolPluginLoader;
 import org.protege.editor.core.Disposable;
 import org.protege.editor.owl.OWLEditorKit;
@@ -23,7 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.protege.ai.api.AgentToolResult.Status.*;
+import static org.protege.ai.api.ToolStatus.*;
 
 /** Owns the tools for one editor kit. Synchronous calls may run concurrently. */
 public final class AgentToolRegistry implements ToolRegistry, Disposable {
@@ -139,34 +140,34 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
     @Override
     public AgentToolResult execute(String name, String input) {
         if (input == null) {
-            return new AgentToolResult.Failure(INVALID_INPUT, "Tool input must not be null");
+            return new ToolFailure(INVALID_INPUT, "Tool input must not be null");
         }
         Entry<?, ?> entry;
         synchronized (this) {
             if (disposed) {
-                return new AgentToolResult.Failure(REGISTRY_CLOSED, "Tool registry is closed");
+                return new ToolFailure(REGISTRY_CLOSED, "Tool registry is closed");
             }
             entry = tools.get(name);
             if (entry == null) {
-                return new AgentToolResult.Failure(NO_SUCH_TOOL, "No such tool: " + name);
+                return new ToolFailure(NO_SUCH_TOOL, "No such tool: " + name);
             }
             entry.inFlight++;
         }
         try {
             return invoke(entry, input);
         } catch (ToolJsonCodec.InvalidInputException e) {
-            return new AgentToolResult.Failure(INVALID_INPUT, e.getMessage(), INVALID_INPUT.name(), e.details());
+            return new ToolFailure(INVALID_INPUT, e.getMessage(), INVALID_INPUT.name(), e.details());
         } catch (AgentToolException e) {
-            return new AgentToolResult.Failure(TOOL_ERROR, e.getMessage(), e.code(), e.details());
+            return new ToolFailure(TOOL_ERROR, e.getMessage(), e.code(), e.details());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return new AgentToolResult.Failure(INTERRUPTED, "Tool call was interrupted: " + name);
+            return new ToolFailure(INTERRUPTED, "Tool call was interrupted: " + name);
         } catch (VirtualMachineError e) {
             throw e;
         } catch (Throwable e) {
             String reference = UUID.randomUUID().toString();
             logger.warn("Tool '{}' from '{}' failed (reference {})", name, entry.sourceId, reference, e);
-            return new AgentToolResult.Failure(EXECUTION_ERROR,
+            return new ToolFailure(EXECUTION_ERROR,
                     "Tool execution failed: " + name + ". See the application log (reference " + reference + ").");
         } finally {
             boolean disposeTool;

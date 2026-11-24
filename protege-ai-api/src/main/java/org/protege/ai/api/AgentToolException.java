@@ -7,13 +7,13 @@ import java.util.Objects;
 public final class AgentToolException extends Exception {
 
     private final String code;
-    private final List<AgentToolResult.ErrorDetail> details;
+    private final List<ToolFailure.Detail> details;
 
     public AgentToolException(String code, String message) {
         this(code, message, List.of());
     }
 
-    public AgentToolException(String code, String message, List<AgentToolResult.ErrorDetail> details) {
+    public AgentToolException(String code, String message, List<ToolFailure.Detail> details) {
         super(Objects.requireNonNull(message));
         this.code = Objects.requireNonNull(code);
         if (code.isBlank() || message.isBlank()) {
@@ -26,7 +26,7 @@ public final class AgentToolException extends Exception {
         return code;
     }
 
-    public List<AgentToolResult.ErrorDetail> details() {
+    public List<ToolFailure.Detail> details() {
         return details;
     }
 }

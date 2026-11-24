@@ -100,6 +100,15 @@ Tests can supply a plain OWL API factory through
 `new AgentToolRegistry(sources, dataFactory)`, without an editor kit.
 The one-argument constructor uses OWL API's default factory.
 
+## Result types
+
+`ToolExecutionResult.Success` holds a Java value. `AgentToolResult.Success` holds
+the Java value and its validated JSON. Both keep the original value by reference;
+producers and consumers must treat it and its contents as read-only.
+
+Both result interfaces accept the same `ToolFailure` record. It carries the
+status, code, message, and field details without a successful value or JSON result.
+
 ## Validation and failures
 
 For each call, core applies input defaults, validates the JSON, constructs the
@@ -131,7 +140,7 @@ throw new AgentToolException("REASONER_UNAVAILABLE", "Initialize the reasoner fi
 
 This returns `TOOL_ERROR` with code `REASONER_UNAVAILABLE`. Keep the message suitable
 for the caller. An optional third constructor argument accepts a list of
-`AgentToolResult.ErrorDetail(field, message)` values. Each field is a JSON Pointer,
+`ToolFailure.Detail(field, message)` values. Each field is a JSON Pointer,
 such as `/queries/0/scope`; an empty pointer means the whole input.
 
 Schema validation returns up to three field details. A missing field may point to
@@ -146,8 +155,9 @@ The registry does not retry calls or implement cancellation. `INTERRUPTED` repor
 an actual interruption, not proof that a separate timeout or cancellation request
 stopped the tool.
 
-Existing `new Failure(status, message)` calls still work. Adapters with exhaustive
-status switches must handle the new `TOOL_ERROR` and `INTERRUPTED` cases.
+Failures use the shared `ToolFailure` type, and statuses use `ToolStatus`.
+Update imports and constructor calls that previously used `AgentToolResult.Failure`,
+`AgentToolResult.ErrorDetail`, or `AgentToolResult.Status`. There are no compatibility aliases.
 
 ## Registration checks
 
@@ -179,6 +189,6 @@ tool requirement should guide any future converter API.
 ## Updating older plugins
 
 Rebuild against the current API. Tools must return their shared definition from
-`getDefinition()`. Code constructing responses must use `Success` or `Failure`
+`getDefinition()`. Code constructing responses must use `Success` or `ToolFailure`
 instead of `new AgentToolResult(status, content)`. Callers can still use
 `status()`, `isSuccess()`, and `content()`.

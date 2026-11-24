@@ -15,7 +15,7 @@ public interface ToolRegistry {
 
     /**
      * Accepts JSON arguments and returns a {@link AgentToolResult.Success} with the original
-     * result reference and validated JSON, or a {@link AgentToolResult.Failure}.
+     * result reference and validated JSON, or a {@link ToolFailure}.
      * Treat successful values and their nested contents as read-only; copy before making changes.
      * Selection by name does not establish a compile-time result type; inspect {@code Success<?>}.
      * Runs on the caller's thread. Concurrent calls are allowed; scheduling belongs to the caller.

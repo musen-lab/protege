@@ -73,7 +73,7 @@ String modelText = result.content(); // JSON on success, error message on failur
 if (result instanceof AgentToolResult.Success<?> success) {
     Object value = success.value();  // Original Java result for application code.
     String json = success.json();
-} else if (result instanceof AgentToolResult.Failure failure) {
+} else if (result instanceof ToolFailure failure) {
     String code = failure.code();    // Stable code for application decisions.
     var details = failure.details(); // Field locations and explanations, when available.
 }
@@ -81,7 +81,7 @@ if (result instanceof AgentToolResult.Success<?> success) {
 
 A failure contains a status, stable code, message, and any field details, with no
 result object. Use `isSuccess()` or `status()` to check the outcome.
-Read `Failure.code()` for programmatic handling and `content()` for the model.
+Read `ToolFailure.code()` for programmatic handling and `content()` for the model.
 A call by name can return different Java types; check the value's type before
 using tool-specific fields. See [failure statuses](docs/tool-contract.md#validation-and-failures)
 for the distinction between invalid input, expected failures, and unexpected errors.

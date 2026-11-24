@@ -7,13 +7,14 @@ import org.protege.ai.api.AgentTool;
 import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolResult;
 import org.protege.ai.api.AgentToolSource;
+import org.protege.ai.api.ToolFailure;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.*;
-import static org.protege.ai.api.AgentToolResult.Status.*;
+import static org.protege.ai.api.ToolStatus.*;
 
 public class AgentToolTypedContractTest {
 
@@ -103,11 +104,11 @@ public class AgentToolTypedContractTest {
     public void responsesRequireCompleteSuccessOrNonSuccessFailure() {
         assertThrows(NullPointerException.class, () -> new AgentToolResult.Success<>(null, "{}"));
         assertThrows(NullPointerException.class, () -> new AgentToolResult.Success<>(new Result(List.of()), null));
-        assertThrows(NullPointerException.class, () -> new AgentToolResult.Failure(null, "Failure"));
-        assertThrows(NullPointerException.class, () -> new AgentToolResult.Failure(EXECUTION_ERROR, null));
-        assertThrows(IllegalArgumentException.class, () -> new AgentToolResult.Failure(SUCCESS, "{}"));
+        assertThrows(NullPointerException.class, () -> new ToolFailure(null, "Failure"));
+        assertThrows(NullPointerException.class, () -> new ToolFailure(EXECUTION_ERROR, null));
+        assertThrows(IllegalArgumentException.class, () -> new ToolFailure(SUCCESS, "{}"));
         for (var status : List.of(NO_SUCH_TOOL, INVALID_INPUT, EXECUTION_ERROR, REGISTRY_CLOSED)) {
-            var failure = new AgentToolResult.Failure(status, "Failure");
+            var failure = new ToolFailure(status, "Failure");
             assertFalse(failure.isSuccess());
             assertEquals(status, failure.status());
             assertEquals("Failure", failure.content());
@@ -172,7 +173,7 @@ public class AgentToolTypedContractTest {
         })));
 
         var result = registry.execute("find", "{\"label\":\"Pizza\",\"scope\":\"ALL\"}");
-        assertTrue(result instanceof AgentToolResult.Failure);
+        assertTrue(result instanceof ToolFailure);
         assertEquals(EXECUTION_ERROR, result.status());
         registry.dispose();
         assertEquals(1, disposed.get());
@@ -188,7 +189,7 @@ public class AgentToolTypedContractTest {
         var registry = new AgentToolRegistry(List.of(source(definition, arguments -> new BrokenResult())));
 
         var result = registry.execute("broken", "{\"label\":\"Pizza\",\"scope\":\"ALL\"}");
-        assertTrue(result instanceof AgentToolResult.Failure);
+        assertTrue(result instanceof ToolFailure);
         assertEquals(EXECUTION_ERROR, result.status());
         registry.dispose();
     }
