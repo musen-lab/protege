@@ -60,13 +60,13 @@ public class AgentToolRegistryTest {
                     public String execute(String input) { throw new AssertionError("Must not execute rejected tool"); }
                     public void dispose() { disposed.incrementAndGet(); }
                 };
-                var registry = new AgentToolRegistry(List.of(source("plugin.mismatch", tool)));
-                assertTrue(registry.listTools().isEmpty());
-                assertTrue(registry.findSchemas(DEFINITION.name()).isEmpty());
-                assertEquals(NO_SUCH_TOOL, registry.execute(DEFINITION.name(), "\"input\"").status());
+                var jsonTools = new AgentToolJsonService(List.of(source("plugin.mismatch", tool)));
+                assertTrue(jsonTools.registry().listTools().isEmpty());
+                assertTrue(jsonTools.findSchemas(DEFINITION.name()).isEmpty());
+                assertEquals(NO_SUCH_TOOL, jsonTools.execute(DEFINITION.name(), "\"input\"").status());
                 assertEquals(0, initialized.get());
                 assertEquals(1, disposed.get());
-                registry.dispose();
+                jsonTools.dispose();
                 assertEquals(1, disposed.get());
             }
             assertEquals(3, appender.list.size());
@@ -86,28 +86,28 @@ public class AgentToolRegistryTest {
         var equivalent = new AgentToolDefinition<>(DEFINITION.name(), DEFINITION.description(),
                 DEFINITION.argumentType(), DEFINITION.resultType());
         assertNotSame(DEFINITION, equivalent);
-        var registry = new AgentToolRegistry(List.of(source("plugin.equivalent",
+        var jsonTools = new AgentToolJsonService(List.of(source("plugin.equivalent",
                 new ToolStub<>(equivalent, input -> input))));
-        assertEquals(SUCCESS, registry.execute(DEFINITION.name(), "\"input\"").status());
-        registry.dispose();
+        assertEquals(SUCCESS, jsonTools.execute(DEFINITION.name(), "\"input\"").status());
+        jsonTools.dispose();
     }
 
     @Test
     public void listsFindsAndInvokesSuppliedTool() {
-        AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", input -> input)));
-        assertEquals(List.of(DEFINITION), registry.listTools());
-        assertEquals(DEFINITION, registry.findTool("test_tool").orElseThrow());
-        assertEquals("\"hello\"", registry.execute("test_tool", "\"hello\"").content());
-        assertEquals(SUCCESS, registry.execute("test_tool", "\"{}\"").status());
-        assertThrows(UnsupportedOperationException.class, () -> registry.listTools().clear());
+        AgentToolJsonService jsonTools = new AgentToolJsonService(List.of(source("first", input -> input)));
+        assertEquals(List.of(DEFINITION), jsonTools.registry().listTools());
+        assertEquals(DEFINITION, jsonTools.registry().findTool("test_tool").orElseThrow());
+        assertEquals("\"hello\"", jsonTools.execute("test_tool", "\"hello\"").content());
+        assertEquals(SUCCESS, jsonTools.execute("test_tool", "\"{}\"").status());
+        assertThrows(UnsupportedOperationException.class, () -> jsonTools.registry().listTools().clear());
     }
 
     @Test
     public void unknownToolReturnsAnErrorWithoutThrowing() {
-        AgentToolRegistry registry = new AgentToolRegistry(List.of());
-        assertTrue(registry.findTool("missing").isEmpty());
-        assertEquals(NO_SUCH_TOOL, registry.execute("missing", "\"{}\"").status());
-        assertEquals("No such tool: missing", registry.execute("missing", "\"{}\"").content());
+        AgentToolJsonService jsonTools = new AgentToolJsonService(List.of());
+        assertTrue(jsonTools.registry().findTool("missing").isEmpty());
+        assertEquals(NO_SUCH_TOOL, jsonTools.execute("missing", "\"{}\"").status());
+        assertEquals("No such tool: missing", jsonTools.execute("missing", "\"{}\"").content());
     }
 
     @Test
@@ -117,14 +117,14 @@ public class AgentToolRegistryTest {
         appender.start();
         logger.addAppender(appender);
         try {
-            AgentToolRegistry registry = new AgentToolRegistry(List.of(source("plugin.first", input -> "first")));
+            AgentToolJsonService jsonTools = new AgentToolJsonService(List.of(source("plugin.first", input -> "first")));
             AgentToolSource<String, String> duplicate = new AgentToolSource<String, String>() {
                 public String getId() { return "plugin.second"; }
                 public AgentToolDefinition<String, String> getDefinition() { return DEFINITION; }
                 public AgentTool<String, String> newInstance() { throw new AssertionError("Must not construct duplicate"); }
             };
-            assertFalse(registry.register(duplicate));
-            assertEquals("\"first\"", registry.execute("test_tool", "\"{}\"").content());
+            assertFalse(jsonTools.registry().register(duplicate));
+            assertEquals("\"first\"", jsonTools.execute("test_tool", "\"{}\"").content());
             assertTrue(appender.list.stream().map(ILoggingEvent::getFormattedMessage)
                     .anyMatch(message -> message.contains("plugin.first") && message.contains("plugin.second")));
         } finally {
@@ -143,14 +143,14 @@ public class AgentToolRegistryTest {
             public String execute(String input) { return "{}"; }
             public void dispose() { disposed.incrementAndGet(); }
         };
-        AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", tool)));
+        AgentToolJsonService jsonTools = new AgentToolJsonService(List.of(source("first", tool)));
         assertEquals(1, initialized.get());
-        registry.dispose();
-        registry.dispose();
+        jsonTools.dispose();
+        jsonTools.dispose();
         assertEquals(1, disposed.get());
-        assertTrue(registry.listTools().isEmpty());
-        assertEquals(REGISTRY_CLOSED, registry.execute("test_tool", "\"{}\"").status());
-        assertThrows(IllegalStateException.class, () -> registry.register(source("second", tool)));
+        assertTrue(jsonTools.registry().listTools().isEmpty());
+        assertEquals(REGISTRY_CLOSED, jsonTools.execute("test_tool", "\"{}\"").status());
+        assertThrows(IllegalStateException.class, () -> jsonTools.registry().register(source("second", tool)));
     }
 
     @Test
@@ -162,12 +162,12 @@ public class AgentToolRegistryTest {
             public String execute(String input) { throw new AssertionError(); }
             public void dispose() { disposed.incrementAndGet(); }
         };
-        AgentToolRegistry registry = new AgentToolRegistry(List.of(
+        AgentToolJsonService jsonTools = new AgentToolJsonService(List.of(
                 source("broken", broken), source("working",
                 new AgentToolDefinition<String, String>("other_tool", "Other tool", String.class, String.class), input -> "{}")));
         assertEquals(1, disposed.get());
-        assertEquals(NO_SUCH_TOOL, registry.execute("test_tool", "\"{}\"").status());
-        assertEquals(SUCCESS, registry.execute("other_tool", "\"{}\"").status());
+        assertEquals(NO_SUCH_TOOL, jsonTools.execute("test_tool", "\"{}\"").status());
+        assertEquals(SUCCESS, jsonTools.execute("other_tool", "\"{}\"").status());
     }
 
     @Test
@@ -182,14 +182,14 @@ public class AgentToolRegistryTest {
                 public void initialise() { throw new IllegalStateException("Cannot initialize"); }
                 public String execute(String input) { throw new AssertionError(); }
             };
-            AgentToolRegistry registry = new AgentToolRegistry(List.of(source("plugin.broken", broken)));
+            AgentToolJsonService jsonTools = new AgentToolJsonService(List.of(source("plugin.broken", broken)));
             AgentToolSource<String, String> duplicate = new AgentToolSource<String, String>() {
                 public String getId() { return "plugin.duplicate"; }
                 public AgentToolDefinition<String, String> getDefinition() { return DEFINITION; }
                 public AgentTool<String, String> newInstance() { throw new AssertionError("Must not construct duplicate"); }
             };
-            assertFalse(registry.register(duplicate));
-            assertTrue(registry.listTools().isEmpty());
+            assertFalse(jsonTools.registry().register(duplicate));
+            assertTrue(jsonTools.registry().listTools().isEmpty());
             assertTrue(appender.list.stream().map(ILoggingEvent::getFormattedMessage)
                     .anyMatch(message -> message.contains("plugin.broken") && message.contains("plugin.duplicate")));
         } finally {
@@ -200,24 +200,24 @@ public class AgentToolRegistryTest {
 
     @Test
     public void nullInputIsRejectedBeforeCallingTool() {
-        AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", input -> {
+        AgentToolJsonService jsonTools = new AgentToolJsonService(List.of(source("first", input -> {
             throw new AssertionError("Must not execute with null input");
         })));
-        assertEquals(INVALID_INPUT, registry.execute("test_tool", null).status());
-        assertEquals("Tool input must not be null", registry.execute("test_tool", null).content());
+        assertEquals(INVALID_INPUT, jsonTools.execute("test_tool", null).status());
+        assertEquals("Tool input must not be null", jsonTools.execute("test_tool", null).content());
     }
 
     @Test
     public void toolFailureIsReportedWithoutLosingTheTool() {
-        AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", input -> {
+        AgentToolJsonService jsonTools = new AgentToolJsonService(List.of(source("first", input -> {
             if (input.equals("fail")) {
                 throw new IllegalArgumentException("Failure details");
             }
             return input;
         })));
-        assertEquals(EXECUTION_ERROR, registry.execute("test_tool", "\"fail\"").status());
-        assertFalse(registry.execute("test_tool", "\"fail\"").content().contains("Failure details"));
-        assertEquals(SUCCESS, registry.execute("test_tool", "\"{}\"").status());
+        assertEquals(EXECUTION_ERROR, jsonTools.execute("test_tool", "\"fail\"").status());
+        assertFalse(jsonTools.execute("test_tool", "\"fail\"").content().contains("Failure details"));
+        assertEquals(SUCCESS, jsonTools.execute("test_tool", "\"{}\"").status());
     }
 
     @Test
@@ -228,12 +228,12 @@ public class AgentToolRegistryTest {
             public String execute(String input) { throw new AssertionError("Broken tool assumption"); }
             public void dispose() { disposed.incrementAndGet(); }
         };
-        AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", tool)));
-        var result = registry.execute("test_tool", "\"{}\"");
+        AgentToolJsonService jsonTools = new AgentToolJsonService(List.of(source("first", tool)));
+        var result = jsonTools.execute("test_tool", "\"{}\"");
         assertEquals(EXECUTION_ERROR, result.status());
         assertFalse(result.content().contains("Broken tool assumption"));
         assertTrue(result.content().contains("reference"));
-        registry.dispose();
+        jsonTools.dispose();
         assertEquals(1, disposed.get());
     }
 
@@ -246,27 +246,27 @@ public class AgentToolRegistryTest {
             public String execute(String input) { throw failure; }
             public void dispose() { disposed.incrementAndGet(); }
         };
-        AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", tool)));
-        assertSame(failure, assertThrows(VirtualMachineError.class, () -> registry.execute("test_tool", "\"{}\"")));
-        registry.dispose();
+        AgentToolJsonService jsonTools = new AgentToolJsonService(List.of(source("first", tool)));
+        assertSame(failure, assertThrows(VirtualMachineError.class, () -> jsonTools.execute("test_tool", "\"{}\"")));
+        jsonTools.dispose();
         assertEquals(1, disposed.get());
     }
 
     @Test
     public void failureWithoutMessageStillHasDiagnosticReference() {
-        AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", input -> {
+        AgentToolJsonService jsonTools = new AgentToolJsonService(List.of(source("first", input -> {
             throw new IllegalStateException();
         })));
-        assertTrue(registry.execute("test_tool", "\"{}\"").content().contains("reference"));
+        assertTrue(jsonTools.execute("test_tool", "\"{}\"").content().contains("reference"));
     }
 
     @Test
     public void interruptionPreservesTheThreadInterruptFlag() {
-        AgentToolRegistry registry = new AgentToolRegistry(List.of(source("first", input -> {
+        AgentToolJsonService jsonTools = new AgentToolJsonService(List.of(source("first", input -> {
             throw new InterruptedException();
         })));
         try {
-            assertEquals(INTERRUPTED, registry.execute("test_tool", "\"{}\"").status());
+            assertEquals(INTERRUPTED, jsonTools.execute("test_tool", "\"{}\"").status());
             assertTrue(Thread.currentThread().isInterrupted());
         } finally {
             Thread.interrupted();
@@ -284,8 +284,8 @@ public class AgentToolRegistryTest {
                 return new ToolStub<>(DEFINITION, input -> instance);
             }
         };
-        AgentToolRegistry first = new AgentToolRegistry(List.of(source));
-        AgentToolRegistry second = new AgentToolRegistry(List.of(source));
+        AgentToolJsonService first = new AgentToolJsonService(List.of(source));
+        AgentToolJsonService second = new AgentToolJsonService(List.of(source));
         assertNotEquals(first.execute("test_tool", "\"{}\"").content(), second.execute("test_tool", "\"{}\"").content());
         first.dispose();
         assertEquals(SUCCESS, second.execute("test_tool", "\"{}\"").status());

@@ -15,7 +15,7 @@ public sealed interface AgentToolResult permits AgentToolResult.Success, ToolFai
     }
 
     /**
-     * Retains the original result reference and its JSON snapshot, validated by the registry.
+     * Retains the original result reference and its JSON snapshot, validated by the JSON service.
      * Producers must not mutate the result after returning it, including during disposal.
      * Consumers must treat it and its nested values as read-only, copying before making changes.
      * No defensive copy or deep immutability enforcement is performed.

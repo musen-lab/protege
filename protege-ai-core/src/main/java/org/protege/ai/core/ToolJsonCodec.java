@@ -16,7 +16,6 @@ import org.protege.ai.api.ToolFailure.Detail;
 import org.semanticweb.owlapi.model.OWLDataFactory;
 
 import java.util.Objects;
-import java.util.List;
 import java.util.stream.Collectors;
 import java.io.IOException;
 
@@ -62,48 +61,31 @@ final class ToolJsonCodec<I, O> {
         return schemas;
     }
 
-    I readArguments(String input) throws InvalidInputException {
+    I readArguments(String input) throws InvalidToolArgumentsException {
         try {
             JsonNode value = jsonReader.readValue(input);
             if (value == null || value.isMissingNode()) {
-                throw new InvalidInputException("Tool arguments must contain a JSON value");
+                throw new InvalidToolArgumentsException("Tool arguments must contain a JSON value");
             }
             inputSchema.applyInputDefaults(value);
             var violations = inputSchema.details(value);
             if (!violations.isEmpty()) {
-                throw new InvalidInputException("Invalid tool arguments: " + violations.stream()
+                throw new InvalidToolArgumentsException("Invalid tool arguments: " + violations.stream()
                         .map(Detail::message).collect(Collectors.joining("; ")), violations);
             }
             return reader.readValue(value);
         } catch (IOException e) {
             // Binding exceptions can contain arbitrary messages from argument constructors.
-            throw new InvalidInputException("Arguments must be valid JSON matching the tool's declared input type");
+            throw new InvalidToolArgumentsException("Arguments must be valid JSON matching the tool's declared input type");
         }
     }
 
-    String writeResult(O result) throws JsonProcessingException {
+    String writeResult(Object result) throws JsonProcessingException {
         String json = writer.writeValueAsString(resultType.cast(Objects.requireNonNull(result, "Tool returned null")));
         String violations = outputSchema.violations(jsonReader.readTree(json));
         if (!violations.isEmpty()) {
             throw new IllegalStateException("Tool result does not match its schema: " + violations);
         }
         return json;
-    }
-
-    static final class InvalidInputException extends Exception {
-        private final List<Detail> details;
-
-        InvalidInputException(String message) {
-            this(message, List.of());
-        }
-
-        InvalidInputException(String message, List<Detail> details) {
-            super(message);
-            this.details = List.copyOf(details);
-        }
-
-        List<Detail> details() {
-            return details;
-        }
     }
 }

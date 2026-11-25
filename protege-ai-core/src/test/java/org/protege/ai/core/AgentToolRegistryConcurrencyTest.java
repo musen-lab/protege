@@ -2,6 +2,8 @@ package org.protege.ai.core;
 
 import org.junit.Test;
 import org.protege.ai.api.AgentTool;
+import org.protege.ai.api.ToolExecutionResult;
+import org.protege.ai.api.ToolFailure;
 import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolSource;
 
@@ -57,7 +59,7 @@ public class AgentToolRegistryConcurrencyTest {
         AgentToolRegistry registry = new AgentToolRegistry(List.of(source("busy", busy), source("idle", idle)));
         var worker = Executors.newSingleThreadExecutor();
         try {
-            var call = worker.submit(() -> registry.execute("busy", "\"{}\""));
+            var call = worker.submit(() -> registry.execute("busy", "{}"));
             assertTrue(started.await(5, SECONDS));
             CompletableFuture<Void> closed = new CompletableFuture<>();
             SwingUtilities.invokeLater(() -> {
@@ -67,7 +69,7 @@ public class AgentToolRegistryConcurrencyTest {
                     registry.dispose();
                     registry.dispose();
                     assertTrue(registry.listTools().isEmpty());
-                    assertEquals(REGISTRY_CLOSED, registry.execute("busy", "\"{}\"").status());
+                    assertEquals(REGISTRY_CLOSED, registry.execute("busy", "{}").status());
                     closed.complete(null);
                 } catch (Throwable e) {
                     closed.completeExceptionally(e);
@@ -78,7 +80,7 @@ public class AgentToolRegistryConcurrencyTest {
             assertEquals(1, idleDisposed.get());
             assertEquals(0, busyDisposed.get());
             release.countDown();
-            assertEquals("\"finished\"", call.get(5, SECONDS).content());
+            assertEquals("finished", ((ToolExecutionResult.Success<?>) call.get(5, SECONDS)).value());
             assertEquals(1, busyDisposed.get());
         } finally {
             release.countDown();
@@ -112,8 +114,8 @@ public class AgentToolRegistryConcurrencyTest {
         AgentToolRegistry registry = new AgentToolRegistry(List.of(source("parallel", tool)));
         var workers = Executors.newFixedThreadPool(2);
         try {
-            var first = workers.submit(() -> registry.execute("parallel", "\"first\""));
-            var second = workers.submit(() -> registry.execute("parallel", "\"second\""));
+            var first = workers.submit(() -> registry.execute("parallel", "first"));
+            var second = workers.submit(() -> registry.execute("parallel", "second"));
             assertTrue(started.await(5, SECONDS));
             registry.dispose();
             releaseFirst.countDown();
@@ -154,7 +156,7 @@ public class AgentToolRegistryConcurrencyTest {
         var worker = Executors.newSingleThreadExecutor();
         try {
             var call = worker.submit(() -> {
-                var result = registry.execute("interruptible", "\"{}\"");
+                var result = registry.execute("interruptible", "{}");
                 interrupted.set(Thread.currentThread().isInterrupted());
                 return result;
             });
@@ -163,7 +165,7 @@ public class AgentToolRegistryConcurrencyTest {
             runningThread.get().interrupt();
             var result = call.get(5, SECONDS);
             assertEquals(INTERRUPTED, result.status());
-            assertTrue(result.content().contains("interrupted"));
+            assertTrue(((ToolFailure) result).content().contains("interrupted"));
             assertTrue(interrupted.get());
             assertEquals(1, disposed.get());
         } finally {

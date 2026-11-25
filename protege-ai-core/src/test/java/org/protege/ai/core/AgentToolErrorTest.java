@@ -32,9 +32,9 @@ public class AgentToolErrorTest {
         }
     }
 
-    private <I> AgentToolRegistry registry(Class<I> input, ToolStub.Invocation<I, String> action) {
+    private <I> AgentToolJsonService jsonTools(Class<I> input, ToolStub.Invocation<I, String> action) {
         var definition = new AgentToolDefinition<>("test", "Test errors", input, String.class);
-        return new AgentToolRegistry(List.of(new AgentToolSource<I, String>() {
+        return new AgentToolJsonService(List.of(new AgentToolSource<I, String>() {
             public String getId() { return "test.errors"; }
             public AgentToolDefinition<I, String> getDefinition() { return definition; }
             public AgentTool<I, String> newInstance() { return new ToolStub<>(definition, action); }
@@ -44,65 +44,65 @@ public class AgentToolErrorTest {
     @Test
     public void validationReturnsFieldDetailsWithoutCallingTheTool() {
         var calls = new AtomicInteger();
-        var registry = registry(Arguments.class, input -> {
+        var jsonTools = jsonTools(Arguments.class, input -> {
             calls.incrementAndGet();
             return "ok";
         });
         try {
-            var failure = (ToolFailure) registry.execute("test", "{\"queries\":[{\"scope\":\"INVALID\"}]}");
+            var failure = (ToolFailure) jsonTools.execute("test", "{\"queries\":[{\"scope\":\"INVALID\"}]}");
             assertEquals(INVALID_INPUT, failure.status());
             assertEquals("INVALID_INPUT", failure.code());
             assertEquals("/queries/0/scope", failure.details().getFirst().field());
             assertTrue(failure.details().getFirst().message().contains("DIRECT"));
             assertTrue(failure.content().contains(failure.details().getFirst().message()));
-            var missing = (ToolFailure) registry.execute("test", "{\"queries\":[{}]}");
+            var missing = (ToolFailure) jsonTools.execute("test", "{\"queries\":[{}]}");
             assertEquals(INVALID_INPUT, missing.status());
             assertTrue(missing.details().getFirst().message().contains("scope"));
             assertEquals(0, calls.get());
-            assertTrue(registry.execute("test", "{\"queries\":[{\"scope\":\"ALL\"}]}").isSuccess());
+            assertTrue(jsonTools.execute("test", "{\"queries\":[{\"scope\":\"ALL\"}]}").isSuccess());
         } finally {
-            registry.dispose();
+            jsonTools.dispose();
         }
     }
 
     @Test
     public void malformedJsonAndBindingErrorsDoNotExposeConstructorMessages() {
         var calls = new AtomicInteger();
-        var registry = registry(CheckedInput.class, input -> {
+        var jsonTools = jsonTools(CheckedInput.class, input -> {
             calls.incrementAndGet();
             return "ok";
         });
         try {
             for (String json : List.of("{", "{\"value\":\"bad\"}")) {
-                var failure = (ToolFailure) registry.execute("test", json);
+                var failure = (ToolFailure) jsonTools.execute("test", json);
                 assertEquals(INVALID_INPUT, failure.status());
                 assertEquals("INVALID_INPUT", failure.code());
                 assertFalse(failure.content().contains("private constructor details"));
             }
             assertEquals(0, calls.get());
         } finally {
-            registry.dispose();
+            jsonTools.dispose();
         }
     }
 
     @Test
     public void expectedFailurePreservesTheToolsCodeMessageAndDetails() {
         var details = List.of(new Detail("/scope", "Inferred queries require an initialized reasoner."));
-        var registry = registry(String.class, input -> {
+        var jsonTools = jsonTools(String.class, input -> {
             if (input.equals("inferred")) {
                 throw new AgentToolException("REASONER_UNAVAILABLE", "Initialize the reasoner first.", details);
             }
             return input;
         });
         try {
-            var failure = (ToolFailure) registry.execute("test", "\"inferred\"");
+            var failure = (ToolFailure) jsonTools.execute("test", "\"inferred\"");
             assertEquals(TOOL_ERROR, failure.status());
             assertEquals("REASONER_UNAVAILABLE", failure.code());
             assertEquals("Initialize the reasoner first.", failure.content());
             assertEquals(details, failure.details());
-            assertTrue(registry.execute("test", "\"asserted\"").isSuccess());
+            assertTrue(jsonTools.execute("test", "\"asserted\"").isSuccess());
         } finally {
-            registry.dispose();
+            jsonTools.dispose();
         }
     }
 
@@ -112,14 +112,14 @@ public class AgentToolErrorTest {
         var appender = new ListAppender<ILoggingEvent>();
         appender.start();
         logger.addAppender(appender);
-        var registry = registry(String.class, input -> {
+        var jsonTools = jsonTools(String.class, input -> {
             if (input.equals("fail")) {
                 throw new IllegalStateException("private diagnostic details");
             }
             return input;
         });
         try {
-            var failure = (ToolFailure) registry.execute("test", "\"fail\"");
+            var failure = (ToolFailure) jsonTools.execute("test", "\"fail\"");
             assertEquals(EXECUTION_ERROR, failure.status());
             assertEquals("EXECUTION_ERROR", failure.code());
             assertTrue(failure.details().isEmpty());
@@ -129,9 +129,9 @@ public class AgentToolErrorTest {
             String reference = event.getArgumentArray()[2].toString();
             assertNotNull(java.util.UUID.fromString(reference));
             assertTrue(failure.content().contains(reference));
-            assertTrue(registry.execute("test", "\"ok\"").isSuccess());
+            assertTrue(jsonTools.execute("test", "\"ok\"").isSuccess());
         } finally {
-            registry.dispose();
+            jsonTools.dispose();
             logger.detachAppender(appender);
             appender.stop();
         }

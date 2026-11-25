@@ -37,6 +37,12 @@ public class AgentToolPluginTest {
         var manager = mock(OWLModelManager.class);
         when(kit.getOWLModelManager()).thenReturn(manager);
         when(manager.getOWLDataFactory()).thenReturn(OWLManager.getOWLDataFactory());
+        Map<Object, Disposable> objects = new HashMap<>();
+        when(kit.get(any())).thenAnswer(call -> objects.get(call.getArgument(0)));
+        doAnswer(call -> {
+            objects.put(call.getArgument(0), call.getArgument(1));
+            return null;
+        }).when(kit).put(any(), any());
         return kit;
     }
 
@@ -50,7 +56,7 @@ public class AgentToolPluginTest {
     }
 
     @Test
-    public void registryUsesTheWindowsDataFactoryForClassArguments() throws Exception {
+    public void jsonServiceUsesTheWindowsDataFactoryForClassArguments() throws Exception {
         var kit = editorKit();
         var factory = mock(OWLDataFactory.class);
         var iri = IRI.create("https://example.org/Pizza");
@@ -59,9 +65,9 @@ public class AgentToolPluginTest {
         when(kit.getOWLModelManager().getOWLDataFactory()).thenReturn(factory);
         var extension = TestPluginRuntime.extension("test.owlClass", ClassFactory.class.getName());
         try (var runtime = new TestPluginRuntime(extension)) {
-            var registry = AgentToolRegistry.getRegistry(kit);
+            var registry = AgentToolServices.getRegistry(kit);
             try {
-                var result = registry.execute("class_reference", "\"https://example.org/Pizza\"");
+                var result = AgentToolServices.getJsonTools(kit).execute("class_reference", "\"https://example.org/Pizza\"");
                 assertEquals(SUCCESS, result.status());
                 verify(factory).getOWLClass(iri);
             } finally {
@@ -142,20 +148,22 @@ public class AgentToolPluginTest {
         }).when(kit).dispose();
 
         try (var runtime = new TestPluginRuntime(extension)) {
-            AgentToolRegistry registry = AgentToolRegistry.getRegistry(kit);
+            var jsonTools = AgentToolServices.getJsonTools(kit);
+            AgentToolRegistry registry = AgentToolServices.getRegistry(kit);
             assertEquals(1, objects.size());
-            assertTrue(objects.containsValue(registry));
+            assertTrue(objects.containsValue(jsonTools));
+            assertSame(jsonTools, AgentToolServices.getJsonTools(kit));
             assertEquals(1, TestFactory.tools.get());
             var hookExtension = TestPluginRuntime.extension("test.hook", AgentToolRegistryInitializer.class.getName());
             var hook = new EditorKitHookPluginImpl(hookExtension, kit).newInstance();
             hook.initialise();
-            assertSame(registry, AgentToolRegistry.getRegistry(kit));
+            assertSame(registry, AgentToolServices.getRegistry(kit));
             assertEquals(1, TestFactory.tools.get());
             hook.dispose();
             assertEquals(0, TestFactory.disposed.get());
             kit.dispose();
             assertEquals(1, TestFactory.disposed.get());
-            assertEquals(REGISTRY_CLOSED, registry.execute("test_tool", "\"{}\"").status());
+            assertEquals(REGISTRY_CLOSED, registry.execute("test_tool", "input").status());
             registry.dispose();
             assertEquals(1, TestFactory.disposed.get());
         }
@@ -171,7 +179,7 @@ public class AgentToolPluginTest {
         appender.start();
         logger.addAppender(appender);
         try (var runtime = new TestPluginRuntime(blankName, blankClass, valid)) {
-            var registry = AgentToolRegistry.getRegistry(editorKit());
+            var registry = AgentToolServices.getRegistry(editorKit());
             assertEquals(java.util.List.of(DEFINITION), registry.listTools());
             assertTrue(appender.list.stream().map(ILoggingEvent::getFormattedMessage)
                     .anyMatch(message -> message.contains("test.blankName")));

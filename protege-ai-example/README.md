@@ -32,10 +32,10 @@ After the build above, run them from the repository root:
 mvn -pl protege-ai-example test
 ```
 
-Obtain the registry on the Swing thread and keep it for later calls:
+Obtain the JSON service on the Swing thread and keep it for later calls:
 
 ```java
-ToolRegistry registry = AgentToolRegistry.getRegistry(editorKit);
+JsonToolService jsonTools = AgentToolServices.getJsonTools(editorKit);
 ```
 
 Calls run on the caller's thread. Use a worker thread for expensive work.
@@ -43,7 +43,7 @@ Calls run on the caller's thread. Use a worker thread for expensive work.
 **Count ontology content:**
 
 ```java
-AgentToolResult counts = registry.execute("example_ontology_counts", "{}");
+AgentToolResult counts = jsonTools.execute("example_ontology_counts", "{}");
 ```
 
 On success, `counts.content()` is JSON such as
@@ -53,7 +53,7 @@ Changing the active ontology changes the next call's target.
 **Convert a class reference:**
 
 ```java
-AgentToolResult result = registry.execute("example_class_reference",
+AgentToolResult result = jsonTools.execute("example_class_reference",
         "\"https://example.org/Pizza\"");
 
 if (result instanceof AgentToolResult.Success<?> success) {
@@ -66,7 +66,7 @@ The result contains an `OWLClass` and the JSON string `"https://example.org/Pizz
 The tool does not check whether that class exists or change the ontology.
 Relative IRIs such as `"Pizza"` fail validation.
 
-Failed registry calls return `ToolFailure` with a status, code, message, and field
+Failed calls return `ToolFailure` with a status, code, message, and field
 details where available. Tools report expected failures by throwing
 `AgentToolException`, for example when a required reasoner is unavailable.
 Unexpected exception messages stay in the application log. Treat

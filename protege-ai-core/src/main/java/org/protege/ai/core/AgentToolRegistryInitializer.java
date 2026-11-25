@@ -7,11 +7,11 @@ public final class AgentToolRegistryInitializer extends OWLEditorKitHook {
 
     @Override
     public void initialise() {
-        AgentToolRegistry.getRegistry(getEditorKit());
+        AgentToolServices.getRegistry(getEditorKit());
     }
 
     @Override
     public void dispose() {
-        // The editor kit owns and disposes the registry stored in its object map.
+        // The editor kit owns the services; their disposal closes the registry.
     }
 }

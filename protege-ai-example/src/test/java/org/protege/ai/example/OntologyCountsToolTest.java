@@ -5,7 +5,7 @@ import org.protege.ai.api.AgentTool;
 import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolResult;
 import org.protege.ai.api.AgentToolSource;
-import org.protege.ai.core.AgentToolRegistry;
+import org.protege.ai.core.AgentToolJsonService;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.OWLOntology;
 
@@ -46,8 +46,8 @@ public class OntologyCountsToolTest {
             }
             public AgentTool<OntologyCountsArguments, OntologyCountsResult> newInstance() { return new OntologyCountsTool(active::get); }
         };
-        var registry = new AgentToolRegistry(List.of(source));
-        var result = registry.execute("example_ontology_counts", "{}");
+        var jsonTools = new AgentToolJsonService(List.of(source));
+        var result = jsonTools.execute("example_ontology_counts", "{}");
         assertTrue(result.isSuccess());
         assertTrue(result instanceof AgentToolResult.Success<?>);
         var success = (AgentToolResult.Success<?>) result;
@@ -59,7 +59,7 @@ public class OntologyCountsToolTest {
                 + ",\"axiomCount\":" + pizza.getAxiomCount() + "}", result.content());
         active.set(manager.createOntology());
         assertEquals("{\"classCount\":0,\"axiomCount\":0}",
-                registry.execute("example_ontology_counts", "{}").content());
-        registry.dispose();
+                jsonTools.execute("example_ontology_counts", "{}").content());
+        jsonTools.dispose();
     }
 }

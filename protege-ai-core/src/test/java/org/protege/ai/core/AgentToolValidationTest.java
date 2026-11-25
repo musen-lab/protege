@@ -32,8 +32,8 @@ public class AgentToolValidationTest {
                                   @ToolNullable Scope scope) {}
     public record ArrayInput(@ToolNullable String[] items) {}
 
-    private <I, O> AgentToolRegistry registry(Class<I> input, Class<O> output, ToolStub.Invocation<I, O> invocation) {
-        return new AgentToolRegistry(List.of(new AgentToolSource<I, O>() {
+    private <I, O> AgentToolJsonService jsonTools(Class<I> input, Class<O> output, ToolStub.Invocation<I, O> invocation) {
+        return new AgentToolJsonService(List.of(new AgentToolSource<I, O>() {
             public String getId() { return "test.validation"; }
             public AgentToolDefinition<I, O> getDefinition() {
                 return new AgentToolDefinition<>("test", "Validate arguments and results", input, output);
@@ -46,43 +46,43 @@ public class AgentToolValidationTest {
     public void omissionUsesDefaultsWhileExplicitNullRequiresPermission() {
         var received = new AtomicReference<Search>();
         var calls = new AtomicInteger();
-        var registry = registry(Search.class, String.class, args -> {
+        var jsonTools = jsonTools(Search.class, String.class, args -> {
             calls.incrementAndGet();
             received.set(args);
             return "ok";
         });
-        assertEquals(SUCCESS, registry.execute("test", "{\"label\":\"Pizza\"}").status());
+        assertEquals(SUCCESS, jsonTools.execute("test", "{\"label\":\"Pizza\"}").status());
         assertEquals(new Search("Pizza", Scope.ALL, null), received.get());
-        assertEquals(SUCCESS, registry.execute("test", "{\"label\":\"Pizza\",\"scope\":\"DIRECT\",\"note\":null}").status());
+        assertEquals(SUCCESS, jsonTools.execute("test", "{\"label\":\"Pizza\",\"scope\":\"DIRECT\",\"note\":null}").status());
         assertEquals(new Search("Pizza", Scope.DIRECT, null), received.get());
         for (String input : List.of("{}", "null", " ", "{\"label\":null}",
                 "{\"label\":\"Pizza\",\"scope\":null}",
                 "{\"label\":\"Pizza\",\"scope\":\"WRONG\"}",
                 "{\"label\":\"Pizza\",\"extra\":true}",
                 "{\"label\":\"Pizza\",\"label\":\"Other\"}")) {
-            assertEquals(input, INVALID_INPUT, registry.execute("test", input).status());
+            assertEquals(input, INVALID_INPUT, jsonTools.execute("test", input).status());
         }
         assertEquals(2, calls.get());
-        assertTrue(registry.execute("test", "{\"label\":\"Pizza\",\"scope\":null}").content().contains("scope"));
-        registry.dispose();
+        assertTrue(jsonTools.execute("test", "{\"label\":\"Pizza\",\"scope\":null}").content().contains("scope"));
+        jsonTools.dispose();
     }
 
     @Test
     public void nullableDoesNotMakeAFieldOptional() {
-        var registry = registry(RequiredNullable.class, RequiredNullable.class, args -> args);
-        assertEquals(INVALID_INPUT, registry.execute("test", "{}").status());
-        assertEquals(SUCCESS, registry.execute("test", "{\"note\":null}").status());
-        assertEquals("{\"note\":null}", registry.execute("test", "{\"note\":null}").content());
-        registry.dispose();
+        var jsonTools = jsonTools(RequiredNullable.class, RequiredNullable.class, args -> args);
+        assertEquals(INVALID_INPUT, jsonTools.execute("test", "{}").status());
+        assertEquals(SUCCESS, jsonTools.execute("test", "{\"note\":null}").status());
+        assertEquals("{\"note\":null}", jsonTools.execute("test", "{\"note\":null}").content());
+        jsonTools.dispose();
     }
 
     @Test
     public void nullableDefaultsPreserveExplicitNullAndArraysSupportNullableElements() {
-        var registry = registry(NullableDefault.class, NullableDefault.class, args -> args);
-        assertEquals("{\"scope\":\"ALL\"}", registry.execute("test", "{}").content());
-        assertEquals("{\"scope\":null}", registry.execute("test", "{\"scope\":null}").content());
-        registry.dispose();
-        var arrays = registry(ArrayInput.class, ArrayInput.class, args -> args);
+        var jsonTools = jsonTools(NullableDefault.class, NullableDefault.class, args -> args);
+        assertEquals("{\"scope\":\"ALL\"}", jsonTools.execute("test", "{}").content());
+        assertEquals("{\"scope\":null}", jsonTools.execute("test", "{\"scope\":null}").content());
+        jsonTools.dispose();
+        var arrays = jsonTools(ArrayInput.class, ArrayInput.class, args -> args);
         assertEquals(SUCCESS, arrays.execute("test", "{\"items\":[null,\"text\"]}").status());
         assertEquals(INVALID_INPUT, arrays.execute("test", "{\"items\":null}").status());
         arrays.dispose();
@@ -94,17 +94,17 @@ public class AgentToolValidationTest {
 
     @Test
     public void distinguishesNullableListsFromNullableElementsInBothDirections() {
-        var registry = registry(CollectionsInput.class, CollectionsInput.class, args -> args);
+        var jsonTools = jsonTools(CollectionsInput.class, CollectionsInput.class, args -> args);
         String valid = "{\"items\":[null,\"x\"],\"list\":null,\"nested\":[[null],[]]}";
-        var result = registry.execute("test", valid);
-        assertEquals(result.content() + " " + registry.findSchemas("test").orElseThrow().inputSchema(), SUCCESS, result.status());
+        var result = jsonTools.execute("test", valid);
+        assertEquals(result.content() + " " + jsonTools.findSchemas("test").orElseThrow().inputSchema(), SUCCESS, result.status());
         for (String input : List.of(
                 "{\"items\":null,\"list\":null,\"nested\":[]}",
                 "{\"items\":[],\"list\":[null],\"nested\":[]}",
                 "{\"items\":[],\"list\":[],\"nested\":[null]}")) {
-            assertEquals(input, INVALID_INPUT, registry.execute("test", input).status());
+            assertEquals(input, INVALID_INPUT, jsonTools.execute("test", input).status());
         }
-        registry.dispose();
+        jsonTools.dispose();
     }
 
     public record Child(@JsonProperty(isRequired = OptBoolean.FALSE, defaultValue = "3") int count) {}
@@ -114,18 +114,18 @@ public class AgentToolValidationTest {
     @Test
     public void appliesNestedObjectAndListDefaultsWithoutSharingThemBetweenCalls() {
         var received = new AtomicReference<Parent>();
-        var registry = registry(Parent.class, String.class, args -> {
+        var jsonTools = jsonTools(Parent.class, String.class, args -> {
             received.set(args);
             return "ok";
         });
-        assertEquals(SUCCESS, registry.execute("test", "{}").status());
+        assertEquals(SUCCESS, jsonTools.execute("test", "{}").status());
         Parent first = received.get();
         assertEquals(new Parent(new Child(3), List.of(new Child(3))), first);
         first.children().clear();
-        assertEquals(SUCCESS, registry.execute("test", "{}").status());
+        assertEquals(SUCCESS, jsonTools.execute("test", "{}").status());
         assertEquals(new Parent(new Child(3), List.of(new Child(3))), received.get());
         assertNotSame(first.children(), received.get().children());
-        registry.dispose();
+        jsonTools.dispose();
     }
 
     public static class Bean {
@@ -137,15 +137,15 @@ public class AgentToolValidationTest {
     @Test
     public void validatesRequiredBeanFieldsAndAssignsNullToOmittedOptionalFields() {
         var received = new AtomicReference<Bean>();
-        var registry = registry(Bean.class, String.class, args -> { received.set(args); return "ok"; });
-        assertEquals(INVALID_INPUT, registry.execute("test", "{}").status());
-        assertEquals(SUCCESS, registry.execute("test", "{\"count\":7.0}").status());
+        var jsonTools = jsonTools(Bean.class, String.class, args -> { received.set(args); return "ok"; });
+        assertEquals(INVALID_INPUT, jsonTools.execute("test", "{}").status());
+        assertEquals(SUCCESS, jsonTools.execute("test", "{\"count\":7.0}").status());
         assertNull(received.get().note);
         assertEquals(7, received.get().count);
         for (String value : List.of("7.1", "2147483648", "7.0000000000000001")) {
-            assertEquals(INVALID_INPUT, registry.execute("test", "{\"count\":" + value + "}").status());
+            assertEquals(INVALID_INPUT, jsonTools.execute("test", "{\"count\":" + value + "}").status());
         }
-        registry.dispose();
+        jsonTools.dispose();
     }
 
     public record Strings(List<String> values) {}
@@ -153,12 +153,12 @@ public class AgentToolValidationTest {
 
     @Test
     public void checksReturnedValuesAndNeverRepairsResultsWithDefaults() {
-        var badItems = registry(String.class, Strings.class, args -> new Strings(Arrays.asList("x", null)));
+        var badItems = jsonTools(String.class, Strings.class, args -> new Strings(Arrays.asList("x", null)));
         var result = badItems.execute("test", "\"x\"");
         assertTrue(result instanceof ToolFailure);
         assertEquals(EXECUTION_ERROR, result.status());
         badItems.dispose();
-        var missing = registry(String.class, DefaultResult.class, args -> new DefaultResult(null));
+        var missing = jsonTools(String.class, DefaultResult.class, args -> new DefaultResult(null));
         assertEquals(EXECUTION_ERROR, missing.execute("test", "\"x\"").status());
         missing.dispose();
     }
@@ -177,7 +177,7 @@ public class AgentToolValidationTest {
         for (Class<?> input : List.of(RequiredDefault.class, OptionalWithoutValue.class, BadJson.class,
                 BadEnum.class, BadNull.class, BadNumber.class, NullablePrimitive.class, RecursiveDefault.class)) {
             var created = new AtomicInteger();
-            var registry = new AgentToolRegistry(List.of(new AgentToolSource<Object, String>() {
+            var jsonTools = new AgentToolJsonService(List.of(new AgentToolSource<Object, String>() {
                 public String getId() { return "test.invalid"; }
                 @SuppressWarnings("unchecked")
                 public AgentToolDefinition<Object, String> getDefinition() {
@@ -186,19 +186,19 @@ public class AgentToolValidationTest {
                 public AgentTool<Object, String> newInstance() { created.incrementAndGet(); return new ToolStub<>(getDefinition(), args -> "ok"); }
             }));
             assertEquals(input.getName(), 0, created.get());
-            assertTrue(input.getName(), registry.listTools().isEmpty());
-            registry.dispose();
+            assertTrue(input.getName(), jsonTools.registry().listTools().isEmpty());
+            jsonTools.dispose();
         }
     }
 
     @Test
     public void discoveryAdvertisesTheSameOptionalDefaultAndNullRules() throws Exception {
-        var registry = registry(Search.class, String.class, args -> "ok");
-        var schema = new ObjectMapper().readTree(registry.findSchemas("test").orElseThrow().inputSchema());
+        var jsonTools = jsonTools(Search.class, String.class, args -> "ok");
+        var schema = new ObjectMapper().readTree(jsonTools.findSchemas("test").orElseThrow().inputSchema());
         assertEquals("[\"label\"]", schema.get("required").toString());
         assertEquals("ALL", schema.at("/properties/scope/default").asText());
         assertTrue(schema.at("/properties/note/type").toString().contains("null"));
-        registry.dispose();
+        jsonTools.dispose();
     }
 
     @Test
@@ -207,9 +207,9 @@ public class AgentToolValidationTest {
         ClassLoader previous = thread.getContextClassLoader();
         try {
             thread.setContextClassLoader(new ClassLoader(null) {});
-            var registry = registry(Search.class, String.class, args -> "ok");
-            assertEquals(SUCCESS, registry.execute("test", "{\"label\":\"Pizza\"}").status());
-            registry.dispose();
+            var jsonTools = jsonTools(Search.class, String.class, args -> "ok");
+            assertEquals(SUCCESS, jsonTools.execute("test", "{\"label\":\"Pizza\"}").status());
+            jsonTools.dispose();
         } finally {
             thread.setContextClassLoader(previous);
         }

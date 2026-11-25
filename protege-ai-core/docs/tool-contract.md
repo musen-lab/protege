@@ -2,9 +2,11 @@
 
 [Back to the registry guide](../README.md)
 
-Core describes Java types as JSON Schemas, checks input, and converts it into Java
-objects. After a tool returns, core converts its result to JSON and checks that too.
-Tool authors do not maintain separate schemas.
+These rules apply to calls through `JsonToolService`. It describes Java types as
+JSON Schemas, checks input, and converts it into Java objects. After a tool returns,
+it converts the result to JSON and checks that too. Tool authors do not maintain
+separate schemas. Direct Java calls through `ToolRegistry` check only the declared
+input and result classes.
 
 ## Supported types
 
@@ -22,8 +24,9 @@ and `BigDecimal`. Use wrapper classes for a whole input or result; primitives
 are supported within records, beans, and arrays.
 
 Maps, untyped `Object` values, raw lists, `byte[]`, `char[]`, other OWL types, and
-custom Jackson conversions are not supported. Core rejects unsupported types
-when the tool registers and logs the source and reason.
+custom Jackson conversions are not supported. The JSON service rejects unsupported
+types before the tool is constructed. Registration logs the source and reason. Desktop registration
+always includes this check; a standalone Java registry does not require JSON support.
 
 ## Required fields, defaults, and nulls
 
@@ -97,7 +100,7 @@ lists, and arrays. The successful response retains the original Java result.
   Core enforces these for input, output, and defaults.
 
 Tests can supply a plain OWL API factory through
-`new AgentToolRegistry(sources, dataFactory)`, without an editor kit.
+`new AgentToolJsonService(sources, dataFactory)`, without an editor kit.
 The one-argument constructor uses OWL API's default factory.
 
 ## Result types
@@ -111,8 +114,8 @@ status, code, message, and field details without a successful value or JSON resu
 
 ## Validation and failures
 
-For each call, core applies input defaults, validates the JSON, constructs the
-Java arguments, and invokes the tool once. It then serializes and validates the
+For each JSON call, the service applies input defaults, validates the JSON,
+constructs the Java arguments, and invokes the tool once. It then serializes and validates the
 result. Only a valid result becomes `Success`, containing the object and JSON.
 
 Input checks reject missing required fields, disallowed nulls, unknown fields,
@@ -122,8 +125,8 @@ are rejected. A successful result cannot be null.
 
 | Status | Meaning |
 | --- | --- |
-| `SUCCESS` | The result object and validated JSON are available. |
-| `INVALID_INPUT` | Input parsing, validation, or conversion failed. The tool was not invoked. |
+| `SUCCESS` | The Java result is available, plus validated JSON for JSON calls. |
+| `INVALID_INPUT` | The argument type or JSON input was invalid. The tool was not invoked. |
 | `NO_SUCH_TOOL` | The registry has no tool with that name. |
 | `TOOL_ERROR` | The tool reported an expected failure through `AgentToolException`. |
 | `EXECUTION_ERROR` | An unexpected exception occurred, or the result could not be serialized or validated. |
@@ -165,8 +168,8 @@ Update imports and constructor calls that previously used `AgentToolResult.Failu
   creating its tool. The log names both sources.
 - A failed source keeps its claimed name. A later duplicate cannot replace it;
   tools with other names can still load.
-- Core checks both schemas and defaults before constructing a tool. A mismatch
-  between the factory's and tool's definitions is rejected before `initialise()`.
+- The JSON service checks schemas and defaults before constructing a tool. A
+  mismatch between factory and tool definitions is rejected before `initialise()`.
 - Generated schemas use draft 2020-12 and are cached for the registered tool.
 
 Core uses VicTools with the invocation mapper to generate schemas, and NetworkNT
@@ -188,7 +191,13 @@ tool requirement should guide any future converter API.
 
 ## Updating older plugins
 
-Rebuild against the current API. Tools must return their shared definition from
+Rebuild against the current API. Obtain the registry with
+`AgentToolServices.getRegistry(editorKit)` and the JSON service with
+`AgentToolServices.getJsonTools(editorKit)`. Move JSON calls and `findSchemas` to
+the JSON service. `ToolRegistry.execute` now accepts Java arguments and returns
+`ToolExecutionResult`.
+
+Tools must return their shared definition from
 `getDefinition()`. Code constructing responses must use `Success` or `ToolFailure`
-instead of `new AgentToolResult(status, content)`. Callers can still use
+instead of `new AgentToolResult(status, content)`. JSON callers can still use
 `status()`, `isSuccess()`, and `content()`.

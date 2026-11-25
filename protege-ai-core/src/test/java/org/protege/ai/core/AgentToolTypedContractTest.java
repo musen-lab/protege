@@ -47,7 +47,7 @@ public class AgentToolTypedContractTest {
         var received = new AtomicReference<Arguments>();
         var returned = new AtomicReference<Result>();
         var calls = new AtomicInteger();
-        var registry = new AgentToolRegistry(List.of(source(DEFINITION, arguments -> {
+        var jsonTools = new AgentToolJsonService(List.of(source(DEFINITION, arguments -> {
             calls.incrementAndGet();
             received.set(arguments);
             var result = new Result(List.of(new Match(arguments.name())));
@@ -55,7 +55,7 @@ public class AgentToolTypedContractTest {
             return result;
         })));
 
-        var result = registry.execute("find", "{\"label\":\"Pizza\",\"scope\":\"DIRECT\"}");
+        var result = jsonTools.execute("find", "{\"label\":\"Pizza\",\"scope\":\"DIRECT\"}");
 
         assertEquals(SUCCESS, result.status());
         assertTrue(result instanceof AgentToolResult.Success<?>);
@@ -66,9 +66,9 @@ public class AgentToolTypedContractTest {
         assertEquals(new Arguments("Pizza", Scope.DIRECT), received.get());
         var mapper = new ObjectMapper();
         assertEquals(mapper.readTree("{\"matches\":[{\"label\":\"Pizza\"}]}"), mapper.readTree(result.content()));
-        assertSame(Arguments.class, registry.findTool("find").orElseThrow().argumentType());
-        assertSame(Result.class, registry.findTool("find").orElseThrow().resultType());
-        registry.dispose();
+        assertSame(Arguments.class, jsonTools.registry().findTool("find").orElseThrow().argumentType());
+        assertSame(Result.class, jsonTools.registry().findTool("find").orElseThrow().resultType());
+        jsonTools.dispose();
         assertEquals(List.of(new Match("Pizza")), ((Result) success.value()).matches());
     }
 
@@ -87,16 +87,16 @@ public class AgentToolTypedContractTest {
     public void retainsOriginalBeanAndSerializesItOnlyOnce() {
         var definition = new AgentToolDefinition<>("bean", "Return a bean", String.class, ReadOnceResult.class);
         var original = new ReadOnceResult();
-        var registry = new AgentToolRegistry(List.of(source(definition, input -> original)));
+        var jsonTools = new AgentToolJsonService(List.of(source(definition, input -> original)));
         try {
-            var result = registry.execute("bean", "\"input\"");
+            var result = jsonTools.execute("bean", "\"input\"");
             assertTrue(result.content(), result instanceof AgentToolResult.Success<?>);
             var success = (AgentToolResult.Success<?>) result;
             assertSame(original, success.value());
             assertEquals("{\"value\":\"value\"}", success.json());
             assertEquals(1, original.reads);
         } finally {
-            registry.dispose();
+            jsonTools.dispose();
         }
     }
 
@@ -118,7 +118,7 @@ public class AgentToolTypedContractTest {
     @Test
     public void rejectsMalformedOrMismatchedArgumentsBeforeToolExecution() {
         var calls = new AtomicInteger();
-        var registry = new AgentToolRegistry(List.of(source(DEFINITION, arguments -> {
+        var jsonTools = new AgentToolJsonService(List.of(source(DEFINITION, arguments -> {
             calls.incrementAndGet();
             return new Result(List.of());
         })));
@@ -134,13 +134,13 @@ public class AgentToolTypedContractTest {
                 "{\"label\":\"Pizza\",\"scope\":0}",
                 "{\"label\":\"Pizza\",\"scope\":\"ALL\",\"extra\":true}",
                 "{\"label\":\"Pizza\",\"scope\":\"ALL\"} {}")) {
-            assertEquals(input, INVALID_INPUT, registry.execute("find", input).status());
+            assertEquals(input, INVALID_INPUT, jsonTools.execute("find", input).status());
         }
         assertEquals(0, calls.get());
         assertEquals("{\"matches\":[]}",
-                registry.execute("find", "{\"label\":\"Pizza\",\"scope\":\"ALL\"}").content());
+                jsonTools.execute("find", "{\"label\":\"Pizza\",\"scope\":\"ALL\"}").content());
         assertEquals(1, calls.get());
-        registry.dispose();
+        jsonTools.dispose();
     }
 
     public record CountArguments(int count) {}
@@ -150,32 +150,32 @@ public class AgentToolTypedContractTest {
     @Test
     public void keepsDifferentToolContractsSeparate() {
         var count = new AgentToolDefinition<>("count", "Return a count", CountArguments.class, CountResult.class);
-        var registry = new AgentToolRegistry(List.of(
+        var jsonTools = new AgentToolJsonService(List.of(
                 source(DEFINITION, arguments -> new Result(List.of())),
                 source(count, arguments -> new CountResult(arguments.count()))));
 
-        assertEquals("{\"count\":7}", registry.execute("count", "{\"count\":7}").content());
-        assertEquals(INVALID_INPUT, registry.execute("count", "{\"count\":\"7\"}").status());
-        assertEquals(INVALID_INPUT, registry.execute("count", "{\"count\":7.5}").status());
-        assertEquals(INVALID_INPUT, registry.execute("count", "{\"count\":null}").status());
-        assertEquals(INVALID_INPUT, registry.execute("find", "{\"count\":7}").status());
-        assertEquals(List.of(DEFINITION, count), registry.listTools());
-        registry.dispose();
+        assertEquals("{\"count\":7}", jsonTools.execute("count", "{\"count\":7}").content());
+        assertEquals(INVALID_INPUT, jsonTools.execute("count", "{\"count\":\"7\"}").status());
+        assertEquals(INVALID_INPUT, jsonTools.execute("count", "{\"count\":7.5}").status());
+        assertEquals(INVALID_INPUT, jsonTools.execute("count", "{\"count\":null}").status());
+        assertEquals(INVALID_INPUT, jsonTools.execute("find", "{\"count\":7}").status());
+        assertEquals(List.of(DEFINITION, count), jsonTools.registry().listTools());
+        jsonTools.dispose();
     }
 
     @Test
     public void nullResultIsAnExecutionFailureAndReleasesTheTool() {
         var disposed = new AtomicInteger();
-        var registry = new AgentToolRegistry(List.of(source(DEFINITION, new AgentTool<Arguments, Result>() {
+        var jsonTools = new AgentToolJsonService(List.of(source(DEFINITION, new AgentTool<Arguments, Result>() {
             public AgentToolDefinition<Arguments, Result> getDefinition() { return DEFINITION; }
             public Result execute(Arguments arguments) { return null; }
             public void dispose() { disposed.incrementAndGet(); }
         })));
 
-        var result = registry.execute("find", "{\"label\":\"Pizza\",\"scope\":\"ALL\"}");
+        var result = jsonTools.execute("find", "{\"label\":\"Pizza\",\"scope\":\"ALL\"}");
         assertTrue(result instanceof ToolFailure);
         assertEquals(EXECUTION_ERROR, result.status());
-        registry.dispose();
+        jsonTools.dispose();
         assertEquals(1, disposed.get());
     }
 
@@ -186,12 +186,12 @@ public class AgentToolTypedContractTest {
     @Test
     public void serializationFailureIsAnExecutionFailure() {
         var definition = new AgentToolDefinition<>("broken", "Broken result", Arguments.class, BrokenResult.class);
-        var registry = new AgentToolRegistry(List.of(source(definition, arguments -> new BrokenResult())));
+        var jsonTools = new AgentToolJsonService(List.of(source(definition, arguments -> new BrokenResult())));
 
-        var result = registry.execute("broken", "{\"label\":\"Pizza\",\"scope\":\"ALL\"}");
+        var result = jsonTools.execute("broken", "{\"label\":\"Pizza\",\"scope\":\"ALL\"}");
         assertTrue(result instanceof ToolFailure);
         assertEquals(EXECUTION_ERROR, result.status());
-        registry.dispose();
+        jsonTools.dispose();
     }
 
     @Test

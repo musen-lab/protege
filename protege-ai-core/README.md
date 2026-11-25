@@ -1,8 +1,9 @@
 # Agent tools
 
 Plugins contribute tools. Agents discover and call them through a registry.
-Each ontology window has its own registry and tool instances. Core handles JSON
-conversion and validation; tools work with Java objects.
+Each ontology window has its own registry and tool instances. Tools work with
+Java objects. A separate JSON service handles schemas, conversion, and validation
+for agents that exchange JSON with a model.
 
 | Module | Purpose |
 | --- | --- |
@@ -56,18 +57,19 @@ See [failure handling](docs/tool-contract.md#validation-and-failures).
 
 ## Call a tool
 
-Obtain the registry on the Swing thread, normally in a hook's `initialise()`, and
-keep the reference. The editor kit stores it in the model manager's unsynchronized
-map, which Protégé writes on the Swing thread.
+Obtain the services on the Swing thread, normally in a hook's `initialise()`, and
+keep the references. The editor kit stores them in the model manager's
+unsynchronized map, which Protégé writes on the Swing thread.
 
 ```java
-ToolRegistry registry = AgentToolRegistry.getRegistry(editorKit);
+ToolRegistry registry = AgentToolServices.getRegistry(editorKit);
+JsonToolService jsonTools = AgentToolServices.getJsonTools(editorKit);
 ```
 
 Calls run on the caller's thread. Run expensive tools on a worker thread:
 
 ```java
-AgentToolResult result = registry.execute("example_ontology_counts", "{}");
+AgentToolResult result = jsonTools.execute("example_ontology_counts", "{}");
 
 String modelText = result.content(); // JSON on success, error message on failure.
 if (result instanceof AgentToolResult.Success<?> success) {
@@ -86,18 +88,23 @@ A call by name can return different Java types; check the value's type before
 using tool-specific fields. See [failure statuses](docs/tool-contract.md#validation-and-failures)
 for the distinction between invalid input, expected failures, and unexpected errors.
 
-For discovery, use `listTools()` or `findTool(name)`. To describe a tool to a model,
-use `findSchemas(name)` for its generated input and output JSON Schemas.
-Agents can depend on `protege-ai-api`; desktop code uses core to obtain the registry.
+For discovery, use `registry.listTools()` or `registry.findTool(name)`. Get the
+generated input and output JSON Schemas from `jsonTools.findSchemas(name)`.
+Agents can depend on `protege-ai-api`; desktop code uses core to obtain the services.
+
+Already have Java arguments? Call `registry.execute(name, arguments)`. It returns
+`ToolExecutionResult.Success` with the Java result, or the same `ToolFailure` type.
+This path checks the declared Java input and result classes. It does not apply
+JSON schemas, field validation, or defaults. Both paths use the same tool instances.
 
 ## Lifetime and threading
 
 | When | What happens |
 | --- | --- |
-| A window opens | A hook creates its registry. `getRegistry` also creates it if requested before that hook runs. |
+| A window opens | A hook creates its registry and JSON service. Either getter also creates the pair if called before the hook. |
 | A tool loads | Its factory creates a tool, and core calls `initialise()`. |
 | The active ontology changes | The registry and tools stay alive. Tools must resolve the current ontology when called. |
-| The window closes | Core rejects new calls and disposes idle tools. Running tools are disposed after their last call returns. |
+| The window closes | Core rejects new calls and disposes idle tools. Busy tools are disposed when their last call finishes, including JSON conversion. |
 
 - Each window gets its own factory and tool instances. Static fields are shared
   across windows, so keep window-specific state in instance fields.

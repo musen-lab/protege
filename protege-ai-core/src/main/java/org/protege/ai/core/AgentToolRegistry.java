@@ -3,16 +3,11 @@ package org.protege.ai.core;
 import org.protege.ai.api.AgentTool;
 import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolException;
-import org.protege.ai.api.AgentToolResult;
-import org.protege.ai.api.AgentToolSchemas;
 import org.protege.ai.api.AgentToolSource;
 import org.protege.ai.api.ToolRegistry;
 import org.protege.ai.api.ToolFailure;
-import org.protege.ai.core.plugin.AgentToolPluginLoader;
+import org.protege.ai.api.ToolExecutionResult;
 import org.protege.editor.core.Disposable;
-import org.protege.editor.owl.OWLEditorKit;
-import org.semanticweb.owlapi.apibinding.OWLManager;
-import org.semanticweb.owlapi.model.OWLDataFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,6 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import static org.protege.ai.api.ToolStatus.*;
 
@@ -30,62 +26,34 @@ import static org.protege.ai.api.ToolStatus.*;
 public final class AgentToolRegistry implements ToolRegistry, Disposable {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentToolRegistry.class);
-    private static final String KEY = "org.protege.ai.core.AgentToolRegistry";
-    private static final Object REGISTRY_CREATION_LOCK = new Object();
 
     private static final class Entry<I, O> {
         final String sourceId;
         final AgentToolDefinition<I, O> definition;
         final AgentTool<I, O> tool;
-        final ToolJsonCodec<I, O> codec;
         int inFlight;
 
-        Entry(String sourceId, AgentToolDefinition<I, O> definition, AgentTool<I, O> tool,
-              ToolJsonCodec<I, O> codec) {
+        Entry(String sourceId, AgentToolDefinition<I, O> definition, AgentTool<I, O> tool) {
             this.sourceId = sourceId;
             this.definition = definition;
             this.tool = tool;
-            this.codec = codec;
         }
     }
 
     private final Map<String, Entry<?, ?>> tools = new LinkedHashMap<>();
     private final Map<String, String> claimedNames = new LinkedHashMap<>();
-    private final OWLDataFactory dataFactory;
+    private final Consumer<AgentToolDefinition<?, ?>> checkDefinition;
     private boolean disposed;
 
     public AgentToolRegistry(Iterable<? extends AgentToolSource<?, ?>> sources) {
-        this(sources, OWLManager.getOWLDataFactory());
+        this(sources, definition -> {});
     }
 
-    /** Creates a registry with a supplied OWL factory, without requiring an editor kit. */
-    public AgentToolRegistry(Iterable<? extends AgentToolSource<?, ?>> sources, OWLDataFactory dataFactory) {
-        this.dataFactory = Objects.requireNonNull(dataFactory);
+    // The desktop wiring supplies its contract check without making the registry depend on a format.
+    AgentToolRegistry(Iterable<? extends AgentToolSource<?, ?>> sources,
+                      Consumer<AgentToolDefinition<?, ?>> checkDefinition) {
+        this.checkDefinition = Objects.requireNonNull(checkDefinition);
         sources.forEach(this::register);
-    }
-
-    /**
-     * Returns the window's registry, creating it if necessary.
-     * Call on the Swing thread, normally from an editor-kit hook's {@code initialise()},
-     * and keep the returned reference for later use.
-     * The editor kit forwards put/get to the model manager's unsynchronized map,
-     * which Protégé writes on the Swing thread.
-     */
-    public static AgentToolRegistry getRegistry(OWLEditorKit editorKit) {
-        Objects.requireNonNull(editorKit);
-        synchronized (REGISTRY_CREATION_LOCK) {
-            Disposable existing = editorKit.get(KEY);
-            if (existing instanceof AgentToolRegistry registry) {
-                return registry;
-            }
-            AgentToolRegistry registry = new AgentToolRegistry(List.of(),
-                    editorKit.getOWLModelManager().getOWLDataFactory());
-            editorKit.put(KEY, registry);
-            new AgentToolPluginLoader(editorKit).getPlugins().stream()
-                    .sorted(java.util.Comparator.comparing(AgentToolSource::getId))
-                    .forEach(registry::register);
-            return registry;
-        }
     }
 
     /** Rejects duplicate names before constructing the second tool. */
@@ -104,13 +72,13 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
                         definition.name(), sourceId, previous);
                 return false;
             }
-            ToolJsonCodec<I, O> codec = new ToolJsonCodec<>(definition, dataFactory);
+            checkDefinition.accept(definition);
             tool = Objects.requireNonNull(source.newInstance(), "Tool factory returned null");
             if (!definition.equals(tool.getDefinition())) {
                 throw new IllegalArgumentException("Tool definition does not match its factory's definition");
             }
             tool.initialise();
-            tools.put(definition.name(), new Entry<>(sourceId, definition, tool, codec));
+            tools.put(definition.name(), new Entry<>(sourceId, definition, tool));
             return true;
         } catch (Exception | LinkageError e) {
             logger.warn("Could not load tool from '{}'", sourceId, e);
@@ -131,17 +99,24 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
         return Optional.ofNullable(tools.get(name)).map(entry -> entry.definition);
     }
 
+    /** Checks Java argument/result types and invokes synchronously. Does not apply schema rules or defaults. */
     @Override
-    public synchronized Optional<AgentToolSchemas> findSchemas(String name) {
-        return Optional.ofNullable(tools.get(name)).map(entry -> entry.codec.schemas());
+    public ToolExecutionResult execute(String name, Object arguments) {
+        return execute(name, definition -> arguments, (definition, result) -> result);
     }
 
-    /** Validates and invokes on the caller's thread, without timeouts, cancellation or rollback. */
-    @Override
-    public AgentToolResult execute(String name, String input) {
-        if (input == null) {
-            return new ToolFailure(INVALID_INPUT, "Tool input must not be null");
-        }
+    @FunctionalInterface
+    interface ArgumentReader {
+        Object read(AgentToolDefinition<?, ?> definition) throws Exception;
+    }
+
+    @FunctionalInterface
+    interface ResultProcessor {
+        Object process(AgentToolDefinition<?, ?> definition, Object result) throws Exception;
+    }
+
+    // Keep the tool in flight through input preparation and result processing, outside the registry lock.
+    ToolExecutionResult execute(String name, ArgumentReader reader, ResultProcessor processor) {
         Entry<?, ?> entry;
         synchronized (this) {
             if (disposed) {
@@ -154,8 +129,15 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
             entry.inFlight++;
         }
         try {
-            return invoke(entry, input);
-        } catch (ToolJsonCodec.InvalidInputException e) {
+            Object arguments = reader.read(entry.definition);
+            if (!entry.definition.argumentType().isInstance(arguments)) {
+                return new ToolFailure(INVALID_INPUT, "Arguments must be a non-null "
+                        + entry.definition.argumentType().getSimpleName());
+            }
+            Object result = invoke(entry, arguments);
+            Object processed = processor.process(entry.definition, result);
+            return new ToolExecutionResult.Success<>(processed);
+        } catch (InvalidToolArgumentsException e) {
             return new ToolFailure(INVALID_INPUT, e.getMessage(), INVALID_INPUT.name(), e.details());
         } catch (AgentToolException e) {
             return new ToolFailure(TOOL_ERROR, e.getMessage(), e.code(), e.details());
@@ -203,11 +185,10 @@ public final class AgentToolRegistry implements ToolRegistry, Disposable {
         }
     }
 
-    private static <I, O> AgentToolResult invoke(Entry<I, O> entry, String input) throws Exception {
-        I arguments = entry.codec.readArguments(input);
-        O result = entry.tool.execute(arguments);
-        String json = entry.codec.writeResult(result);
-        return new AgentToolResult.Success<>(result, json);
+    private static <I, O> O invoke(Entry<I, O> entry, Object arguments) throws Exception {
+        I input = entry.definition.argumentType().cast(arguments);
+        O result = entry.tool.execute(input);
+        return entry.definition.resultType().cast(Objects.requireNonNull(result, "Tool returned null"));
     }
 
     private static void disposeTool(AgentTool<?, ?> tool, String sourceId) {

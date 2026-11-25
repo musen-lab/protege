@@ -18,7 +18,7 @@ import org.junit.Test;
 import org.protege.ai.api.AgentTool;
 import org.protege.ai.api.AgentToolDefinition;
 import org.protege.ai.api.AgentToolSource;
-import org.protege.ai.api.ToolRegistry;
+import org.protege.ai.api.JsonToolService;
 import org.semanticweb.owlapi.model.OWLClassExpression;
 import org.slf4j.LoggerFactory;
 
@@ -65,9 +65,9 @@ public class AgentToolSchemaTest {
 
     @Test
     public void schemasDescribeTheSameNamesEnumsAndNestedValuesAsInvocation() throws Exception {
-        var registry = new AgentToolRegistry(List.of(source(Arguments.class, Result.class,
+        var jsonTools = new AgentToolJsonService(List.of(source(Arguments.class, Result.class,
                 args -> new Result(args.matches(), args.scope()))));
-        ToolRegistry api = registry;
+        JsonToolService api = jsonTools;
         var schemas = api.findSchemas("test").orElseThrow();
         var input = checkedSchema(schemas.inputSchema());
         var output = checkedSchema(schemas.outputSchema());
@@ -84,15 +84,15 @@ public class AgentToolSchemaTest {
         }
         assertSame(schemas, api.findSchemas("test").orElseThrow());
         assertTrue(api.findSchemas("missing").isEmpty());
-        registry.dispose();
+        jsonTools.dispose();
         assertTrue(api.findSchemas("test").isEmpty());
     }
 
     @Test
     public void schemasRequireFieldsAndExcludeNullsUnknownFieldsAndWrongValues() throws Exception {
-        var registry = new AgentToolRegistry(List.of(source(Arguments.class, Result.class,
+        var jsonTools = new AgentToolJsonService(List.of(source(Arguments.class, Result.class,
                 args -> new Result(args.matches(), args.scope()))));
-        var schemas = registry.findSchemas("test").orElseThrow();
+        var schemas = jsonTools.findSchemas("test").orElseThrow();
         var input = checkedSchema(schemas.inputSchema());
         for (String json : List.of("null", "{}",
                 "{\"label\":null,\"scope\":\"ALL\",\"matches\":[]}",
@@ -106,7 +106,7 @@ public class AgentToolSchemaTest {
         var output = checkedSchema(schemas.outputSchema());
         assertTrue(output.validate(mapper.readTree("{\"matches\":[],\"scope\":\"ALL\"}")).isEmpty());
         assertFalse(output.validate(mapper.readTree("{\"matches\":[null],\"scope\":\"ALL\"}")).isEmpty());
-        registry.dispose();
+        jsonTools.dispose();
     }
 
     public static class CountBean {
@@ -123,7 +123,7 @@ public class AgentToolSchemaTest {
 
     @Test
     public void supportsBeanInputsComputedResultsAndRecursiveRecords() throws Exception {
-        var beans = new AgentToolRegistry(List.of(source(CountBean.class, ComputedResult.class,
+        var beans = new AgentToolJsonService(List.of(source(CountBean.class, ComputedResult.class,
                 args -> new ComputedResult())));
         var schemas = beans.findSchemas("test").orElseThrow();
         String json = "{\"count\":3}";
@@ -134,7 +134,7 @@ public class AgentToolSchemaTest {
         assertEquals("integer", mapper.readTree(schemas.outputSchema()).at("/properties/count/type").asText());
         beans.dispose();
 
-        var recursive = new AgentToolRegistry(List.of(source(Node.class, Node.class, args -> args)));
+        var recursive = new AgentToolJsonService(List.of(source(Node.class, Node.class, args -> args)));
         schemas = recursive.findSchemas("test").orElseThrow();
         json = "{\"label\":\"root\",\"children\":[{\"label\":\"leaf\",\"children\":[]}]}";
         assertTrue(checkedSchema(schemas.inputSchema()).validate(mapper.readTree(json)).isEmpty());
@@ -146,17 +146,17 @@ public class AgentToolSchemaTest {
 
     @Test
     public void supportsEmptyRecordsAndBeanProperties() throws Exception {
-        var registry = new AgentToolRegistry(List.of(source(Empty.class, CountBean.class, args -> new CountBean())));
-        var schemas = registry.findSchemas("test").orElseThrow();
+        var jsonTools = new AgentToolJsonService(List.of(source(Empty.class, CountBean.class, args -> new CountBean())));
+        var schemas = jsonTools.findSchemas("test").orElseThrow();
         var input = checkedSchema(schemas.inputSchema());
         assertTrue(input.validate(mapper.readTree("{}")).isEmpty());
         assertFalse(input.validate(mapper.readTree("{\"extra\":true}")).isEmpty());
-        var result = registry.execute("test", "{}");
+        var result = jsonTools.execute("test", "{}");
         assertTrue(result.isSuccess());
         var failures = checkedSchema(schemas.outputSchema()).validate(mapper.readTree(result.content()));
         assertTrue(failures.toString(), failures.isEmpty());
         assertEquals("integer", mapper.readTree(schemas.outputSchema()).at("/properties/count/type").asText());
-        registry.dispose();
+        jsonTools.dispose();
     }
 
     public record UnsupportedNested(List<OWLClassExpression> classes) {}
@@ -196,8 +196,8 @@ public class AgentToolSchemaTest {
     }
 
     private <I, O> void assertRejected(Class<I> input, Class<O> output, AtomicInteger constructed) {
-        var registry = new AgentToolRegistry(List.of());
-        assertFalse(input + " / " + output, registry.register(new AgentToolSource<I, O>() {
+        var jsonTools = new AgentToolJsonService(List.of());
+        assertFalse(input + " / " + output, jsonTools.registry().register(new AgentToolSource<I, O>() {
             public String getId() { return "test.unsupported"; }
             public AgentToolDefinition<I, O> getDefinition() {
                 return new AgentToolDefinition<>("test", "Unsupported", input, output);
@@ -207,8 +207,8 @@ public class AgentToolSchemaTest {
                 return new ToolStub<>(getDefinition(), args -> null);
             }
         }));
-        assertTrue(registry.listTools().isEmpty());
-        assertTrue(registry.findSchemas("test").isEmpty());
-        registry.dispose();
+        assertTrue(jsonTools.registry().listTools().isEmpty());
+        assertTrue(jsonTools.findSchemas("test").isEmpty());
+        jsonTools.dispose();
     }
 }
