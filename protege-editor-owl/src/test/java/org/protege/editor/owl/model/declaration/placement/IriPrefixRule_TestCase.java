@@ -57,8 +57,8 @@ public class IriPrefixRule_TestCase {
     @Test
     public void shouldReadTheOntologyIriRatherThanTheVersionIri() throws Exception {
         OWLOntology versioned = manager.createOntology(new OWLOntologyID(
-                com.google.common.base.Optional.of(IRI.create("http://example.org/versioned")),
-                com.google.common.base.Optional.of(IRI.create("http://example.org/versioned/2026-09-09"))));
+                IRI.create("http://example.org/versioned"),
+                IRI.create("http://example.org/versioned/2026-09-09")));
 
         assertOwner(versioned, clazz("http://example.org/versioned#Term"), versioned);
     }

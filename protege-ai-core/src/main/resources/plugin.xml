@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.0"?>
+<plugin>
+    <extension-point id="AgentTool" name="Agent tool" schema="schema/AgentTool.exsd"/>
+    <extension id="AgentToolRegistryInitializer" point="org.protege.editor.core.application.EditorKitHook">
+        <class value="org.protege.ai.core.AgentToolRegistryInitializer"/>
+        <editorKitId value="OWLEditorKit"/>
+    </extension>
+</plugin>

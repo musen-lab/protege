@@ -88,6 +88,9 @@
 		<module>protege-common</module>
 		<module>protege-editor-core</module>
 		<module>protege-editor-owl</module>
+		<module>protege-ai-api</module>
+		<module>protege-ai-core</module>
+		<module>protege-ai-example</module>
 		<module>protege-desktop</module>
 	</modules>
 	
@@ -138,11 +141,18 @@
 		<slf4j.version>1.7.36</slf4j.version>
 		<logback.version>1.2.13</logback.version>
 		<lib.location>target/lib</lib.location>
-		<jackson.version>2.9.8</jackson.version>
+		<jackson.version>2.21.8</jackson.version>
 	</properties>
 
 	<dependencyManagement>
 		<dependencies>
+			<dependency>
+				<groupId>com.fasterxml.jackson</groupId>
+				<artifactId>jackson-bom</artifactId>
+				<version>${jackson.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
 
 			<dependency>
 				<groupId>net.sourceforge.owlapi</groupId>
